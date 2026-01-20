@@ -58,9 +58,6 @@ public class User {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private AdminProfile adminProfile;
 
-    // Relationship to wallet (one-to-one) - created during user registration
-    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Wallet wallet;
 
     @PrePersist
     protected void onCreate() {

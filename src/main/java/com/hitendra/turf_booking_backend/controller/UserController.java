@@ -26,13 +26,6 @@ public class UserController {
     @Autowired
     private BookingService bookingService;
 
-    @PostMapping("/setname")
-    @Operation(summary = "Set user name", description = "Set name for a new user")
-    public ResponseEntity<String> setName(
-            @RequestBody UserDto userDto
-            ) {
-        return ResponseEntity.ok(userService.setNewUserName(userDto));
-    }
 
     @GetMapping("/bookings")
     @Operation(summary = "Get user bookings",

@@ -323,14 +323,14 @@ public class DataInitializer implements CommandLineRunner {
     private void initializeSampleData() {
         log.info("Initializing sample data...");
 
-        // Create manager user with wallet using UserRegistrationService
-        User manager = userRegistrationService.registerNewUserWithWallet("+919460629707");
+        // Create manager user using UserRegistrationService
+        User manager = userRegistrationService.registerNewUser("+919460629707");
         manager.setRole(Role.MANAGER);
         manager.setName("System Manager");
         manager.setEmail("manager@ezturf.com");
         manager.setEnabled(true);
         userRepository.save(manager);
-        log.info("Created manager user with wallet: {}", manager.getPhone());
+        log.info("Created manager user: {}", manager.getPhone());
 
         // Create 10 sample admins
         initializeAdmins();
@@ -341,7 +341,7 @@ public class DataInitializer implements CommandLineRunner {
     */
 
     /**
-     * Initialize 10 sample admins with profiles and wallets
+     * Initialize 10 sample admins with profiles
      */
     /*
     private void initializeAdmins() {
@@ -361,8 +361,8 @@ public class DataInitializer implements CommandLineRunner {
         };
 
         for (String[] data : adminData) {
-            // Create User with wallet using UserRegistrationService
-            User adminUser = userRegistrationService.registerNewUserWithWallet(data[1]);
+            // Create User using UserRegistrationService
+            User adminUser = userRegistrationService.registerNewUser(data[1]);
             adminUser.setName(data[0]);
             adminUser.setEmail(data[2]);
             adminUser.setRole(Role.ADMIN);
@@ -379,10 +379,10 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             adminProfileRepository.save(adminProfile);
 
-            log.info("Created admin with wallet: {} - {}", adminUser.getName(), adminUser.getPhone());
+            log.info("Created admin: {} - {}", adminUser.getName(), adminUser.getPhone());
         }
 
-        log.info("Successfully created 10 sample admins with wallets");
+        log.info("Successfully created 10 sample admins");
     }
     */
 

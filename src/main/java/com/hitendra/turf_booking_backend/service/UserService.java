@@ -105,15 +105,6 @@ public class UserService {
                 .cancelledBookings(cancelledBookings)
                 .build();
 
-        // Add wallet information if available
-        if (user.getWallet() != null) {
-            UserInfoDto.WalletInfo walletInfo = UserInfoDto.WalletInfo.builder()
-                    .walletId(user.getWallet().getId())
-                    .balance(user.getWallet().getBalance())
-                    .status(user.getWallet().getStatus().name())
-                    .build();
-            dto.setWallet(walletInfo);
-        }
 
         return dto;
     }

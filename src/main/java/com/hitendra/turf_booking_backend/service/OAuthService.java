@@ -25,7 +25,6 @@ public class OAuthService {
     private final OAuthTokenValidationService tokenValidationService;
     private final UserRepository userRepository;
     private final JwtUtils jwtUtils;
-    private final UserRegistrationService userRegistrationService;
 
     /**
      * Handle OAuth login (Google or Apple)
@@ -103,15 +102,6 @@ public class OAuthService {
             user = userRepository.save(user);
             log.info("Created new OAuth user - UserId: {}, Email: {}, Provider: {}",
                 user.getId(), email, provider);
-
-            // Create wallet for new user
-            try {
-                userRegistrationService.createWalletForUser(user);
-                log.info("Created wallet for new OAuth user: {}", user.getId());
-            } catch (Exception e) {
-                log.error("Failed to create wallet for OAuth user: {}", user.getId(), e);
-                // Don't fail the registration, wallet can be created later
-            }
         }
 
         // Generate JWT token (email-based)

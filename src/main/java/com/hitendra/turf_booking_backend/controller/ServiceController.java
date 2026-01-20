@@ -76,45 +76,6 @@ public class ServiceController {
         return ResponseEntity.ok(services);
     }
 
-//    @PostMapping("/by-location")
-//    @Operation(summary = "Get services by user location",
-//               description = "Get services in the city detected from user's coordinates. Falls back to nearby turfs if city detection fails.")
-//    public ResponseEntity<List<ServiceDto>> getServicesByUserLocation(
-//            @RequestBody LocationRequest locationRequest
-//    ) {
-//        List<ServiceDto> services = serviceService.getServicesByUserLocation(
-//            locationRequest.getLatitude(),
-//            locationRequest.getLongitude()
-//        );
-//        return ResponseEntity.ok(services);
-//    }
-
-//    @PostMapping("/nearby")
-//    @Operation(summary = "Get nearby services",
-//               description = "Get services near user's location sorted by distance. Optional radius parameter (default 50km)")
-//    public ResponseEntity<List<ServiceDto>> getNearbyTurfs(
-//            @RequestBody LocationRequest locationRequest,
-//            @RequestParam(required = false) Double radiusKm) {
-//        List<ServiceDto> serviceDtos = serviceService.getServicesNearLocation(
-//            locationRequest.getLatitude(),
-//            locationRequest.getLongitude(),
-//            radiusKm
-//        );
-//        return ResponseEntity.ok(serviceDtos);
-//    }
-
-    @PostMapping("/detect-city")
-    @Operation(summary = "Detect city from coordinates",
-               description = "Get city name from latitude and longitude using reverse geocoding")
-    public ResponseEntity<CityResponse> detectCity(
-            @RequestBody LocationRequest locationRequest) {
-        CityResponse city = serviceService.getCityFromCoordinates(
-            locationRequest.getLatitude(),
-            locationRequest.getLongitude()
-        );
-        return ResponseEntity.ok(city);
-    }
-
     @GetMapping("/search-by-availability")
     @Operation(summary = "Search services by date and slot availability",
                description = "Find services that have specific slots available on a given date. Optionally filter by city, time range, and activity.")

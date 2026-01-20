@@ -120,17 +120,6 @@ public class Booking {
     @Column(name = "payment_initiated_at")
     private Instant paymentInitiatedAt;
 
-    // Wallet payment tracking
-    @Column(name = "wallet_amount_used", precision = 19, scale = 2)
-    private java.math.BigDecimal walletAmountUsed;
-
     @Column(name = "online_amount_paid", precision = 19, scale = 2)
     private java.math.BigDecimal onlineAmountPaid;
-
-    @Column(name = "wallet_transaction_id")
-    private Long walletTransactionId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method_type")
-    private com.hitendra.turf_booking_backend.entity.PaymentMethod paymentMethodType;
 }

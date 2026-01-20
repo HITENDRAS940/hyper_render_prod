@@ -21,18 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Bookings", description = "User booking APIs")
 @PreAuthorize("hasRole('USER')")
 public class  BookingController {
-
-    private final BookingService bookingService;
     private final RefundService refundService;
-
-    @PostMapping("/user")
-    @Operation(summary = "Create booking by user", description = "Create a new booking request for user")
-    public ResponseEntity<BookingResponseDto> userBooking(
-            @RequestBody BookingRequestDto request
-            ) {
-        BookingResponseDto response = bookingService.createUserBooking(request);
-        return ResponseEntity.ok(response);
-    }
 
     /**
      * Refund Preview API (Read-Only)

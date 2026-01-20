@@ -87,15 +87,14 @@ public class AuthService {
         boolean isNewUser = false;
 
         if (user == null) {
-            // REGISTRATION FLOW: Create new user WITH wallet atomically
-            // This is the ONLY place where wallet creation happens
+            // REGISTRATION FLOW: Create new user
             log.info("New user registration: phone={}", phone);
-            user = userRegistrationService.registerNewUserWithWallet(phone);
-            isNewUser = true;  // Mark as new user
+            user = userRegistrationService.registerNewUser(phone);
+            isNewUser = true;
         } else {
-            // LOGIN FLOW: User already exists, no wallet creation needed
+            // LOGIN FLOW: User already exists
             log.info("Existing user login: userId={}, phone={}", user.getId(), phone);
-            isNewUser = false;  // Mark as existing user
+            isNewUser = false;
         }
 
         // Generate token with email (user must have email)

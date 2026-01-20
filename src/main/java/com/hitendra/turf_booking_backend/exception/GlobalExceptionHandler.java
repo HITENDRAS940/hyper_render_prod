@@ -29,29 +29,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getHttpStatus()).body(error);
     }
 
-    @ExceptionHandler(WalletException.class)
-    public ResponseEntity<ErrorResponse> handleWalletException(WalletException ex) {
-        log.error("Wallet exception: {} - {}", ex.getErrorCode(), ex.getMessage());
-        int httpStatus;
-        WalletException.WalletErrorCode code = ex.getErrorCode();
-        if (code == WalletException.WalletErrorCode.WALLET_NOT_FOUND) {
-            httpStatus = 404;
-        } else if (code == WalletException.WalletErrorCode.INSUFFICIENT_BALANCE) {
-            httpStatus = 402;
-        } else if (code == WalletException.WalletErrorCode.WALLET_BLOCKED) {
-            httpStatus = 403;
-        } else {
-            httpStatus = 400;
-        }
-        ErrorResponse error = new ErrorResponse(
-                httpStatus,
-                ex.getMessage(),
-                Instant.now(),
-                ex.getErrorCode().name(),
-                null
-        );
-        return ResponseEntity.status(httpStatus).body(error);
-    }
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<AuthErrorResponse> handleAuthException(AuthException ex) {

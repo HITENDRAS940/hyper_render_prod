@@ -28,7 +28,6 @@ public class EmailOtpService {
     private final OtpRepository otpRepository;
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
-    private final UserRegistrationService userRegistrationService;
 
     /**
      * Request OTP for email
@@ -113,7 +112,7 @@ public class EmailOtpService {
         boolean isNewUser = false;
 
         if (user == null) {
-            // REGISTRATION FLOW: Create new user with wallet
+            // REGISTRATION FLOW: Create new user
             log.info("New user registration via email: {}", email);
 
             user = User.builder()
@@ -123,13 +122,6 @@ public class EmailOtpService {
 
             user = userRepository.save(user);
 
-            // Create wallet for new user
-            try {
-                userRegistrationService.createWalletForUser(user);
-                log.info("Created wallet for new email user: {}", user.getId());
-            } catch (Exception e) {
-                log.error("Failed to create wallet for email user: {}", user.getId(), e);
-            }
 
             // Send welcome email
             try {

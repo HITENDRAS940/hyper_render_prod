@@ -251,11 +251,11 @@ public class RefundService {
                 refundRepository.save(refund);
             }
         } else {
-            // For wallet payments or other methods, mark for manual processing
-            refund.setRefundType("WALLET");
+            // For other payment methods, mark for manual processing
+            refund.setRefundType("MANUAL");
             refund.setStatus(RefundStatus.PROCESSING);
             refundRepository.save(refund);
-            log.info("Refund marked for wallet credit: booking={}, amount={}",
+            log.info("Refund marked for manual processing: booking={}, amount={}",
                     booking.getReference(), preview.getRefundAmount());
         }
 
@@ -420,7 +420,7 @@ public class RefundService {
 
         String destination = "RAZORPAY".equals(refundType)
                 ? "your original payment method"
-                : "your wallet";
+                : "your account (manual processing)";
 
         return String.format(
                 "Booking cancelled successfully. ₹%.2f will be refunded to %s within 5-7 business days.",

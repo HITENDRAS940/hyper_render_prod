@@ -168,7 +168,6 @@ public class EmailService {
                                     <ul style="margin:0; padding-left:20px; color:#555555;">
                                         <li style="margin-bottom:8px;">Browse and book sports courts</li>
                                         <li style="margin-bottom:8px;">Manage your bookings</li>
-                                        <li style="margin-bottom:8px;">Track your wallet balance</li>
                                         <li>View booking history</li>
                                     </ul>
                                 </div>

@@ -29,5 +29,6 @@ COPY --from=build /app/target/Hyper_backend-0.0.1-SNAPSHOT.jar app.jar
 # Expose port (Render will override with $PORT)
 EXPOSE 8080
 
-# Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Run the application with entrypoint script to handle DATABASE_URL conversion
+# Render provides postgres:// but Spring needs jdbc:postgresql://
+ENTRYPOINT ["sh", "-c", "if [ -n \"$DATABASE_URL\" ] && echo \"$DATABASE_URL\" | grep -q '^postgres://'; then export DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgres:/jdbc:postgresql:/'); fi && java -jar app.jar"]

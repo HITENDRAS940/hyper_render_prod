@@ -6,7 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
@@ -26,22 +25,8 @@ public class UserInfoDto {
     private boolean enabled;
     private Instant createdAt;
 
-    // Wallet information
-    private WalletInfo wallet;
-
     // Booking statistics
     private Long totalBookings;
     private Long confirmedBookings;
     private Long cancelledBookings;
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class WalletInfo {
-        private Long walletId;
-        private BigDecimal balance;
-        private String status;
-    }
 }
-
