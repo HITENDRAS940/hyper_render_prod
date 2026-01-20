@@ -1,6 +1,6 @@
 # 🚀 Deploying Hyper Backend to Render
 
-Complete step-by-step guide for deploying your Spring Boot backend to Render.
+Complete step-by-step guide for deploying your Spring Boot backend to Render using Docker.
 
 ---
 
@@ -22,6 +22,7 @@ Before deploying, make sure you have:
 ### 1.1 Make sure these files are in your repo:
 
 ```
+✅ Dockerfile              # Docker build configuration
 ✅ pom.xml
 ✅ mvnw (Maven wrapper)
 ✅ src/main/resources/application.properties
@@ -29,12 +30,26 @@ Before deploying, make sure you have:
 ✅ .gitignore (excluding credentials.json, .tokens/, .env)
 ```
 
-### 1.2 Verify .gitignore excludes sensitive files:
+### 1.2 Verify Dockerfile exists:
 
-```gitignore
-credentials.json
-.tokens/
-.env
+```dockerfile
+# Build stage
+FROM eclipse-temurin:17-jdk-alpine AS build
+WORKDIR /app
+COPY mvnw .
+COPY .mvn .mvn
+COPY pom.xml .
+RUN chmod +x mvnw
+RUN ./mvnw dependency:go-offline -B
+COPY src src
+RUN ./mvnw package -DskipTests
+
+# Runtime stage
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/Hyper_backend-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
 ### 1.3 Push to GitHub:
@@ -80,9 +95,8 @@ git push origin main
 | **Name** | `hyper-backend` |
 | **Region** | Same as database |
 | **Branch** | `main` |
-| **Runtime** | `Java` |
-| **Build Command** | `./mvnw -DskipTests clean package` |
-| **Start Command** | `java -Dserver.port=$PORT -jar target/Hyper_backend-0.0.1-SNAPSHOT.jar` |
+| **Runtime** | `Docker` |
+| **Dockerfile Path** | `./Dockerfile` |
 | **Plan** | Free (or paid for production) |
 
 ### Instance Type:
@@ -187,9 +201,9 @@ curl https://hyper-backend.onrender.com/api/services
 ### Build Fails
 
 **Check logs for:**
-- Missing dependencies → Check pom.xml
-- Java version mismatch → Render uses Java 17 by default
-- Test failures → We use `-DskipTests` to avoid this
+- Docker build errors → Check Dockerfile syntax
+- Maven dependency issues → Check pom.xml
+- Out of memory → Docker build needs ~1GB RAM
 
 **Common fixes:**
 ```bash
@@ -200,12 +214,18 @@ git commit -m "Make mvnw executable"
 git push
 ```
 
+### Docker Build Timeout
+
+If build times out (free tier has 15min limit):
+- Consider using a paid plan
+- Optimize Dockerfile with better caching
+
 ### Application Crashes on Start
 
 **Check:**
 - Database connection → Verify DATABASE_URL format
 - Missing env vars → Check all required variables are set
-- Port binding → Make sure using `$PORT` env var
+- Memory issues → Free tier has 512MB limit
 
 **Database URL format:**
 ```
