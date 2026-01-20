@@ -1,0 +1,74 @@
+package com.hitendra.turf_booking_backend.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.Instant;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true)
+    private String phone;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column
+    private String name;
+
+    // OAuth Provider Information
+    @Column(name = "oauth_provider")
+    @Enumerated(EnumType.STRING)
+    private OAuthProvider oauthProvider;  // GOOGLE, APPLE, null for OTP users
+
+    @Column(name = "oauth_provider_id")
+    private String oauthProviderId;  // Unique ID from OAuth provider
+
+    @Column(name = "email_verified")
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private Role role = Role.USER;
+
+    @Column
+    @Builder.Default
+    private boolean enabled = true;
+
+    @Column
+    @Builder.Default
+    private Instant createdAt = Instant.now();
+
+    // Relationship to user profile (one-to-one)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private UserProfile userProfile;
+
+    // Relationship to admin profile (one-to-one)
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private AdminProfile adminProfile;
+
+    // Relationship to wallet (one-to-one) - created during user registration
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Wallet wallet;
+
+    @PrePersist
+    protected void onCreate() {
+        if (role == null) {
+            role = Role.USER;  // Set default role
+        }
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+    }
+}

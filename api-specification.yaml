@@ -1,0 +1,1095 @@
+openapi: 3.0.3
+info:
+  title: Turf Booking API
+  description: REST APIs for turf booking mobile application
+  version: 1.0.0
+  contact:
+    name: Hitendra Singh
+    email: hitendras940@gmail.com
+
+servers:
+  - url: http://turfbackend-env.eba-yrja2qmi.ap-south-1.elasticbeanstalk.com
+    description: Production server (AWS)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    RequestOtpDto:
+      type: object
+      required:
+        - phone
+      properties:
+        phone:
+          type: string
+          example: "+919460629707"
+
+    VerifyOtpDto:
+      type: object
+      required:
+        - phone
+        - otp
+      properties:
+        phone:
+          type: string
+          example: "+919460629707"
+        otp:
+          type: string
+          example: "123456"
+
+    JwtResponseDto:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        tokenType:
+          type: string
+          example: "Bearer"
+
+    SlotDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        startTime:
+          type: string
+          format: time
+          example: "09:00:00"
+        endTime:
+          type: string
+          format: time
+          example: "10:00:00"
+        price:
+          type: number
+          format: double
+          example: 1500.0
+        enabled:
+          type: boolean
+          example: true
+
+    TurfDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Premium Cricket Ground"
+        location:
+          type: string
+          example: "Sector 18, Noida"
+        description:
+          type: string
+          example: "Professional cricket ground with floodlights and pavilion"
+        images:
+          type: array
+          items:
+            type: string
+          example: ["https://res.cloudinary.com/demo/image/upload/sample1.jpg"]
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlotDto'
+
+    CreateTurfRequest:
+      type: object
+      required:
+        - name
+        - location
+      properties:
+        name:
+          type: string
+          example: "Premium Cricket Ground"
+        location:
+          type: string
+          example: "Sector 18, Noida"
+        description:
+          type: string
+          example: "Professional cricket ground"
+
+    TurfImageUploadResponse:
+      type: object
+      properties:
+        turfId:
+          type: integer
+          format: int64
+          example: 1
+        message:
+          type: string
+          example: "Images uploaded successfully"
+        uploadedImageUrls:
+          type: array
+          items:
+            type: string
+        totalImages:
+          type: integer
+          example: 3
+
+    BookingRequestDto:
+      type: object
+      required:
+        - turfId
+        - slotIds
+        - bookingDate
+      properties:
+        turfId:
+          type: integer
+          format: int64
+          example: 1
+        slotIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+          example: [1, 2, 3, 5, 8]
+          description: "Array of slot IDs - can be continuous or discrete slots"
+        bookingDate:
+          type: string
+          format: date
+          example: "2025-10-20"
+        paymentDetails:
+          type: object
+          description: Payment details from frontend
+
+    BookingResponseDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        reference:
+          type: string
+          example: "TRF12345678"
+        amount:
+          type: number
+          format: double
+          example: 4500.0
+          description: "Total amount for all selected slots"
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED, REFUNDED]
+          example: "CONFIRMED"
+        turfName:
+          type: string
+          example: "Premium Cricket Ground"
+        slotTime:
+          type: string
+          example: "09:00 - 10:00, 10:00 - 11:00, 11:00 - 12:00"
+          description: "Comma-separated slot times for backward compatibility"
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlotDetails'
+          description: "Detailed information for each booked slot"
+        bookingDate:
+          type: string
+          format: date
+          example: "2025-10-20"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-10-18T12:00:00Z"
+
+    SlotDetails:
+      type: object
+      properties:
+        slotId:
+          type: integer
+          format: int64
+          example: 1
+        startTime:
+          type: string
+          example: "09:00:00"
+        endTime:
+          type: string
+          example: "10:00:00"
+        price:
+          type: number
+          format: double
+          example: 1500.0
+
+    UserProfileDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        phone:
+          type: string
+          example: "+919876543210"
+        name:
+          type: string
+          example: "John Doe"
+        memberSince:
+          type: string
+          format: date-time
+          example: "2025-01-15T10:30:00Z"
+        totalBookings:
+          type: integer
+          example: 15
+        currentBookings:
+          type: integer
+          example: 2
+        completedBookings:
+          type: integer
+          example: 12
+        cancelledBookings:
+          type: integer
+          example: 1
+        totalLifetimeExpenditure:
+          type: number
+          format: double
+          example: 45000.0
+        pendingPayments:
+          type: number
+          format: double
+          example: 3000.0
+        currentBookingsList:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingSummaryDto'
+        previousBookingsList:
+          type: array
+          items:
+            $ref: '#/components/schemas/BookingSummaryDto'
+
+    BookingSummaryDto:
+      type: object
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+          example: 1
+        reference:
+          type: string
+          example: "TRF12AB34CD"
+        turfName:
+          type: string
+          example: "Premium Cricket Ground"
+        turfLocation:
+          type: string
+          example: "Sector 18, Noida"
+        bookingDate:
+          type: string
+          format: date
+          example: "2025-10-25"
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED, REFUNDED]
+          example: "CONFIRMED"
+        amount:
+          type: number
+          format: double
+          example: 4500.0
+        slots:
+          type: array
+          items:
+            type: object
+            properties:
+              startTime:
+                type: string
+                example: "09:00:00"
+              endTime:
+                type: string
+                example: "10:00:00"
+              price:
+                type: number
+                format: double
+                example: 1500.0
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-10-20T10:30:00Z"
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: "Invalid or expired OTP"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-10-18T12:00:00Z"
+
+paths:
+  /auth/request-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Request OTP
+      description: Send OTP to user's phone number for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestOtpDto'
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OTP sent successfully"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify-otp/{phone}:
+    post:
+      tags:
+        - Authentication
+      summary: Verify OTP
+      description: Verify OTP and get JWT token
+      parameters:
+        - name: phone
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "+919460629707"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                otp:
+                  type: string
+                  example: "123456"
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwtResponseDto'
+        '400':
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /turfs:
+    get:
+      tags:
+        - Turfs
+      summary: List all turfs
+      description: Get all available turfs with their slots and pricing
+      responses:
+        '200':
+          description: List of turfs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TurfDto'
+
+  /turfs/{id}:
+    get:
+      tags:
+        - Turfs
+      summary: Get turf details
+      description: Get detailed information about a specific turf
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Turf details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurfDto'
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /bookings:
+    post:
+      tags:
+        - Bookings
+      summary: Create booking
+      description: Create a new turf booking
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingRequestDto'
+      responses:
+        '200':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+        '400':
+          description: Bad request - Slot already booked or invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '403':
+          description: Forbidden
+
+  /admin/turf-details:
+    post:
+      tags:
+        - Admin
+      summary: Create turf (Step 1)
+      description: Create a new turf with basic details (without images). All 24 slots are automatically assigned.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTurfRequest'
+      responses:
+        '200':
+          description: Turf created successfully with 24 slots assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurfDto'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{turfId}/images:
+    post:
+      tags:
+        - Admin
+      summary: Upload turf images (Step 2)
+      description: Upload images for an existing turf to Cloudinary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: turfId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - images
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '200':
+          description: Images uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurfImageUploadResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turfs:
+    get:
+      tags:
+        - Admin
+      summary: List all turfs
+      description: Get all turfs (admin view)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of turfs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TurfDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{id}:
+    get:
+      tags:
+        - Admin
+      summary: Get turf details
+      description: Get turf details by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Turf details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurfDto'
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+    put:
+      tags:
+        - Admin
+      summary: Update turf details
+      description: Update turf name, location, and description
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTurfRequest'
+      responses:
+        '200':
+          description: Turf updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurfDto'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+    delete:
+      tags:
+        - Admin
+      summary: Delete turf
+      description: Delete a turf and all its images from Cloudinary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Turf deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Turf and all associated images deleted successfully"
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{id}/images:
+    delete:
+      tags:
+        - Admin
+      summary: Delete specific images
+      description: Delete specific images from a turf
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+              example: ["https://res.cloudinary.com/demo/image1.jpg"]
+      responses:
+        '200':
+          description: Images deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Images deleted successfully"
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/bookings:
+    get:
+      tags:
+        - Admin
+      summary: Get all bookings
+      description: Get all bookings across all turfs
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of all bookings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponseDto'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{id}/bookings:
+    get:
+      tags:
+        - Admin
+      summary: Get turf bookings
+      description: Get bookings for a specific turf
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of bookings for the turf
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponseDto'
+        '404':
+          description: Turf not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{turfId}/slot/{slotId}/disable:
+    patch:
+      tags:
+        - Admin
+      summary: Disable slot for turf
+      description: Disable a specific slot for a specific turf
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: turfId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Slot disabled successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Slot disabled for this turf successfully"
+        '404':
+          description: Turf or slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{turfId}/slot/{slotId}/enable:
+    patch:
+      tags:
+        - Admin
+      summary: Enable slot for turf
+      description: Enable a specific slot for a specific turf
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: turfId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Slot enabled successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Slot enabled for this turf successfully"
+        '404':
+          description: Turf or slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /admin/turf/{turfId}/slot/{slotId}/price:
+    patch:
+      tags:
+        - Admin
+      summary: Update slot price
+      description: Update the price for a specific slot on a specific turf
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: turfId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: price
+          in: query
+          required: true
+          schema:
+            type: number
+            format: double
+          example: 2500.0
+      responses:
+        '200':
+          description: Slot price updated successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Slot price updated successfully"
+        '404':
+          description: Turf or slot not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden - Admin role required
+
+  /payments/confirm:
+    post:
+      tags:
+        - Payments
+      summary: Payment confirmation
+      description: Webhook endpoint for payment gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: "success"
+                reference:
+                  type: string
+                  example: "TRF12345678"
+      responses:
+        '200':
+          description: Payment processed
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Payment processed"
+        '500':
+          description: Error processing payment
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Error processing payment"
+
+  /api/payment/create-order:
+    post:
+      tags:
+        - Payments
+      summary: Create Cashfree order
+      description: Create a payment order with Cashfree for turf booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - internalBookingId
+                - amount
+                - customerId
+                - customerName
+                - customerPhone
+              properties:
+                internalBookingId:
+                  type: string
+                  description: Your booking reference ID
+                amount:
+                  type: number
+                  description: Amount in INR
+                customerId:
+                  type: string
+                  description: Customer ID
+                customerName:
+                  type: string
+                  description: Customer name
+                customerEmail:
+                  type: string
+                  description: Customer email (optional)
+                customerPhone:
+                  type: string
+                  description: Customer phone number
+                returnUrl:
+                  type: string
+                  description: Return URL after payment (optional)
+                notifyUrl:
+                  type: string
+                  description: Webhook URL (optional)
+      responses:
+        '200':
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  orderId:
+                    type: string
+                  paymentSessionId:
+                    type: string
+                  orderStatus:
+                    type: string
+                  message:
+                    type: string
+        '500':
+          description: Error creating order
+
+  /webhook/cashfree:
+    post:
+      tags:
+        - Payments
+      summary: Cashfree webhook
+      description: Webhook endpoint for Cashfree payment notifications
+      parameters:
+        - name: x-webhook-timestamp
+          in: header
+          schema:
+            type: string
+        - name: x-webhook-signature
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Cashfree webhook payload
+      responses:
+        '200':
+          description: Webhook processed
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+        '403':
+          description: Invalid signature
+
+  /user/profile:
+    get:
+      tags:
+        - User
+      summary: Get user profile
+      description: Retrieve the authenticated user's profile information
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileDto'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '403':
+          description: Forbidden
+
+    put:
+      tags:
+        - User
+      summary: Update user profile
+      description: Update the authenticated user's profile information
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "John Doe"
+                phone:
+                  type: string
+                  example: "+919876543210"
+      responses:
+        '200':
+          description: User profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileDto'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - Invalid or missing JWT token
+        '403':
+          description: Forbidden
