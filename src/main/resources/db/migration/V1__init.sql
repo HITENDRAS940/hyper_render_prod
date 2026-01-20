@@ -156,6 +156,39 @@ CREATE TABLE IF NOT EXISTS service_activity (
 );
 
 -- ============================================================================
+-- SLOTS (Master slot definitions)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS slots (
+    id BIGSERIAL PRIMARY KEY,
+    start_time TIME NOT NULL UNIQUE,
+    end_time TIME NOT NULL UNIQUE
+);
+
+-- ============================================================================
+-- SERVICE SLOTS (Slots available for a service)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS service_slots (
+    id BIGSERIAL PRIMARY KEY,
+    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    slot_id BIGINT NOT NULL REFERENCES slots(id) ON DELETE CASCADE,
+    price DOUBLE PRECISION NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_slots_service ON service_slots(service_id);
+CREATE INDEX IF NOT EXISTS idx_service_slots_slot ON service_slots(slot_id);
+
+-- Service Slot Booked Dates (ElementCollection)
+CREATE TABLE IF NOT EXISTS service_slot_booked_dates (
+    service_slot_id BIGINT NOT NULL REFERENCES service_slots(id) ON DELETE CASCADE,
+    booked_date DATE NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_slot_booked_dates ON service_slot_booked_dates(service_slot_id);
+
+-- ============================================================================
 -- SERVICE RESOURCES (Individual Turfs/Courts within a Service)
 -- ============================================================================
 
@@ -191,6 +224,24 @@ CREATE TABLE IF NOT EXISTS resource_slot_configs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_slot_configs_resource ON resource_slot_configs(resource_id);
+
+-- Resource Slots (pre-generated slots for fast access)
+CREATE TABLE IF NOT EXISTS resource_slots (
+    id BIGSERIAL PRIMARY KEY,
+    resource_id BIGINT NOT NULL REFERENCES service_resources(id) ON DELETE CASCADE,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    display_name VARCHAR(100),
+    base_price DOUBLE PRECISION NOT NULL,
+    weekday_price DOUBLE PRECISION,
+    weekend_price DOUBLE PRECISION,
+    display_order INTEGER,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    duration_minutes INTEGER NOT NULL,
+    UNIQUE (resource_id, start_time, end_time)
+);
+
+CREATE INDEX IF NOT EXISTS idx_resource_slots_resource ON resource_slots(resource_id);
 
 CREATE TABLE IF NOT EXISTS resource_price_rules (
     id BIGSERIAL PRIMARY KEY,
