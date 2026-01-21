@@ -123,13 +123,6 @@ public class EmailOtpService {
             user = userRepository.save(user);
 
 
-            // Send welcome email
-            try {
-                emailService.sendWelcomeEmail(email, user.getName());
-            } catch (Exception e) {
-                log.error("Failed to send welcome email", e);
-            }
-
             isNewUser = true;
         } else {
             // LOGIN FLOW: User already exists

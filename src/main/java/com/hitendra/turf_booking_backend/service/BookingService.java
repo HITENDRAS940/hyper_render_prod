@@ -31,6 +31,7 @@ public class BookingService {
     private final ServiceResourceRepository serviceResourceRepository;
     private final UserRepository userRepository;
     private final SmsService smsService;
+    private final EmailService emailService;
     private final ResourceSlotService resourceSlotService;
     private final PricingService pricingService;
     private final AuthUtil authUtil;
@@ -458,6 +459,7 @@ public class BookingService {
         String resourceName = booking.getResource() != null ? booking.getResource().getName() : "";
 
         if (booking.getUser() != null) {
+            // Send SMS notification
             String userMessage = String.format(
                     "Booking confirmed! Service: %s, Resource: %s, Date: %s, Slots: %s, Total: ₹%.2f, Reference: %s",
                     booking.getService().getName(),
@@ -468,6 +470,31 @@ public class BookingService {
                     booking.getReference()
             );
             smsService.sendBookingConfirmation(booking.getUser().getPhone(), userMessage);
+
+            // Send detailed email notification
+            if (booking.getUser().getEmail() != null && !booking.getUser().getEmail().isEmpty()) {
+                try {
+                    EmailService.BookingDetails bookingDetails = EmailService.BookingDetails.builder()
+                            .reference(booking.getReference())
+                            .serviceName(booking.getService().getName())
+                            .resourceName(resourceName)
+                            .bookingDate(booking.getBookingDate().toString())
+                            .startTime(booking.getStartTime().toString())
+                            .endTime(booking.getEndTime().toString())
+                            .totalAmount(booking.getAmount())
+                            .location(booking.getService().getLocation())
+                            .contactNumber(booking.getService().getContactNumber())
+                            .build();
+
+                    emailService.sendBookingConfirmationEmail(
+                            booking.getUser().getEmail(),
+                            booking.getUser().getName(),
+                            bookingDetails
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send booking confirmation email for booking {}", booking.getReference(), e);
+                }
+            }
         }
 
         log.info("Booking notification sent for {}", booking.getReference());

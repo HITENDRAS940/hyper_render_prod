@@ -39,22 +39,22 @@ public class EmailService {
     }
 
     /**
-     * Send welcome email to new users using Gmail API
+     * Send booking confirmation email with detailed information
      */
-    public void sendWelcomeEmail(String toEmail, String userName) {
+    public void sendBookingConfirmationEmail(String toEmail, String userName, BookingDetails bookingDetails) {
         try {
-            log.info("Sending welcome email to: {}", toEmail);
+            log.info("Sending booking confirmation email to: {}", toEmail);
 
-            String subject = "Welcome to Hyper!";
-            String htmlBody = buildWelcomeEmailBody(userName);
+            String subject = "Booking Confirmed - " + bookingDetails.getServiceName();
+            String htmlBody = buildBookingConfirmationEmailBody(userName, bookingDetails);
 
             gmailService.sendEmail(toEmail, subject, htmlBody);
 
-            log.info("Welcome email sent successfully to: {}", toEmail);
+            log.info("Booking confirmation email sent successfully to: {}", toEmail);
 
         } catch (Exception e) {
-            log.error("Failed to send welcome email to: {}", toEmail, e);
-            // Don't throw exception for welcome email failure
+            log.error("Failed to send booking confirmation email to: {}", toEmail, e);
+            // Don't throw exception for email failure
         }
     }
 
@@ -128,65 +128,121 @@ public class EmailService {
 
 
     /**
-     * Build welcome email body
+     * Build booking confirmation email body with card UI
      */
-    private String buildWelcomeEmailBody(String userName) {
-        String displayName = userName != null ? userName : "there";
+    private String buildBookingConfirmationEmailBody(String userName, BookingDetails booking) {
+        String displayName = userName != null && !userName.isEmpty() ? userName : "there";
+
         return """
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Welcome to Hyper</title>
+        <title>Booking Confirmation</title>
     </head>
     <body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
         <table width="100%%" cellpadding="0" cellspacing="0">
             <tr>
                 <td align="center" style="padding: 30px 0;">
-                    <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.08);">
                         
-                        <!-- Header -->
+                        <!-- Success Header -->
                         <tr>
-                            <td style="background:linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding:24px; text-align:center; border-radius:8px 8px 0 0;">
-                                <h1 style="color:#ffffff; margin:0;">Welcome to Hyper! 🎉</h1>
+                            <td style="background:linear-gradient(135deg, #10b981 0%%, #059669 100%%); padding:32px; text-align:center; border-radius:12px 12px 0 0;">
+                                <div style="font-size:48px; margin-bottom:12px;">✓</div>
+                                <h1 style="color:#ffffff; margin:0 0 8px 0; font-size:26px;">Booking Confirmed!</h1>
+                                <p style="color:#d1fae5; margin:0; font-size:15px;">Your booking has been successfully confirmed</p>
                             </td>
                         </tr>
 
-                        <!-- Body -->
+                        <!-- Greeting -->
                         <tr>
-                            <td style="padding:32px; color:#333333;">
-                                <p style="font-size:16px; margin-bottom:8px;">Hello %s,</p>
+                            <td style="padding:24px 32px 16px 32px;">
+                                <p style="font-size:16px; margin:0; color:#374151;">Hello %s,</p>
+                            </td>
+                        </tr>
 
-                                <p style="font-size:15px; line-height:1.6; margin-bottom:24px;">
-                                    We're excited to have you on board! Your account has been successfully created.
-                                </p>
+                        <!-- Booking Reference Card -->
+                        <tr>
+                            <td style="padding:0 32px 24px 32px;">
+                                <div style="background:#f0fdf4; border-left:4px solid #10b981; padding:16px 20px; border-radius:6px;">
+                                    <p style="margin:0 0 6px 0; font-size:13px; color:#6b7280; font-weight:600;">BOOKING REFERENCE</p>
+                                    <p style="margin:0; font-size:20px; color:#065f46; font-weight:bold; letter-spacing:1px;">%s</p>
+                                </div>
+                            </td>
+                        </tr>
 
-                                <div style="background:#f0f5ff; padding:20px; border-radius:6px; margin-bottom:24px;">
-                                    <p style="margin:0 0 12px 0; font-size:15px; font-weight:600; color:#2563eb;">
-                                        Here's what you can do now:
-                                    </p>
-                                    <ul style="margin:0; padding-left:20px; color:#555555;">
-                                        <li style="margin-bottom:8px;">Browse and book sports courts</li>
-                                        <li style="margin-bottom:8px;">Manage your bookings</li>
-                                        <li>View booking history</li>
+                        <!-- Booking Details Card -->
+                        <tr>
+                            <td style="padding:0 32px 24px 32px;">
+                                <div style="border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                                    
+                                    <!-- Service Name Header -->
+                                    <div style="background:#f9fafb; padding:16px 20px; border-bottom:1px solid #e5e7eb;">
+                                        <p style="margin:0; font-size:18px; font-weight:600; color:#111827;">%s</p>
+                                        %s
+                                    </div>
+                                    
+                                    <!-- Details Grid -->
+                                    <div style="padding:20px;">
+                                        <table width="100%%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="padding:12px 0; border-bottom:1px solid #f3f4f6;">
+                                                    <p style="margin:0; font-size:13px; color:#6b7280;">📅 Date</p>
+                                                    <p style="margin:4px 0 0 0; font-size:15px; color:#111827; font-weight:600;">%s</p>
+                                                </td>
+                                                <td style="padding:12px 0; border-bottom:1px solid #f3f4f6; text-align:right;">
+                                                    <p style="margin:0; font-size:13px; color:#6b7280;">⏰ Time</p>
+                                                    <p style="margin:4px 0 0 0; font-size:15px; color:#111827; font-weight:600;">%s - %s</p>
+                                                </td>
+                                            </tr>
+                                            %s
+                                            <tr>
+                                                <td colspan="2" style="padding:16px 0 8px 0;">
+                                                    <p style="margin:0; font-size:13px; color:#6b7280;">💰 Amount Paid</p>
+                                                    <p style="margin:4px 0 0 0; font-size:22px; color:#059669; font-weight:bold;">₹%s</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        %s
+
+                        <!-- Important Info -->
+                        <tr>
+                            <td style="padding:0 32px 24px 32px;">
+                                <div style="background:#fef3c7; border-left:4px solid #f59e0b; padding:16px 20px; border-radius:6px;">
+                                    <p style="margin:0 0 8px 0; font-size:14px; color:#92400e; font-weight:600;">📌 Important Information</p>
+                                    <ul style="margin:0; padding-left:20px; color:#78350f; font-size:14px; line-height:1.6;">
+                                        <li style="margin-bottom:6px;">Please arrive 5-10 minutes before your slot time</li>
+                                        <li style="margin-bottom:6px;">Keep your booking reference handy</li>
+                                        <li>For any queries, contact the venue directly</li>
                                     </ul>
                                 </div>
+                            </td>
+                        </tr>
 
-                                <p style="font-size:15px; margin-bottom:24px;">
-                                    Start booking your favorite courts today!
+                        <!-- Footer Message -->
+                        <tr>
+                            <td style="padding:0 32px 32px 32px;">
+                                <p style="font-size:15px; color:#374151; margin:0 0 24px 0; line-height:1.6;">
+                                    Thank you for booking with Hyper! We hope you have a great experience.
                                 </p>
-
-                                <p style="margin-top:32px; font-size:14px;">
+                                <p style="margin:0; font-size:14px; color:#6b7280;">
                                     Best regards,<br/>
-                                    <strong>Hyper Team</strong>
+                                    <strong style="color:#111827;">Hyper Team</strong>
                                 </p>
                             </td>
                         </tr>
 
                         <!-- Footer -->
                         <tr>
-                            <td style="padding:20px; background:#f9fafb; font-size:12px; color:#999999; text-align:center; border-radius:0 0 8px 8px;">
-                                Need help? Contact us at <a href="mailto:support@hyper.com" style="color:#2563eb; text-decoration:none;">support@hyper.com</a>
+                            <td style="padding:24px 32px; background:#f9fafb; font-size:12px; color:#9ca3af; text-align:center; border-radius:0 0 12px 12px; border-top:1px solid #e5e7eb;">
+                                <p style="margin:0 0 8px 0;">Need help? Contact us at <a href="mailto:support@hyper.com" style="color:#10b981; text-decoration:none;">support@hyper.com</a></p>
+                                <p style="margin:0;">This is an automated message. Please do not reply to this email.</p>
                             </td>
                         </tr>
 
@@ -196,7 +252,40 @@ public class EmailService {
         </table>
     </body>
     </html>
-    """.formatted(displayName);
+    """.formatted(
+            displayName,
+            booking.getReference(),
+            booking.getServiceName(),
+            booking.getResourceName() != null ?
+                "<p style=\"margin:4px 0 0 0; font-size:14px; color:#6b7280;\">Resource: " + booking.getResourceName() + "</p>" : "",
+            booking.getBookingDate(),
+            booking.getStartTime(),
+            booking.getEndTime(),
+            booking.getLocation() != null ?
+                "<tr><td colspan=\"2\" style=\"padding:12px 0; border-bottom:1px solid #f3f4f6;\"><p style=\"margin:0; font-size:13px; color:#6b7280;\">📍 Location</p><p style=\"margin:4px 0 0 0; font-size:15px; color:#111827; font-weight:500;\">" + booking.getLocation() + "</p></td></tr>" : "",
+            String.format("%.2f", booking.getTotalAmount()),
+            booking.getContactNumber() != null ?
+                "<tr><td style=\"padding:0 32px 24px 32px;\"><div style=\"background:#eff6ff; border-left:4px solid #3b82f6; padding:16px 20px; border-radius:6px;\"><p style=\"margin:0 0 6px 0; font-size:13px; color:#1e40af; font-weight:600;\">📞 Venue Contact</p><p style=\"margin:0; font-size:16px; color:#1e3a8a; font-weight:600;\">" + booking.getContactNumber() + "</p></div></td></tr>" : ""
+        );
+    }
+
+    /**
+     * DTO class for booking details
+     */
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class BookingDetails {
+        private String reference;
+        private String serviceName;
+        private String resourceName;
+        private String bookingDate;
+        private String startTime;
+        private String endTime;
+        private Double totalAmount;
+        private String location;
+        private String contactNumber;
     }
 }
 

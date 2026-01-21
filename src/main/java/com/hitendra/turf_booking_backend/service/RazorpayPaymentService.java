@@ -31,6 +31,8 @@ public class RazorpayPaymentService {
 
     private final RazorpayClient razorpayClient;
     private final BookingRepository bookingRepository;
+    private final SmsService smsService;
+    private final EmailService emailService;
 
     @Value("${razorpay.key-id}")
     private String keyId;
@@ -260,6 +262,9 @@ public class RazorpayPaymentService {
 
                 expireAbandonedBookingsForSlot(booking);
 
+                // Send notifications (SMS and Email)
+                sendBookingNotifications(booking);
+
                 log.info("✅ Payment captured successfully. Booking confirmed: ID={}, PaymentID={}",
                         booking.getId(), paymentId);
             }
@@ -449,5 +454,53 @@ public class RazorpayPaymentService {
             throw new PaymentException("Failed to fetch order details: " + e.getMessage());
         }
     }
-}
 
+    /**
+     * Send booking notifications via SMS and Email
+     */
+    private void sendBookingNotifications(Booking booking) {
+        String slotDetails = booking.getStartTime() + " - " + booking.getEndTime();
+        String resourceName = booking.getResource() != null ? booking.getResource().getName() : "";
+
+        if (booking.getUser() != null) {
+            // Send SMS notification
+            String userMessage = String.format(
+                    "Booking confirmed! Service: %s, Resource: %s, Date: %s, Slots: %s, Total: ₹%.2f, Reference: %s",
+                    booking.getService().getName(),
+                    resourceName,
+                    booking.getBookingDate(),
+                    slotDetails,
+                    booking.getAmount(),
+                    booking.getReference()
+            );
+            smsService.sendBookingConfirmation(booking.getUser().getPhone(), userMessage);
+
+            // Send detailed email notification
+            if (booking.getUser().getEmail() != null && !booking.getUser().getEmail().isEmpty()) {
+                try {
+                    EmailService.BookingDetails bookingDetails = EmailService.BookingDetails.builder()
+                            .reference(booking.getReference())
+                            .serviceName(booking.getService().getName())
+                            .resourceName(resourceName)
+                            .bookingDate(booking.getBookingDate().toString())
+                            .startTime(booking.getStartTime().toString())
+                            .endTime(booking.getEndTime().toString())
+                            .totalAmount(booking.getAmount())
+                            .location(booking.getService().getLocation())
+                            .contactNumber(booking.getService().getContactNumber())
+                            .build();
+
+                    emailService.sendBookingConfirmationEmail(
+                            booking.getUser().getEmail(),
+                            booking.getUser().getName(),
+                            bookingDetails
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send booking confirmation email for booking {}", booking.getReference(), e);
+                }
+            }
+        }
+
+        log.info("Booking notifications sent for {}", booking.getReference());
+    }
+}
