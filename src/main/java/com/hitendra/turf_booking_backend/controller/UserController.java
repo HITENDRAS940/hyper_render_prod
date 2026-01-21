@@ -7,6 +7,7 @@ import com.hitendra.turf_booking_backend.service.BookingService;
 import com.hitendra.turf_booking_backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,13 @@ public class UserController {
     @Autowired
     private BookingService bookingService;
 
+    @PutMapping("/name")
+    @Operation(summary = "Set user name",
+               description = "Update the name of the current logged-in user")
+    public ResponseEntity<String> setUserName(@Valid @RequestBody UserDto userDto) {
+        String message = userService.setNewUserName(userDto);
+        return ResponseEntity.ok(message);
+    }
 
     @GetMapping("/bookings")
     @Operation(summary = "Get user bookings",
