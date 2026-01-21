@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.repository;
 
 import com.hitendra.turf_booking_backend.entity.User;
 import com.hitendra.turf_booking_backend.entity.Role;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,7 +14,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByPhone(String phone);
 
-    Optional<User> findUserByPhone(String phone);
+    User findUserByPhone(String phone);
 
     Optional<User> findByEmail(String email);
 

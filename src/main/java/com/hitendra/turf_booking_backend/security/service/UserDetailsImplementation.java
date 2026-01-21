@@ -24,11 +24,9 @@ public class UserDetailsImplementation implements UserDetails {
     }
 
     public static UserDetailsImplementation build(User user) {
-
         List<GrantedAuthority> authorities = List.of(
                 new SimpleGrantedAuthority("ROLE_"+user.getRole().name())
         );
-
         return new UserDetailsImplementation(
                 user.getId(),
                 user.getEmail(),
@@ -43,13 +41,11 @@ public class UserDetailsImplementation implements UserDetails {
 
     @Override
     public String getPassword() {
-        // Return empty string or encoded dummy password for email authentication
         return "";
     }
 
     @Override
     public String getUsername() {
-        // Use email as username
         return email;
     }
 

@@ -8,6 +8,8 @@ import com.hitendra.turf_booking_backend.entity.Role;
 import com.hitendra.turf_booking_backend.entity.User;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
 import com.hitendra.turf_booking_backend.repository.UserRepository;
+import com.hitendra.turf_booking_backend.util.AuthUtil;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -27,6 +29,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final AuthUtil authUtil;
 
     public String setNewUserName(UserDto userDto) {
 
@@ -107,5 +110,19 @@ public class UserService {
 
 
         return dto;
+    }
+
+    public String setNewUserPhone(@Valid String phone) {
+        User user = userRepository.findUserByPhone(phone);
+
+        if(user == null) {
+            User loggedInUser = authUtil.getCurrentUser();
+            loggedInUser.setPhone(phone);
+            userRepository.save(loggedInUser);
+
+            return "Phone number updated successfully";
+        } else {
+            return "Phone number already exists";
+        }
     }
 }
