@@ -2,9 +2,8 @@ package com.hitendra.turf_booking_backend.controller;
 
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.UserBookingDto;
-import com.hitendra.turf_booking_backend.dto.user.UpdatePhoneDto;
+import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserProfileRequest;
-import com.hitendra.turf_booking_backend.dto.user.UserDto;
 import com.hitendra.turf_booking_backend.dto.user.UserProfileDto;
 import com.hitendra.turf_booking_backend.security.service.UserDetailsImplementation;
 import com.hitendra.turf_booking_backend.service.BookingService;
@@ -33,11 +32,11 @@ public class UserController {
 
     private final UserProfileService userProfileService;
 
-    @PutMapping("/name")
-    @Operation(summary = "Set user name",
-               description = "Update the name of the current logged-in user")
-    public ResponseEntity<String> setUserName(@Valid @RequestBody UserDto userDto) {
-        String message = userService.setNewUserName(userDto);
+    @PutMapping("/basic-info")
+    @Operation(summary = "Update user basic info",
+               description = "Update the name and/or phone number of the current logged-in user. Both fields are optional.")
+    public ResponseEntity<String> updateUserBasicInfo(@Valid @RequestBody UpdateUserBasicInfoDto updateDto) {
+        String message = userService.updateUserBasicInfo(updateDto);
         return ResponseEntity.ok(message);
     }
 
@@ -93,13 +92,5 @@ public class UserController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         UserDetailsImplementation userDetails = (UserDetailsImplementation) authentication.getPrincipal();
         return userDetails.getId();
-    }
-
-    @PutMapping("/phone")
-    @Operation(summary = "Set user phone",
-               description = "Update the phone number of the current logged-in user")
-    public ResponseEntity<String> setUserPhone(@Valid @RequestBody UpdatePhoneDto updatePhoneDto) {
-        String message = userService.setNewUserPhone(updatePhoneDto.getPhone());
-        return ResponseEntity.ok(message);
     }
 }

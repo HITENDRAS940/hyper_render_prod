@@ -1,12 +1,10 @@
 package com.hitendra.turf_booking_backend.util;
 
-import com.hitendra.turf_booking_backend.security.service.UserDetailsImplementation;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -25,30 +23,15 @@ public class JwtUtils {
     private int jwtExpirationMs;
 
     /**
-     * Generate JWT token from Authentication object
+     * Generate JWT token from email, role, userId, name, and phone
      */
-    public String generateJwtToken(Authentication authentication) {
-        UserDetailsImplementation userPrincipal = (UserDetailsImplementation) authentication.getPrincipal();
-
-        return Jwts.builder()
-                .setSubject(userPrincipal.getEmail())
-                .claim("role", userPrincipal.getAuthorities().iterator().next().getAuthority())
-                .claim("userId", userPrincipal.getId())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    /**
-     * Generate JWT token from email and role
-     */
-    public String generateTokenFromEmail(String email, String role, Long userId, String name) {
+    public String generateTokenFromEmail(String email, String role, Long userId, String name, String phone) {
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
                 .claim("userId", userId)
                 .claim("name", name)
+                .claim("phone", phone)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)

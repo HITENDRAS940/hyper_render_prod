@@ -105,11 +105,13 @@ public class AuthService {
             );
         }
 
+        // Generate JWT token with all user details including phone
         String token = jwtUtils.generateTokenFromEmail(
                 user.getEmail(),
                 "ROLE_"+user.getRole().name(),
                 user.getId(),
-                user.getName()
+                user.getName(),
+                user.getPhone()
         );
 
         return new JwtResponseDto(token, isNewUser);

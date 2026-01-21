@@ -1,6 +1,7 @@
 package com.hitendra.turf_booking_backend.service;
 
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
+import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
 import com.hitendra.turf_booking_backend.dto.user.UserDto;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
@@ -123,6 +124,48 @@ public class UserService {
             return "Phone number updated successfully";
         } else {
             return "Phone number already exists";
+        }
+    }
+
+    /**
+     * Update user's basic information (name and/or phone)
+     * Either field can be updated independently
+     */
+    public String updateUserBasicInfo(@Valid UpdateUserBasicInfoDto updateDto) {
+        User loggedInUser = authUtil.getCurrentUser();
+
+        boolean updated = false;
+        StringBuilder message = new StringBuilder();
+
+        // Update name if provided
+        if (updateDto.getName() != null && !updateDto.getName().trim().isEmpty()) {
+            loggedInUser.setName(updateDto.getName().trim());
+            updated = true;
+            message.append("Name updated successfully");
+        }
+
+        // Update phone if provided
+        if (updateDto.getPhone() != null && !updateDto.getPhone().trim().isEmpty()) {
+            // Check if phone already exists for another user
+            User existingUser = userRepository.findUserByPhone(updateDto.getPhone());
+            if (existingUser != null && !existingUser.getId().equals(loggedInUser.getId())) {
+                throw new IllegalArgumentException("Phone number already exists");
+            }
+
+            loggedInUser.setPhone(updateDto.getPhone());
+            updated = true;
+            if (message.length() > 0) {
+                message.append(" and phone number updated successfully");
+            } else {
+                message.append("Phone number updated successfully");
+            }
+        }
+
+        if (updated) {
+            userRepository.save(loggedInUser);
+            return message.toString();
+        } else {
+            throw new IllegalArgumentException("No valid fields provided for update");
         }
     }
 }

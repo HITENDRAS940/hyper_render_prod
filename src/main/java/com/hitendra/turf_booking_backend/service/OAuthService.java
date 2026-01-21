@@ -109,7 +109,8 @@ public class OAuthService {
             user.getEmail(),
             "ROLE_" + user.getRole().name(),
             user.getId(),
-            user.getName()
+            user.getName(),
+                user.getPhone()
         );
 
         return OAuthResponseDto.builder()

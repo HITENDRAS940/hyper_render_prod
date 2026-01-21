@@ -149,7 +149,8 @@ public class EmailOtpService {
                 user.getEmail(),
                 "ROLE_" + user.getRole().name(),
                 user.getId(),
-                user.getName()
+                user.getName(),
+                user.getPhone()
         );
 
         log.info("Email OTP verification successful for user: {}", user.getId());
