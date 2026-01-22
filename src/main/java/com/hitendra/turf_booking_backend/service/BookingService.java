@@ -296,6 +296,48 @@ public class BookingService {
     }
 
     /**
+     * Get bookings by admin ID (for services created by this admin)
+     */
+    public PaginatedResponse<BookingResponseDto> getBookingsByAdminId(Long adminId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Booking> bookingPage = bookingRepository.findByServiceCreatedById(adminId, pageable);
+
+        List<BookingResponseDto> content = bookingPage.getContent().stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                content,
+                bookingPage.getNumber(),
+                bookingPage.getSize(),
+                bookingPage.getTotalElements(),
+                bookingPage.getTotalPages(),
+                bookingPage.isLast()
+        );
+    }
+
+    /**
+     * Get pending bookings by admin ID (for services created by this admin)
+     */
+    public PaginatedResponse<PendingBookingDto> getPendingBookingsByAdminId(Long adminId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Booking> bookingPage = bookingRepository.findPendingByServiceCreatedById(adminId, pageable);
+
+        List<PendingBookingDto> content = bookingPage.getContent().stream()
+                .map(this::convertToPendingBookingDto)
+                .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                content,
+                bookingPage.getNumber(),
+                bookingPage.getSize(),
+                bookingPage.getTotalElements(),
+                bookingPage.getTotalPages(),
+                bookingPage.isLast()
+        );
+    }
+
+    /**
      * Get current user's bookings
      */
     public List<UserBookingDto> getCurrentUserBookings() {
@@ -547,37 +589,74 @@ public class BookingService {
             dto.setUser(userInfo);
         }
 
-        // Calculate and add price breakdown (only slot price + 2% platform fee, NO taxes)
+        // Calculate accurate price breakdown using PricingService
         if (booking.getResource() != null && booking.getAmount() != null) {
             try {
-                // Calculate slot subtotal (total amount / 1.02 to get base before 2% fee)
-                double totalAmount = booking.getAmount();
-                double slotSubtotal = totalAmount / 1.02;  // Remove 2% to get base price
-                double platformFee = totalAmount - slotSubtotal;  // 2% fee
-                double platformFeePercent = 2.0;
+                // Use PricingService for accurate calculation
+                PriceBreakdownDto priceBreakdown = pricingService.calculatePriceBreakdownForTimeRange(
+                        booking.getResource().getId(),
+                        booking.getStartTime(),
+                        booking.getEndTime(),
+                        booking.getBookingDate()
+                );
 
-                // Round to 2 decimal places
+                // Use calculated values from PricingService
+                double slotSubtotal = priceBreakdown.getSubtotal() != null ? priceBreakdown.getSubtotal() : 0.0;
+                double platformFeePercent = priceBreakdown.getConvenienceFeeRate() != null ? priceBreakdown.getConvenienceFeeRate() : 2.0;
+                double platformFee = priceBreakdown.getConvenienceFee() != null ? priceBreakdown.getConvenienceFee() : 0.0;
+
+                // Use the stored amount as the authoritative total (in case pricing rules changed)
+                double storedTotal = booking.getAmount();
+
+                // If calculated total differs significantly from stored total,
+                // use stored total and recalculate breakdown proportionally
+                double calculatedTotal = priceBreakdown.getTotalAmount() != null ? priceBreakdown.getTotalAmount() : 0.0;
+
+                if (Math.abs(calculatedTotal - storedTotal) > 0.01) {
+                    // Pricing rules may have changed, so derive breakdown from stored amount
+                    // Using the formula: storedTotal = subtotal * (1 + feeRate/100)
+                    // Therefore: subtotal = storedTotal / (1 + feeRate/100)
+                    slotSubtotal = storedTotal / (1 + platformFeePercent / 100.0);
+                    platformFee = storedTotal - slotSubtotal;
+                    log.debug("Price recalculated for booking {}: stored={}, calculated={}",
+                            booking.getId(), storedTotal, calculatedTotal);
+                }
+
+                // Round to 2 decimal places for monetary precision
                 slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
                 platformFee = Math.round(platformFee * 100.0) / 100.0;
-                totalAmount = Math.round(totalAmount * 100.0) / 100.0;
+                storedTotal = Math.round(storedTotal * 100.0) / 100.0;
 
                 BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
-                        .totalAmount(totalAmount)
+                        .totalAmount(storedTotal)
                         .currency("INR")
                         .build();
 
                 dto.setAmountBreakdown(amountBreakdown);
             } catch (Exception e) {
                 log.warn("Failed to calculate price breakdown for booking {}: {}", booking.getId(), e.getMessage());
-                // If calculation fails, at least show the total amount
-                BookingResponseDto.AmountBreakdown basicBreakdown = BookingResponseDto.AmountBreakdown.builder()
-                        .totalAmount(booking.getAmount())
+                // Fallback: derive from stored amount with default 2% fee
+                double storedTotal = booking.getAmount();
+                double platformFeePercent = 2.0;
+                double slotSubtotal = storedTotal / (1 + platformFeePercent / 100.0);
+                double platformFee = storedTotal - slotSubtotal;
+
+                // Round to 2 decimal places
+                slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
+                platformFee = Math.round(platformFee * 100.0) / 100.0;
+                storedTotal = Math.round(storedTotal * 100.0) / 100.0;
+
+                BookingResponseDto.AmountBreakdown fallbackBreakdown = BookingResponseDto.AmountBreakdown.builder()
+                        .slotSubtotal(slotSubtotal)
+                        .platformFeePercent(platformFeePercent)
+                        .platformFee(platformFee)
+                        .totalAmount(storedTotal)
                         .currency("INR")
                         .build();
-                dto.setAmountBreakdown(basicBreakdown);
+                dto.setAmountBreakdown(fallbackBreakdown);
             }
         }
 

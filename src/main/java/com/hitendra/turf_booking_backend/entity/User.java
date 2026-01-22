@@ -42,9 +42,18 @@ public class User {
     @Builder.Default
     private Role role = Role.USER;
 
+    // Account status for deletion compliance
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status")
+    @Builder.Default
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
     @Column
     @Builder.Default
     private boolean enabled = true;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 
     @Column
     @Builder.Default
@@ -66,6 +75,9 @@ public class User {
         }
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (accountStatus == null) {
+            accountStatus = AccountStatus.ACTIVE;
         }
     }
 }

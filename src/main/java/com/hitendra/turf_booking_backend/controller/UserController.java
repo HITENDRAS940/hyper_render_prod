@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.controller;
 
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.UserBookingDto;
+import com.hitendra.turf_booking_backend.dto.user.DeleteProfileRequest;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserProfileRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserProfileDto;
@@ -86,6 +87,27 @@ public class UserController {
         Long userId = getCurrentUserId();
         UserProfileDto profile = userProfileService.updateUserProfile(userId, request);
         return ResponseEntity.ok(profile);
+    }
+
+    @DeleteMapping("/profile")
+    @Operation(
+            summary = "Delete user account",
+            description = "Permanently delete the user's account. This action is IRREVERSIBLE. " +
+                    "All personal data (name, email, phone, address, etc.) will be permanently removed. " +
+                    "Booking records will be preserved in anonymized form for business records. " +
+                    "User must confirm by sending confirmationText as 'DELETE MY ACCOUNT'."
+    )
+    public ResponseEntity<String> deleteProfile(@RequestBody DeleteProfileRequest request) {
+        // Validate confirmation with a more explicit confirmation text
+        if (request.getConfirmationText() == null || !request.getConfirmationText().equals("DELETE MY ACCOUNT")) {
+            throw new RuntimeException("Please confirm deletion by setting confirmationText to 'DELETE MY ACCOUNT'");
+        }
+
+        Long userId = getCurrentUserId();
+        userProfileService.permanentlyDeleteAccount(userId);
+        return ResponseEntity.ok("Your account has been permanently deleted. " +
+                "All personal data has been removed. " +
+                "You will be logged out and cannot access this account again.");
     }
 
     private Long getCurrentUserId() {

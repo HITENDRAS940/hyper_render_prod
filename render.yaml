@@ -1,6 +1,6 @@
 # Render Blueprint - Hyper Backend
 # https://render.com/docs/blueprint-spec
-# All environment variables are configured in the Render dashboard
+# Most environment variables are configured in the Render dashboard
 
 services:
   - type: web
@@ -8,5 +8,10 @@ services:
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
-    # All environment variables (DATABASE_URL, JWT_SECRET, etc.)
-    # are already configured in the Render dashboard
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: staging
+      # All other environment variables (DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD,
+      # JWT_SECRET, GOOGLE_CLIENT_ID, CLOUDINARY_*, RAZORPAY_*, etc.)
+      # are configured in the Render dashboard for security

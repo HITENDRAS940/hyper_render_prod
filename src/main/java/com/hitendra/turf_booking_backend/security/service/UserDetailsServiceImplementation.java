@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.security.service;
 
+import com.hitendra.turf_booking_backend.entity.AccountStatus;
 import com.hitendra.turf_booking_backend.entity.User;
 import com.hitendra.turf_booking_backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,11 @@ public class UserDetailsServiceImplementation implements UserDetailsService {
         User user = userRepository.findUserByEmail(username)
                 .or(() -> userRepository.findByPhone(username))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username: " + username));
+
+        // Check if account is deleted - prevent login for deleted accounts
+        if (user.getAccountStatus() == AccountStatus.DELETED) {
+            throw new UsernameNotFoundException("Account has been deleted");
+        }
 
         return UserDetailsImplementation.build(user);
     }

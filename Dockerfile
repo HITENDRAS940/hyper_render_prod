@@ -26,6 +26,10 @@ WORKDIR /app
 # Copy the built JAR from build stage
 COPY --from=build /app/target/Hyper_backend-0.0.1-SNAPSHOT.jar app.jar
 
+# Set default Spring profile to staging for Render deployment
+# Can be overridden via environment variable in Render dashboard
+ENV SPRING_PROFILES_ACTIVE=staging
+
 # Expose port (Render will override with $PORT)
 EXPOSE 8080
 

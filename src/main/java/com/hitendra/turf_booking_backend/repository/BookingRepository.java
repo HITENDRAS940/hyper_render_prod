@@ -439,4 +439,55 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         WHERE b.id IN :bookingIds
         """)
     int expireAbandonedBookings(@Param("bookingIds") List<Long> bookingIds);
+
+    /**
+     * Find all bookings for services created by a specific admin
+     * Used for admin dashboard
+     */
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.service.createdBy.id = :adminId " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByServiceCreatedById(
+            @Param("adminId") Long adminId,
+            Pageable pageable
+    );
+
+    /**
+     * Find all pending bookings for services created by a specific admin
+     * Used for admin dashboard
+     */
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.service.createdBy.id = :adminId " +
+           "AND b.status = 'PENDING' " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findPendingByServiceCreatedById(
+            @Param("adminId") Long adminId,
+            Pageable pageable
+    );
+
+    // ==================== GDPR/PRIVACY COMPLIANCE METHODS ====================
+
+    /**
+     * Unlink all bookings from a user for GDPR-compliant account deletion.
+     * Sets user_id = NULL for all bookings belonging to this user.
+     * This preserves booking records for business purposes while removing
+     * any association with the deleted user.
+     *
+     * @param userId The user ID whose bookings should be unlinked
+     * @return Number of bookings unlinked
+     */
+    @Modifying
+    @Query("UPDATE Booking b SET b.user = NULL WHERE b.user.id = :userId")
+    int unlinkBookingsFromUser(@Param("userId") Long userId);
+
+    /**
+     * Unlink all bookings created by an admin for GDPR-compliant account deletion.
+     * Sets created_by_admin_id = NULL for all bookings created by this admin.
+     *
+     * @param adminProfileId The admin profile ID whose created bookings should be unlinked
+     * @return Number of bookings unlinked
+     */
+    @Modifying
+    @Query("UPDATE Booking b SET b.adminProfile = NULL WHERE b.adminProfile.id = :adminProfileId")
+    int unlinkBookingsFromAdmin(@Param("adminProfileId") Long adminProfileId);
 }
