@@ -187,6 +187,13 @@ public class ManagerController {
         return ResponseEntity.ok(approvedBooking);
     }
 
+    @PutMapping("/bookings/{bookingId}/complete")
+    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered")
+    public ResponseEntity<BookingResponseDto> completeBooking(@PathVariable Long bookingId) {
+        BookingResponseDto completedBooking = bookingService.completeBooking(bookingId);
+        return ResponseEntity.ok(completedBooking);
+    }
+
     @GetMapping("/bookings/pending")
     @Operation(summary = "Get pending bookings", description = "Get all bookings with PENDING status")
     public ResponseEntity<PaginatedResponse<PendingBookingDto>> getPendingBookings(

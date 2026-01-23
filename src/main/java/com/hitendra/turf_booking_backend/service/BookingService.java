@@ -497,6 +497,26 @@ public class BookingService {
     }
 
     /**
+     * Mark a booking as completed (service has been delivered)
+     * Only CONFIRMED bookings can be marked as completed
+     */
+    public BookingResponseDto completeBooking(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Only CONFIRMED bookings can be marked as completed. Current status: " + booking.getStatus());
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        log.info("Booking {} marked as completed", bookingId);
+
+        return convertToResponseDto(savedBooking);
+    }
+
+    /**
      * Get pending bookings with detailed info
      */
     public PaginatedResponse<PendingBookingDto> getPendingBookingsWithDetails(int page, int size) {

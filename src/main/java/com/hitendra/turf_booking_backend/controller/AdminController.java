@@ -355,6 +355,13 @@ public class AdminController {
         return ResponseEntity.ok(approvedBooking);
     }
 
+    @PutMapping("/bookings/{bookingId}/complete")
+    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered")
+    public ResponseEntity<BookingResponseDto> completeBooking(@PathVariable Long bookingId) {
+        BookingResponseDto completedBooking = bookingService.completeBooking(bookingId);
+        return ResponseEntity.ok(completedBooking);
+    }
+
     @PutMapping("/bookings/{bookingId}/cancel")
     @Operation(summary = "Cancel booking", description = "Cancel a booking. Slots will be released.")
     public ResponseEntity<String> cancelBooking(@PathVariable Long bookingId) {
