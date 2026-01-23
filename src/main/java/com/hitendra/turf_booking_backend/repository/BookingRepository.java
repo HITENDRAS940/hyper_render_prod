@@ -453,15 +453,43 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
-     * Find all bookings for services created by a specific admin with optional date and status filters
-     * Used for admin dashboard with filtering
+     * Find all bookings for services created by a specific admin filtered by date
+     * Used for admin dashboard with date filtering
      */
     @Query("SELECT b FROM Booking b " +
            "WHERE b.service.createdBy.id = :adminId " +
-           "AND (:date IS NULL OR b.bookingDate = :date) " +
-           "AND (:status IS NULL OR b.status = :status) " +
+           "AND b.bookingDate = :date " +
            "ORDER BY b.createdAt DESC")
-    Page<Booking> findByServiceCreatedByIdWithFilters(
+    Page<Booking> findByServiceCreatedByIdAndDate(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date,
+            Pageable pageable
+    );
+
+    /**
+     * Find all bookings for services created by a specific admin filtered by status
+     * Used for admin dashboard with status filtering
+     */
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.service.createdBy.id = :adminId " +
+           "AND b.status = :status " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByServiceCreatedByIdAndStatus(
+            @Param("adminId") Long adminId,
+            @Param("status") BookingStatus status,
+            Pageable pageable
+    );
+
+    /**
+     * Find all bookings for services created by a specific admin filtered by date and status
+     * Used for admin dashboard with both filters
+     */
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.service.createdBy.id = :adminId " +
+           "AND b.bookingDate = :date " +
+           "AND b.status = :status " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByServiceCreatedByIdAndDateAndStatus(
             @Param("adminId") Long adminId,
             @Param("date") LocalDate date,
             @Param("status") BookingStatus status,

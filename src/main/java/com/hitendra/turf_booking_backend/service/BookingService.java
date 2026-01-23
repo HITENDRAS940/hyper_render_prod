@@ -323,7 +323,17 @@ public class BookingService {
     public PaginatedResponse<BookingResponseDto> getBookingsByAdminIdWithFilters(
             Long adminId, java.time.LocalDate date, BookingStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findByServiceCreatedByIdWithFilters(adminId, date, status, pageable);
+
+        Page<Booking> bookingPage;
+        if (date != null && status != null) {
+            bookingPage = bookingRepository.findByServiceCreatedByIdAndDateAndStatus(adminId, date, status, pageable);
+        } else if (date != null) {
+            bookingPage = bookingRepository.findByServiceCreatedByIdAndDate(adminId, date, pageable);
+        } else if (status != null) {
+            bookingPage = bookingRepository.findByServiceCreatedByIdAndStatus(adminId, status, pageable);
+        } else {
+            bookingPage = bookingRepository.findByServiceCreatedById(adminId, pageable);
+        }
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
                 .map(this::convertToResponseDto)
