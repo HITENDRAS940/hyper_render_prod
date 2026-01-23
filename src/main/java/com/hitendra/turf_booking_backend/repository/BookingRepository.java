@@ -453,6 +453,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
+     * Find all bookings for services created by a specific admin with optional date and status filters
+     * Used for admin dashboard with filtering
+     */
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.service.createdBy.id = :adminId " +
+           "AND (:date IS NULL OR b.bookingDate = :date) " +
+           "AND (:status IS NULL OR b.status = :status) " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByServiceCreatedByIdWithFilters(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date,
+            @Param("status") BookingStatus status,
+            Pageable pageable
+    );
+
+    /**
      * Find all pending bookings for services created by a specific admin
      * Used for admin dashboard
      */

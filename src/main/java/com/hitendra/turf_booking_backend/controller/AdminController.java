@@ -288,13 +288,16 @@ public class AdminController {
     // ==================== Booking Management ====================
 
     @GetMapping("/bookings")
-    @Operation(summary = "Get all my bookings", description = "Get all bookings for services created by this admin")
+    @Operation(summary = "Get all my bookings", description = "Get all bookings for services created by this admin. Optionally filter by date and/or status.")
     public ResponseEntity<PaginatedResponse<BookingResponseDto>> getMyBookings(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) com.hitendra.turf_booking_backend.entity.BookingStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Long userId = getCurrentUserId();
         AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByAdminId(adminProfile.getId(), page, size);
+        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByAdminIdWithFilters(
+                adminProfile.getId(), date, status, page, size);
         return ResponseEntity.ok(bookings);
     }
 

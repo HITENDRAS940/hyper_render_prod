@@ -105,9 +105,11 @@ public class UserController {
 
         Long userId = getCurrentUserId();
         userProfileService.permanentlyDeleteAccount(userId);
-        return ResponseEntity.ok("Your account has been permanently deleted. " +
-                "All personal data has been removed. " +
-                "You will be logged out and cannot access this account again.");
+        return ResponseEntity.ok("Your account has been permanently deleted." +
+                "All your personal data has been erased and you have been logged out." +
+                "Your past bookings are retained only in an anonymous form for legal and accounting purposes and are no longer linked to you." +
+                "This action cannot be undone."
+                );
     }
 
     private Long getCurrentUserId() {

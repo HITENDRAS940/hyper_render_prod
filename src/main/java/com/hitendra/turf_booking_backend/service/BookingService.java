@@ -317,6 +317,29 @@ public class BookingService {
     }
 
     /**
+     * Get bookings by admin ID with optional date and status filters
+     * If date or status is null, that filter is not applied
+     */
+    public PaginatedResponse<BookingResponseDto> getBookingsByAdminIdWithFilters(
+            Long adminId, java.time.LocalDate date, BookingStatus status, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Booking> bookingPage = bookingRepository.findByServiceCreatedByIdWithFilters(adminId, date, status, pageable);
+
+        List<BookingResponseDto> content = bookingPage.getContent().stream()
+                .map(this::convertToResponseDto)
+                .collect(Collectors.toList());
+
+        return new PaginatedResponse<>(
+                content,
+                bookingPage.getNumber(),
+                bookingPage.getSize(),
+                bookingPage.getTotalElements(),
+                bookingPage.getTotalPages(),
+                bookingPage.isLast()
+        );
+    }
+
+    /**
      * Get pending bookings by admin ID (for services created by this admin)
      */
     public PaginatedResponse<PendingBookingDto> getPendingBookingsByAdminId(Long adminId, int page, int size) {
