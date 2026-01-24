@@ -77,12 +77,12 @@ public class AdminController {
     // ==================== Service Management ====================
 
     @GetMapping("/services")
-    @Operation(summary = "Get my services", description = "Get all services created by the current admin")
-    public ResponseEntity<PaginatedResponse<ServiceDto>> getMyServices(
+    @Operation(summary = "Get my services", description = "Get all services created by the current admin (lightweight summary)")
+    public ResponseEntity<PaginatedResponse<AdminServiceSummaryDto>> getMyServices(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Long userId = getCurrentUserId();
-        PaginatedResponse<ServiceDto> services = serviceService.getServicesByUserId(userId, page, size);
+        PaginatedResponse<AdminServiceSummaryDto> services = serviceService.getAdminServiceSummaryByUserId(userId, page, size);
         return ResponseEntity.ok(services);
     }
 

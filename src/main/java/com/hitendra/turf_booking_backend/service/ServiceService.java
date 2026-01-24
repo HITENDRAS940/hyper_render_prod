@@ -129,6 +129,28 @@ public class ServiceService {
         );
     }
 
+    /**
+     * Get a lightweight list of services for admin dashboard.
+     * Only fetches id, name, location, city, and availability for optimization.
+     */
+    public PaginatedResponse<AdminServiceSummaryDto> getAdminServiceSummaryByUserId(Long userId, int page, int size) {
+        // Find admin profile by user ID
+        AdminProfile adminProfile = adminProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Admin profile not found for user id: " + userId));
+
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AdminServiceSummaryDto> servicePage = serviceRepository.findAdminServiceSummaryByCreatedById(adminProfile.getId(), pageable);
+
+        return new PaginatedResponse<>(
+                servicePage.getContent(),
+                servicePage.getNumber(),
+                servicePage.getSize(),
+                servicePage.getTotalElements(),
+                servicePage.getTotalPages(),
+                servicePage.isLast()
+        );
+    }
+
     public ServiceDto getServiceById(Long id) {
         Service service = serviceRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Service not found"));

@@ -19,6 +19,12 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
 
     List<Service> findByCreatedById(Long adminProfileId);
     Page<Service> findByCreatedById(Long adminProfileId, Pageable pageable);
+
+    @Query("SELECT new com.hitendra.turf_booking_backend.dto.service.AdminServiceSummaryDto(" +
+            "s.id, s.name, s.location, s.city, s.availability) " +
+            "FROM Service s WHERE s.createdBy.id = :adminProfileId")
+    Page<com.hitendra.turf_booking_backend.dto.service.AdminServiceSummaryDto> findAdminServiceSummaryByCreatedById(
+            @Param("adminProfileId") Long adminProfileId, Pageable pageable);
     List<Service> findByCityIgnoreCase(String city);
     Page<Service> findByCityIgnoreCase(String city, Pageable pageable);
 
