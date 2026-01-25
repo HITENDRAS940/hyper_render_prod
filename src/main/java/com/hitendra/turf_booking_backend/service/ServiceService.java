@@ -472,6 +472,7 @@ public class ServiceService {
         dto.setLocation(service.getLocation());
         dto.setAvailability(service.isAvailability());
         dto.setImages(service.getImages());
+        dto.setDescription(service.getDescription());
         return dto;
     }
 

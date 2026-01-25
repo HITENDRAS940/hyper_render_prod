@@ -15,4 +15,5 @@ public class ServiceCardDto {
     private String location;
     private boolean availability;
     private List<String> images;
+    private String description;
 }
