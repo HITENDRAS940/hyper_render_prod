@@ -36,6 +36,9 @@ public class BookingService {
     private final PricingService pricingService;
     private final AuthUtil authUtil;
 
+    @Value("${pricing.online-payment-percent:20}")
+    private Double onlinePaymentPercent;
+
     // Auto-confirm is now handled via Razorpay webhook only
 
     /**
@@ -680,11 +683,28 @@ public class BookingService {
                 platformFee = Math.round(platformFee * 100.0) / 100.0;
                 storedTotal = Math.round(storedTotal * 100.0) / 100.0;
 
+                // Calculate online and venue amounts
+                double onlineAmount;
+                double venueAmount;
+
+                if (booking.getOnlineAmountPaid() != null) {
+                    // Use stored value if available
+                    onlineAmount = booking.getOnlineAmountPaid().doubleValue();
+                    venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
+                } else {
+                    // Calculate from percentage (for backward compatibility)
+                    onlineAmount = Math.round(storedTotal * onlinePaymentPercent) / 100.0;
+                    venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
+                }
+
                 BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
                         .totalAmount(storedTotal)
+                        .onlinePaymentPercent(onlinePaymentPercent)
+                        .onlineAmount(onlineAmount)
+                        .venueAmount(venueAmount)
                         .currency("INR")
                         .build();
 
@@ -702,11 +722,26 @@ public class BookingService {
                 platformFee = Math.round(platformFee * 100.0) / 100.0;
                 storedTotal = Math.round(storedTotal * 100.0) / 100.0;
 
+                // Calculate online and venue amounts for fallback
+                double onlineAmount;
+                double venueAmount;
+
+                if (booking.getOnlineAmountPaid() != null) {
+                    onlineAmount = booking.getOnlineAmountPaid().doubleValue();
+                    venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
+                } else {
+                    onlineAmount = Math.round(storedTotal * onlinePaymentPercent) / 100.0;
+                    venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
+                }
+
                 BookingResponseDto.AmountBreakdown fallbackBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
                         .totalAmount(storedTotal)
+                        .onlinePaymentPercent(onlinePaymentPercent)
+                        .onlineAmount(onlineAmount)
+                        .venueAmount(venueAmount)
                         .currency("INR")
                         .build();
                 dto.setAmountBreakdown(fallbackBreakdown);

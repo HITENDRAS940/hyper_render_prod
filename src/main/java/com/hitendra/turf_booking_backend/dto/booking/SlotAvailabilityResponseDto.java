@@ -45,6 +45,7 @@ public class SlotAvailabilityResponseDto {
         private String endTime;
         private Integer durationMinutes;
         private Double displayPrice;
+
         private Integer availableCount;
         private Integer totalCount;
         private Boolean available;

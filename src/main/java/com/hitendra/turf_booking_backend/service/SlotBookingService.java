@@ -117,6 +117,9 @@ public class SlotBookingService {
     @Value("${pricing.platform-fee-rate:2.0}")
     private Double platformFeeRate;
 
+    @Value("${pricing.online-payment-percent:20}")
+    private Double onlinePaymentPercent;
+
     // ==================== SLOT AVAILABILITY (Aggregated) ====================
 
     /**
@@ -707,6 +710,9 @@ public class SlotBookingService {
             Double totalAmount = slotPrice + platformFee;
             totalAmount = Math.round(totalAmount * 100.0) / 100.0;
 
+            // Calculate online and venue amounts based on configurable percentage
+            Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+
             String idempotencyKey = request.getIdempotencyKey() != null ? request.getIdempotencyKey() + "-" + i : null;
             String reference = generateBookingReference();
 
@@ -719,6 +725,7 @@ public class SlotBookingService {
                     .endTime(payload.getEndTime())
                     .bookingDate(bookingDate)
                     .amount(totalAmount)
+                    .onlineAmountPaid(java.math.BigDecimal.valueOf(onlineAmount))
                     .reference(reference)
                     .status(BookingStatus.PENDING)
                     .createdAt(Instant.now())
