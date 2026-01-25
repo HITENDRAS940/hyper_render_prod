@@ -76,9 +76,7 @@ public class RazorpayPaymentService {
             booking.getPaymentStatusEnum() == PaymentStatus.IN_PROGRESS) {
             log.warn("Razorpay order already exists for booking: {}. Returning existing order.", bookingId);
             // Use onlineAmountPaid for the order amount (this is what user pays online)
-            double onlineAmount = booking.getOnlineAmountPaid() != null
-                    ? booking.getOnlineAmountPaid().doubleValue()
-                    : booking.getAmount(); // Fallback to total if not set
+            double onlineAmount = booking.getOnlineAmountPaid().doubleValue();
             return RazorpayOrderResponse.builder()
                     .orderId(booking.getRazorpayOrderId())
                     .amount(String.valueOf((int)(onlineAmount * 100)))

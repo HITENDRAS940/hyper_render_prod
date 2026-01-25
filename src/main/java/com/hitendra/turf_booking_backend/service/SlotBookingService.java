@@ -631,6 +631,10 @@ public class SlotBookingService {
         Double totalAmount = totalSlotPrice + platformFee;
         totalAmount = Math.round(totalAmount * 100.0) / 100.0;
 
+        // Calculate online and venue amounts based on configurable percentage
+        Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+        Double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
+
         User user = authUtil.getCurrentUser();
         String reference = generateBookingReference();
 
@@ -650,6 +654,8 @@ public class SlotBookingService {
                 .endTime(endTime)
                 .bookingDate(bookingDate)
                 .amount(totalAmount)
+                .onlineAmountPaid(java.math.BigDecimal.valueOf(onlineAmount))
+                .venueAmountDue(java.math.BigDecimal.valueOf(venueAmount))
                 .reference(reference)
                 .status(bookingStatus)
                 .paymentMode(paymentMode)
@@ -712,6 +718,7 @@ public class SlotBookingService {
 
             // Calculate online and venue amounts based on configurable percentage
             Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            Double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
             String idempotencyKey = request.getIdempotencyKey() != null ? request.getIdempotencyKey() + "-" + i : null;
             String reference = generateBookingReference();
@@ -726,6 +733,7 @@ public class SlotBookingService {
                     .bookingDate(bookingDate)
                     .amount(totalAmount)
                     .onlineAmountPaid(java.math.BigDecimal.valueOf(onlineAmount))
+                    .venueAmountDue(java.math.BigDecimal.valueOf(venueAmount))
                     .reference(reference)
                     .status(BookingStatus.PENDING)
                     .createdAt(Instant.now())
