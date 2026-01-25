@@ -75,9 +75,13 @@ public class RazorpayPaymentService {
         if (booking.getRazorpayOrderId() != null &&
             booking.getPaymentStatusEnum() == PaymentStatus.IN_PROGRESS) {
             log.warn("Razorpay order already exists for booking: {}. Returning existing order.", bookingId);
+            // Use onlineAmountPaid for the order amount (this is what user pays online)
+            double onlineAmount = booking.getOnlineAmountPaid() != null
+                    ? booking.getOnlineAmountPaid().doubleValue()
+                    : booking.getAmount(); // Fallback to total if not set
             return RazorpayOrderResponse.builder()
                     .orderId(booking.getRazorpayOrderId())
-                    .amount(String.valueOf((int)(booking.getAmount() * 100)))
+                    .amount(String.valueOf((int)(onlineAmount * 100)))
                     .currency("INR")
                     .receipt("receipt_" + bookingId)
                     .status("created")
@@ -107,9 +111,14 @@ public class RazorpayPaymentService {
         }
 
         try {
+            // Calculate online amount to charge (use onlineAmountPaid if set, else fallback to total)
+            double onlineAmount = booking.getOnlineAmountPaid() != null
+                    ? booking.getOnlineAmountPaid().doubleValue()
+                    : booking.getAmount(); // Fallback to total if not set
+
             // Create Razorpay order
             JSONObject orderRequest = new JSONObject();
-            orderRequest.put("amount", (int) (booking.getAmount() * 100)); // Amount in paise
+            orderRequest.put("amount", (int) (onlineAmount * 100)); // Amount in paise
             orderRequest.put("currency", "INR");
             orderRequest.put("receipt", "receipt_" + bookingId);
             orderRequest.put("payment_capture", 1); // Auto-capture payment
