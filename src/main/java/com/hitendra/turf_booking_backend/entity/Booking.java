@@ -120,6 +120,22 @@ public class Booking {
     @Column(name = "payment_initiated_at")
     private Instant paymentInitiatedAt;
 
+    /**
+     * Amount paid online at the time of booking (X% of total).
+     */
     @Column(name = "online_amount_paid", precision = 19, scale = 2)
     private java.math.BigDecimal onlineAmountPaid;
+
+    /**
+     * Amount due to be paid at the venue (remaining amount after online payment).
+     */
+    @Column(name = "venue_amount_due", precision = 19, scale = 2)
+    private java.math.BigDecimal venueAmountDue;
+
+    /**
+     * Whether the venue amount has been collected.
+     */
+    @Column(name = "venue_amount_collected")
+    @Builder.Default
+    private Boolean venueAmountCollected = false;
 }

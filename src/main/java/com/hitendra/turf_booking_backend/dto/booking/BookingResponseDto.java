@@ -56,8 +56,9 @@ public class BookingResponseDto {
         private Double platformFee;        // Platform fee amount (2% of subtotal)
         private Double totalAmount;        // Final amount to pay (slotSubtotal + platformFee)
         private Double onlinePaymentPercent; // Percentage of total to pay online
-        private Double onlineAmount;       // Amount to pay online (X% of totalAmount)
+        private Double onlineAmount;       // Amount paid online (X% of totalAmount)
         private Double venueAmount;        // Amount to pay at venue (100-X% of totalAmount)
+        private Boolean venueAmountCollected; // Whether venue amount has been collected
         private String currency;           // Currency code (e.g., "INR")
     }
 }

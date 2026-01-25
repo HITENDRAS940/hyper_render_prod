@@ -697,6 +697,8 @@ public class BookingService {
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 }
 
+                Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+
                 BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
@@ -705,6 +707,7 @@ public class BookingService {
                         .onlinePaymentPercent(onlinePaymentPercent)
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
+                        .venueAmountCollected(venueAmountCollected)
                         .currency("INR")
                         .build();
 
@@ -734,6 +737,8 @@ public class BookingService {
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 }
 
+                Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+
                 BookingResponseDto.AmountBreakdown fallbackBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
@@ -742,6 +747,7 @@ public class BookingService {
                         .onlinePaymentPercent(onlinePaymentPercent)
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
+                        .venueAmountCollected(venueAmountCollected)
                         .currency("INR")
                         .build();
                 dto.setAmountBreakdown(fallbackBreakdown);

@@ -978,11 +978,33 @@ public class SlotBookingService {
         double platformFee = totalAmount - slotSubtotal;
         platformFee = Math.round(platformFee * 100.0) / 100.0;
 
+        // Calculate online and venue amounts
+        double onlineAmount;
+        double venueAmount;
+
+        if (booking.getOnlineAmountPaid() != null) {
+            onlineAmount = booking.getOnlineAmountPaid().doubleValue();
+        } else {
+            onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+        }
+
+        if (booking.getVenueAmountDue() != null) {
+            venueAmount = booking.getVenueAmountDue().doubleValue();
+        } else {
+            venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
+        }
+
+        Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+
         BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                 .slotSubtotal(slotSubtotal)
                 .platformFeePercent(platformFeeRate)
                 .platformFee(platformFee)
                 .totalAmount(totalAmount)
+                .onlinePaymentPercent(onlinePaymentPercent)
+                .onlineAmount(onlineAmount)
+                .venueAmount(venueAmount)
+                .venueAmountCollected(venueAmountCollected)
                 .currency("INR")
                 .build();
 
