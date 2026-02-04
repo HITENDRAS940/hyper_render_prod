@@ -94,5 +94,36 @@ public interface CashLedgerRepository extends JpaRepository<CashLedger, Long> {
         LIMIT 1
     """)
     Optional<Double> getCurrentBalance(@Param("serviceId") Long serviceId);
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Get total credits and debits in a single query (for dashboard).
+     */
+    @Query("""
+        SELECT COALESCE(SUM(c.creditAmount), 0.0), COALESCE(SUM(c.debitAmount), 0.0)
+        FROM CashLedger c
+        WHERE c.service.id = :serviceId
+        AND c.createdAt BETWEEN :startDate AND :endDate
+    """)
+    Object[] getTotalCreditsAndDebitsByServiceAndDateRange(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate
+    );
+
+    /**
+     * Count ledger entries for a service (for pagination info).
+     */
+    @Query("SELECT COUNT(c) FROM CashLedger c WHERE c.service.id = :serviceId")
+    long countByServiceId(@Param("serviceId") Long serviceId);
+
+    /**
+     * Check if any ledger entry exists for service (faster than counting).
+     */
+    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM CashLedger c WHERE c.service.id = :serviceId")
+    boolean existsByServiceId(@Param("serviceId") Long serviceId);
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

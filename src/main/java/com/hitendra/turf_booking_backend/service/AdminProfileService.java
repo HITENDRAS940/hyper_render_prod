@@ -40,8 +40,8 @@ public class AdminProfileService {
     // ---------------------------------------------------------
     public AdminProfileDto createAdmin(CreateAdminRequest request) {
 
-        // Check if phone exists
-        if (userRepository.findByPhone(request.getPhone()).isPresent()) {
+        // Check if phone exists (optimized)
+        if (userRepository.existsByPhone(request.getPhone())) {
             throw new RuntimeException("User with this phone number already exists");
         }
 

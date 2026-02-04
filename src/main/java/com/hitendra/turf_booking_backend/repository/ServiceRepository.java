@@ -1,6 +1,7 @@
 package com.hitendra.turf_booking_backend.repository;
 
 import com.hitendra.turf_booking_backend.entity.Service;
+import com.hitendra.turf_booking_backend.repository.projection.ServiceCardProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface ServiceRepository extends JpaRepository<Service, Long> {
     @Modifying
@@ -88,4 +90,104 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
             @Param("city") String city,
             @Param("activityCode") String activityCode
     );
+
+    // ==================== OPTIMIZED PROJECTION QUERIES ====================
+
+    /**
+     * Get lightweight service cards (projection-based).
+     * Only fetches essential fields for list/card views.
+     */
+    @Query("""
+        SELECT DISTINCT s.id as id, s.name as name, s.location as location, 
+               s.city as city, s.availability as availability
+        FROM Service s
+        ORDER BY s.id DESC
+        """)
+    Page<ServiceCardProjection> findAllServicesCardProjected(Pageable pageable);
+
+    /**
+     * Get lightweight service cards by city (projection-based).
+     * Uses DISTINCT to avoid duplicates from EAGER relationships.
+     */
+    @Query("""
+        SELECT DISTINCT s.id as id, s.name as name, s.location as location, 
+               s.city as city, s.availability as availability
+        FROM Service s
+        WHERE LOWER(s.city) = LOWER(:city)
+        ORDER BY s.id DESC
+        """)
+    Page<ServiceCardProjection> findServiceCardsByCityProjected(@Param("city") String city, Pageable pageable);
+
+    /**
+     * Get service IDs by city (for pagination) - Step 1
+     * This avoids JOIN with service_images table
+     */
+    @Query("""
+        SELECT s.id
+        FROM Service s
+        WHERE LOWER(s.city) = LOWER(:city)
+        ORDER BY s.id DESC
+        """)
+    Page<Long> findServiceIdsByCity(@Param("city") String city, Pageable pageable);
+
+    /**
+     * Get complete service entities by IDs - Step 2
+     * This will fetch services with their images collection
+     */
+    @Query("""
+        SELECT s
+        FROM Service s
+        WHERE s.id IN :ids
+        ORDER BY s.id DESC
+        """)
+    List<Service> findServicesByIds(@Param("ids") List<Long> ids);
+
+    /**
+     * Get all service IDs (for pagination) - Step 1
+     * This avoids JOIN with service_images table
+     */
+    @Query("""
+        SELECT s.id
+        FROM Service s
+        ORDER BY s.id DESC
+        """)
+    Page<Long> findAllServiceIds(Pageable pageable);
+
+    /**
+     * Get only service IDs for a specific admin (for batch operations).
+     */
+    @Query("SELECT s.id FROM Service s WHERE s.createdBy.id = :adminProfileId")
+    List<Long> findServiceIdsByCreatedById(@Param("adminProfileId") Long adminProfileId);
+
+    /**
+     * Check if service exists and belongs to admin (faster than full entity load).
+     */
+    @Query("SELECT CASE WHEN COUNT(s) > 0 THEN true ELSE false END FROM Service s WHERE s.id = :serviceId AND s.createdBy.id = :adminProfileId")
+    boolean existsByIdAndCreatedById(@Param("serviceId") Long serviceId, @Param("adminProfileId") Long adminProfileId);
+
+    /**
+     * Get service name by ID (minimal data fetch).
+     */
+    @Query("SELECT s.name FROM Service s WHERE s.id = :serviceId")
+    Optional<String> findServiceNameById(@Param("serviceId") Long serviceId);
+
+    /**
+     * Get only service IDs that are available.
+     */
+    @Query("SELECT s.id FROM Service s WHERE s.availability = true")
+    List<Long> findAvailableServiceIds();
+
+    /**
+     * Get service IDs by city (for batch availability checking).
+     */
+    @Query("SELECT s.id FROM Service s WHERE LOWER(s.city) = LOWER(:city) AND s.availability = true")
+    List<Long> findAvailableServiceIdsByCity(@Param("city") String city);
+
+    /**
+     * Get all distinct cities where services exist (optimized).
+     */
+    @Query("SELECT DISTINCT s.city FROM Service s WHERE s.city IS NOT NULL AND s.city != '' AND s.city != 'Unknown' ORDER BY s.city")
+    List<String> findAllDistinctCities();
+
+    // ==================== END OPTIMIZED PROJECTION QUERIES ====================
 }

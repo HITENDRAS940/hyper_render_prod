@@ -26,8 +26,8 @@ public class UserRegistrationService {
      */
     @Transactional
     public User registerNewUser(String phone) {
-        // Safety check: Ensure no user exists with this phone
-        if (userRepository.findByPhone(phone).isPresent()) {
+        // Safety check: Ensure no user exists with this phone (optimized)
+        if (userRepository.existsByPhone(phone)) {
             throw new IllegalStateException("User already exists with phone: " + phone);
         }
 
@@ -48,13 +48,13 @@ public class UserRegistrationService {
     }
 
     /**
-     * Check if a user exists by phone number.
+     * Check if a user exists by phone number (optimized).
      *
      * @param phone The phone number to check
      * @return true if user exists, false otherwise
      */
     @Transactional(readOnly = true)
     public boolean userExists(String phone) {
-        return userRepository.findByPhone(phone).isPresent();
+        return userRepository.existsByPhone(phone);
     }
 }

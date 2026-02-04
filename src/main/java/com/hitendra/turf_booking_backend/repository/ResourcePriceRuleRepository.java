@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface ResourcePriceRuleRepository extends JpaRepository<ResourcePriceRule, Long> {
 
@@ -38,5 +39,58 @@ public interface ResourcePriceRuleRepository extends JpaRepository<ResourcePrice
     List<ResourcePriceRule> findEnabledRulesByResourceId(@Param("resourceId") Long resourceId);
 
     void deleteByResourceSlotConfig_Resource_Id(Long resourceId);
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Get only the base price for a specific slot (minimal data for quick pricing).
+     * Returns the first applicable rule's base price (highest priority).
+     * Note: extraCharge should be added separately if needed.
+     * NOTE: Caller should use .stream().findFirst() to get single result
+     */
+    @Query("""
+        SELECT r.basePrice FROM ResourcePriceRule r 
+        WHERE r.resourceSlotConfig.resource.id = :resourceId 
+        AND r.enabled = true 
+        AND (r.dayType = :dayType OR r.dayType = 'ALL') 
+        AND r.startTime <= :slotTime AND r.endTime > :slotTime 
+        ORDER BY r.priority DESC
+        """)
+    List<Double> findApplicableBasePriceList(
+            @Param("resourceId") Long resourceId,
+            @Param("dayType") DayType dayType,
+            @Param("slotTime") LocalTime slotTime);
+
+    /**
+     * Get base price and extra charge for a specific slot.
+     * Returns [basePrice, extraCharge] for the highest priority applicable rule.
+     * NOTE: Caller should use .stream().findFirst() to get single result
+     */
+    @Query("""
+        SELECT r.basePrice, r.extraCharge FROM ResourcePriceRule r 
+        WHERE r.resourceSlotConfig.resource.id = :resourceId 
+        AND r.enabled = true 
+        AND (r.dayType = :dayType OR r.dayType = 'ALL') 
+        AND r.startTime <= :slotTime AND r.endTime > :slotTime 
+        ORDER BY r.priority DESC
+        """)
+    List<Object[]> findApplicablePriceComponentsList(
+            @Param("resourceId") Long resourceId,
+            @Param("dayType") DayType dayType,
+            @Param("slotTime") LocalTime slotTime);
+
+    /**
+     * Check if any price rule exists for resource (faster than loading rules).
+     */
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM ResourcePriceRule r WHERE r.resourceSlotConfig.resource.id = :resourceId AND r.enabled = true")
+    boolean existsEnabledRulesForResource(@Param("resourceId") Long resourceId);
+
+    /**
+     * Get count of enabled rules for a resource.
+     */
+    @Query("SELECT COUNT(r) FROM ResourcePriceRule r WHERE r.resourceSlotConfig.resource.id = :resourceId AND r.enabled = true")
+    long countEnabledRulesByResourceId(@Param("resourceId") Long resourceId);
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

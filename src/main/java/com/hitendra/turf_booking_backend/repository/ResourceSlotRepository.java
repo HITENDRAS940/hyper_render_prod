@@ -28,5 +28,27 @@ public interface ResourceSlotRepository extends JpaRepository<ResourceSlot, Long
     void deleteByResourceId(Long resourceId);
 
     boolean existsByResourceIdAndStartTimeAndEndTime(Long resourceId, LocalTime startTime, LocalTime endTime);
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Get only slot times for a resource (minimal data for availability display).
+     */
+    @Query("SELECT rs.id, rs.startTime, rs.endTime, rs.displayOrder FROM ResourceSlot rs WHERE rs.resource.id = :resourceId AND rs.enabled = true ORDER BY rs.startTime ASC")
+    List<Object[]> findEnabledSlotTimesOnly(@Param("resourceId") Long resourceId);
+
+    /**
+     * Get only slot IDs for a resource (for batch operations).
+     */
+    @Query("SELECT rs.id FROM ResourceSlot rs WHERE rs.resource.id = :resourceId AND rs.enabled = true")
+    List<Long> findEnabledSlotIdsByResourceId(@Param("resourceId") Long resourceId);
+
+    /**
+     * Count enabled slots for a resource.
+     */
+    @Query("SELECT COUNT(rs) FROM ResourceSlot rs WHERE rs.resource.id = :resourceId AND rs.enabled = true")
+    long countEnabledSlotsByResourceId(@Param("resourceId") Long resourceId);
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

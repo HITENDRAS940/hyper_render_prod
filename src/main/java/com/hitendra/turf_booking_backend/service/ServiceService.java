@@ -47,26 +47,36 @@ public class ServiceService {
 
     public PaginatedResponse<ServiceCardDto> getAllServicesCard(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<com.hitendra.turf_booking_backend.entity.Service> servicePage = serviceRepository.findAll(pageable);
 
-        List<ServiceCardDto> content = servicePage.getContent().stream()
+        // Step 1: Get paginated service IDs (no join with images table)
+        Page<Long> serviceIdsPage = serviceRepository.findAllServiceIds(pageable);
+
+        // Step 2: Fetch full service entities by IDs (with images)
+        List<com.hitendra.turf_booking_backend.entity.Service> services =
+            serviceIdsPage.getContent().isEmpty() ?
+            List.of() :
+            serviceRepository.findServicesByIds(serviceIdsPage.getContent());
+
+        // Convert to DTOs
+        List<ServiceCardDto> content = services.stream()
                 .map(this::convertToCardDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
                 content,
-                servicePage.getNumber(),
-                servicePage.getSize(),
-                servicePage.getTotalElements(),
-                servicePage.getTotalPages(),
-                servicePage.isLast()
+                serviceIdsPage.getNumber(),
+                serviceIdsPage.getSize(),
+                serviceIdsPage.getTotalElements(),
+                serviceIdsPage.getTotalPages(),
+                serviceIdsPage.isLast()
         );
     }
 
     public List<ServiceDto> getServicesByAdminId(Long adminProfileId) {
-        // Verify admin profile exists
-        adminProfileRepository.findById(adminProfileId)
-                .orElseThrow(() -> new RuntimeException("Admin profile not found with id: " + adminProfileId));
+        // Verify admin profile exists (optimized)
+        if (!adminProfileRepository.existsById(adminProfileId)) {
+            throw new RuntimeException("Admin profile not found with id: " + adminProfileId);
+        }
 
         return serviceRepository.findByCreatedById(adminProfileId).stream()
                 .map(this::convertToDto)
@@ -74,9 +84,10 @@ public class ServiceService {
     }
 
     public PaginatedResponse<ServiceDto> getServicesByAdminId(Long adminProfileId, int page, int size) {
-        // Verify admin profile exists
-        adminProfileRepository.findById(adminProfileId)
-                .orElseThrow(() -> new RuntimeException("Admin profile not found with id: " + adminProfileId));
+        // Verify admin profile exists (optimized)
+        if (!adminProfileRepository.existsById(adminProfileId)) {
+            throw new RuntimeException("Admin profile not found with id: " + adminProfileId);
+        }
 
         Pageable pageable = PageRequest.of(page, size);
         Page<com.hitendra.turf_booking_backend.entity.Service> servicePage = serviceRepository.findByCreatedById(adminProfileId, pageable);
@@ -527,11 +538,10 @@ public class ServiceService {
 
     /**
      * Get services by city name
+     * OPTIMIZED: Uses repository query instead of loading all services
      */
     public List<ServiceDto> getServicesByCity(String city) {
-        return serviceRepository.findAll().stream()
-                .filter(service -> service.getCity() != null &&
-                               service.getCity().equalsIgnoreCase(city))
+        return serviceRepository.findByCityIgnoreCase(city).stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -559,22 +569,32 @@ public class ServiceService {
 
     /**
      * Get services by city name with pagination (Card view)
+     * OPTIMIZED: Only fetches required fields (id, name, location, availability, images, description)
      */
     public PaginatedResponse<ServiceCardDto> getServicesCardByCity(String city, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<Service> servicePage = serviceRepository.findByCityIgnoreCase(city, pageable);
 
-        List<ServiceCardDto> content = servicePage.getContent().stream()
+        // Step 1: Get paginated service IDs by city (no join with images table)
+        Page<Long> serviceIdsPage = serviceRepository.findServiceIdsByCity(city, pageable);
+
+        // Step 2: Fetch full service entities by IDs (with images)
+        List<com.hitendra.turf_booking_backend.entity.Service> services =
+            serviceIdsPage.getContent().isEmpty() ?
+            List.of() :
+            serviceRepository.findServicesByIds(serviceIdsPage.getContent());
+
+        // Convert to DTOs
+        List<ServiceCardDto> content = services.stream()
                 .map(this::convertToCardDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
                 content,
-                servicePage.getNumber(),
-                servicePage.getSize(),
-                servicePage.getTotalElements(),
-                servicePage.getTotalPages(),
-                servicePage.isLast()
+                serviceIdsPage.getNumber(),
+                serviceIdsPage.getSize(),
+                serviceIdsPage.getTotalElements(),
+                serviceIdsPage.getTotalPages(),
+                serviceIdsPage.isLast()
         );
     }
 
@@ -608,14 +628,10 @@ public class ServiceService {
 
     /**
      * Get all unique cities where services are available
+     * OPTIMIZED: Direct query for distinct cities without loading full entities
      */
     public List<String> getAvailableCities() {
-        return serviceRepository.findAll().stream()
-                .map(com.hitendra.turf_booking_backend.entity.Service::getCity)
-                .filter(city -> city != null && !city.isEmpty() && !"Unknown".equals(city))
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        return serviceRepository.findAllDistinctCities();
     }
 
     /**

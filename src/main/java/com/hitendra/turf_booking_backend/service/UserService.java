@@ -84,17 +84,22 @@ public class UserService {
     }
 
     private UserInfoDto convertToUserInfoDto(User user) {
-        // Get booking statistics
-        List<com.hitendra.turf_booking_backend.entity.Booking> userBookings =
-                bookingRepository.findByUserId(user.getId());
+        // Get booking statistics using optimized projection query
+        List<com.hitendra.turf_booking_backend.repository.projection.BookingCountProjection> bookingCounts =
+                bookingRepository.getBookingCountsByStatusForUser(user.getId());
 
-        long totalBookings = userBookings.size();
-        long confirmedBookings = userBookings.stream()
-                .filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
-                .count();
-        long cancelledBookings = userBookings.stream()
-                .filter(b -> b.getStatus() == BookingStatus.CANCELLED)
-                .count();
+        long totalBookings = 0;
+        long confirmedBookings = 0;
+        long cancelledBookings = 0;
+
+        for (var count : bookingCounts) {
+            totalBookings += count.getCount();
+            if ("CONFIRMED".equals(count.getStatus())) {
+                confirmedBookings = count.getCount();
+            } else if ("CANCELLED".equals(count.getStatus())) {
+                cancelledBookings = count.getCount();
+            }
+        }
 
         UserInfoDto dto = UserInfoDto.builder()
                 .id(user.getId())

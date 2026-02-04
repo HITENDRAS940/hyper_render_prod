@@ -28,5 +28,36 @@ public interface InventorySaleRepository extends JpaRepository<InventorySale, Lo
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate
     );
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Count sales for a service in date range.
+     */
+    @Query("SELECT COUNT(s) FROM InventorySale s WHERE s.service.id = :serviceId AND s.saleDate BETWEEN :startDate AND :endDate")
+    long countByServiceIdAndDateRange(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Get sale IDs for batch operations.
+     */
+    @Query("SELECT s.id FROM InventorySale s WHERE s.service.id = :serviceId ORDER BY s.saleDate DESC")
+    List<Long> findSaleIdsByServiceId(@Param("serviceId") Long serviceId);
+
+    /**
+     * Get total quantity sold for an item (for analytics).
+     * Joins through InventorySaleItem to sum quantities.
+     */
+    @Query("SELECT COALESCE(SUM(si.quantity), 0) FROM InventorySaleItem si JOIN si.sale s WHERE si.item.id = :itemId AND s.saleDate BETWEEN :startDate AND :endDate")
+    Long getTotalQuantitySoldByItemAndDateRange(
+        @Param("itemId") Long itemId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

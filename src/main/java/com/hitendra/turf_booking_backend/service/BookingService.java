@@ -188,14 +188,15 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by service
+     * Get bookings by service (optimized with projection)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByService(Long serviceId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findByServiceId(serviceId, pageable);
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
+                bookingRepository.findBookingsByServiceIdProjected(serviceId, pageable);
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -209,14 +210,15 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by status
+     * Get bookings by status (optimized with projection)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByStatus(BookingStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findByStatus(status, pageable);
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
+                bookingRepository.findBookingsByStatusProjected(status, pageable);
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -230,14 +232,15 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by resource ID
+     * Get bookings by resource ID (optimized with projection)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByResource(Long resourceId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findByResourceId(resourceId, pageable);
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
+                bookingRepository.findBookingsByResourceIdProjected(resourceId, pageable);
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -251,20 +254,20 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by resource ID and optional date
+     * Get bookings by resource ID and optional date (optimized with projection)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByResourceAndDate(Long resourceId, LocalDate date, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage;
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
 
         if (date != null) {
-            bookingPage = bookingRepository.findByResourceIdAndBookingDate(resourceId, date, pageable);
+            bookingPage = bookingRepository.findBookingsByResourceIdAndDateProjected(resourceId, date, pageable);
         } else {
-            bookingPage = bookingRepository.findByResourceId(resourceId, pageable);
+            bookingPage = bookingRepository.findBookingsByResourceIdProjected(resourceId, pageable);
         }
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -299,14 +302,15 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by admin ID (for services created by this admin)
+     * Get bookings by admin ID (optimized with projection - for services created by this admin)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByAdminId(Long adminId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findByServiceCreatedById(adminId, pageable);
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
+                bookingRepository.findBookingsByAdminIdProjected(adminId, pageable);
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -320,26 +324,26 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by admin ID with optional date and status filters
+     * Get bookings by admin ID with optional date and status filters (optimized with projection)
      * If date or status is null, that filter is not applied
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByAdminIdWithFilters(
             Long adminId, java.time.LocalDate date, BookingStatus status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Page<Booking> bookingPage;
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
         if (date != null && status != null) {
-            bookingPage = bookingRepository.findByServiceCreatedByIdAndDateAndStatus(adminId, date, status, pageable);
+            bookingPage = bookingRepository.findBookingsByAdminIdAndDateAndStatusProjected(adminId, date, status, pageable);
         } else if (date != null) {
-            bookingPage = bookingRepository.findByServiceCreatedByIdAndDate(adminId, date, pageable);
+            bookingPage = bookingRepository.findBookingsByAdminIdAndDateProjected(adminId, date, pageable);
         } else if (status != null) {
-            bookingPage = bookingRepository.findByServiceCreatedByIdAndStatus(adminId, status, pageable);
+            bookingPage = bookingRepository.findBookingsByAdminIdAndStatusProjected(adminId, status, pageable);
         } else {
-            bookingPage = bookingRepository.findByServiceCreatedById(adminId, pageable);
+            bookingPage = bookingRepository.findBookingsByAdminIdProjected(adminId, pageable);
         }
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertToResponseDto)
+                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -374,40 +378,54 @@ public class BookingService {
     }
 
     /**
-     * Get current user's bookings
+     * Get current user's bookings (optimized with projection query)
      */
     public List<UserBookingDto> getCurrentUserBookings() {
         User currentUser = authUtil.getCurrentUser();
-        List<Booking> userBookings = bookingRepository.findByUserId(currentUser.getId());
+        List<com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection> projections =
+                bookingRepository.findUserBookingsProjected(currentUser.getId());
 
-        return userBookings.stream()
-                .map(this::convertToUserBookingDto)
+        return projections.stream()
+                .map(this::convertProjectionToUserBookingDto)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Get the last (most recent) booking for the current user
+     * Get the last (most recent) booking for the current user (optimized)
      * Returns the booking with the latest createdAt timestamp
-     * Returns empty Optional if user has no bookings
+     * Returns null if user has no bookings
      */
     public UserBookingDto getLastUserBooking() {
         User currentUser = authUtil.getCurrentUser();
-        List<Booking> userBookings = bookingRepository.findByUserId(currentUser.getId());
+        com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection projection =
+                bookingRepository.findLastUserBookingProjected(currentUser.getId());
 
-        if (userBookings.isEmpty()) {
+        if (projection == null) {
             return null;
         }
 
-        // Find the booking with the latest createdAt timestamp
-        Booking lastBooking = userBookings.stream()
-                .max((b1, b2) -> b1.getCreatedAt().compareTo(b2.getCreatedAt()))
-                .orElse(null);
+        return convertProjectionToUserBookingDto(projection);
+    }
 
-        if (lastBooking == null) {
-            return null;
-        }
+    private UserBookingDto convertProjectionToUserBookingDto(
+            com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection projection) {
+        List<UserBookingDto.SlotTimeDto> slotTimes = List.of(UserBookingDto.SlotTimeDto.builder()
+                .startTime(projection.getStartTime().toString())
+                .endTime(projection.getEndTime().toString())
+                .build());
 
-        return convertToUserBookingDto(lastBooking);
+        return UserBookingDto.builder()
+                .id(projection.getId())
+                .serviceId(projection.getServiceId())
+                .serviceName(projection.getServiceName())
+                .resourceId(projection.getResourceId())
+                .resourceName(projection.getResourceName())
+                .status(projection.getStatus())
+                .date(projection.getBookingDate())
+                .slots(slotTimes)
+                .totalAmount(projection.getAmount())
+                .createdAt(projection.getCreatedAt())
+                .build();
     }
 
     /**
@@ -616,6 +634,78 @@ public class BookingService {
                 .totalAmount(booking.getAmount())
                 .createdAt(booking.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Convert BookingListProjection to BookingResponseDto (optimized - uses projection data)
+     */
+    private BookingResponseDto convertProjectionToResponseDto(
+            com.hitendra.turf_booking_backend.repository.projection.BookingListProjection projection) {
+        BookingResponseDto dto = new BookingResponseDto();
+        dto.setId(projection.getId());
+        dto.setReference(projection.getReference());
+        dto.setServiceId(projection.getServiceId());
+        dto.setServiceName(projection.getServiceName());
+        dto.setBookingDate(projection.getBookingDate());
+        dto.setCreatedAt(projection.getCreatedAt());
+        dto.setStartTime(projection.getStartTime().toString());
+        dto.setEndTime(projection.getEndTime().toString());
+        dto.setStatus(projection.getStatus());
+
+        if (projection.getResourceId() != null) {
+            dto.setResourceId(projection.getResourceId());
+            dto.setResourceName(projection.getResourceName());
+        }
+
+        if (projection.getUserId() != null) {
+            BookingResponseDto.UserInfo userInfo = BookingResponseDto.UserInfo.builder()
+                    .id(projection.getUserId())
+                    .name(projection.getUserName())
+                    .email(projection.getUserEmail())
+                    .phone(projection.getUserPhone())
+                    .build();
+            dto.setUser(userInfo);
+        }
+
+        // Use stored amounts from projection (already calculated during booking creation)
+        Double totalAmount = projection.getAmount();
+        if (totalAmount != null) {
+            double onlineAmount = projection.getOnlineAmountPaid() != null
+                    ? projection.getOnlineAmountPaid().doubleValue()
+                    : Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            double venueAmount = projection.getVenueAmountDue() != null
+                    ? projection.getVenueAmountDue().doubleValue()
+                    : Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
+            Boolean venueAmountCollected = projection.getVenueAmountCollected() != null
+                    ? projection.getVenueAmountCollected()
+                    : false;
+
+            // Calculate breakdown from total (assume 2% platform fee)
+            double platformFeePercent = 2.0;
+            double slotSubtotal = totalAmount / (1 + platformFeePercent / 100.0);
+            double platformFee = totalAmount - slotSubtotal;
+
+            // Round to 2 decimal places
+            slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
+            platformFee = Math.round(platformFee * 100.0) / 100.0;
+            totalAmount = Math.round(totalAmount * 100.0) / 100.0;
+
+            BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
+                    .slotSubtotal(slotSubtotal)
+                    .platformFeePercent(platformFeePercent)
+                    .platformFee(platformFee)
+                    .totalAmount(totalAmount)
+                    .onlinePaymentPercent(onlinePaymentPercent)
+                    .onlineAmount(onlineAmount)
+                    .venueAmount(venueAmount)
+                    .venueAmountCollected(venueAmountCollected)
+                    .currency("INR")
+                    .build();
+
+            dto.setAmountBreakdown(amountBreakdown);
+        }
+
+        return dto;
     }
 
     private BookingResponseDto convertToResponseDto(Booking booking) {

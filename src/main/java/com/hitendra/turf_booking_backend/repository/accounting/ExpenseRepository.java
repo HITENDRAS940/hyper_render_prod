@@ -58,5 +58,35 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate
     );
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Count expenses for a service (for pagination info).
+     */
+    @Query("SELECT COUNT(e) FROM Expense e WHERE e.service.id = :serviceId")
+    long countByServiceId(@Param("serviceId") Long serviceId);
+
+    /**
+     * Count expenses for a service in date range.
+     */
+    @Query("SELECT COUNT(e) FROM Expense e WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate")
+    long countByServiceIdAndDateRange(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Get expense IDs for a service in date range (for batch operations).
+     */
+    @Query("SELECT e.id FROM Expense e WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate ORDER BY e.expenseDate DESC")
+    List<Long> findExpenseIdsByServiceIdAndDateRange(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

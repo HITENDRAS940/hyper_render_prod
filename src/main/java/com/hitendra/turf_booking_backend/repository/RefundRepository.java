@@ -43,4 +43,32 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
      */
     @Query("SELECT r FROM Refund r WHERE r.status IN ('INITIATED', 'PROCESSING') ORDER BY r.initiatedAt ASC")
     List<Refund> findPendingRefunds();
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Get refund ID by booking ID (minimal data fetch).
+     */
+    @Query("SELECT r.id FROM Refund r WHERE r.booking.id = :bookingId")
+    Optional<Long> findRefundIdByBookingId(@Param("bookingId") Long bookingId);
+
+    /**
+     * Get refund status by booking ID (minimal data for status check).
+     */
+    @Query("SELECT r.status FROM Refund r WHERE r.booking.id = :bookingId")
+    Optional<RefundStatus> findRefundStatusByBookingId(@Param("bookingId") Long bookingId);
+
+    /**
+     * Count refunds by status (for dashboard statistics).
+     */
+    @Query("SELECT COUNT(r) FROM Refund r WHERE r.status = :status")
+    long countByStatus(@Param("status") RefundStatus status);
+
+    /**
+     * Get only IDs of pending refunds (for batch processing).
+     */
+    @Query("SELECT r.id FROM Refund r WHERE r.status IN ('INITIATED', 'PROCESSING') ORDER BY r.initiatedAt ASC")
+    List<Long> findPendingRefundIds();
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }

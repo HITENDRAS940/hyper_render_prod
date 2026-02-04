@@ -90,4 +90,57 @@ public interface DisabledSlotRepository extends JpaRepository<DisabledSlot, Long
      * Get all disabled slots for a resource
      */
     List<DisabledSlot> findByResourceId(Long resourceId);
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Check if any overlapping disabled slot exists (returns boolean for fast check).
+     */
+    @Query("""
+        SELECT CASE WHEN COUNT(ds) > 0 THEN true ELSE false END
+        FROM DisabledSlot ds 
+        WHERE ds.resource.id = :resourceId 
+        AND ds.disabledDate = :date 
+        AND ds.startTime < :endTime AND ds.endTime > :startTime
+        """)
+    boolean existsOverlappingDisabledSlot(
+            @Param("resourceId") Long resourceId,
+            @Param("date") LocalDate date,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime
+    );
+
+    /**
+     * Check if any overlapping disabled slot exists for multiple resources (returns boolean).
+     */
+    @Query("""
+        SELECT CASE WHEN COUNT(ds) > 0 THEN true ELSE false END
+        FROM DisabledSlot ds 
+        WHERE ds.resource.id IN :resourceIds 
+        AND ds.disabledDate = :date 
+        AND ds.startTime < :endTime AND ds.endTime > :startTime
+        """)
+    boolean existsOverlappingDisabledSlotForResources(
+            @Param("resourceIds") List<Long> resourceIds,
+            @Param("date") LocalDate date,
+            @Param("startTime") LocalTime startTime,
+            @Param("endTime") LocalTime endTime
+    );
+
+    /**
+     * Get only disabled slot times for a resource on a date (minimal data).
+     */
+    @Query("SELECT ds.startTime, ds.endTime FROM DisabledSlot ds WHERE ds.resource.id = :resourceId AND ds.disabledDate = :date ORDER BY ds.startTime")
+    List<Object[]> findDisabledTimeRanges(
+            @Param("resourceId") Long resourceId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Count disabled slots for a resource on a date.
+     */
+    @Query("SELECT COUNT(ds) FROM DisabledSlot ds WHERE ds.resource.id = :resourceId AND ds.disabledDate = :date")
+    long countByResourceIdAndDate(@Param("resourceId") Long resourceId, @Param("date") LocalDate date);
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }

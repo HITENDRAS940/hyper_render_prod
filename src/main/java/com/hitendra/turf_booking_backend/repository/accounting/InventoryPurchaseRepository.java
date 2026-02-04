@@ -28,5 +28,25 @@ public interface InventoryPurchaseRepository extends JpaRepository<InventoryPurc
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate
     );
+
+    // ==================== OPTIMIZED QUERIES ====================
+
+    /**
+     * Count purchases for a service in date range.
+     */
+    @Query("SELECT COUNT(ip) FROM InventoryPurchase ip WHERE ip.service.id = :serviceId AND ip.purchaseDate BETWEEN :startDate AND :endDate")
+    long countByServiceIdAndDateRange(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Get purchase IDs for batch operations.
+     */
+    @Query("SELECT ip.id FROM InventoryPurchase ip WHERE ip.service.id = :serviceId ORDER BY ip.purchaseDate DESC")
+    List<Long> findPurchaseIdsByServiceId(@Param("serviceId") Long serviceId);
+
+    // ==================== END OPTIMIZED QUERIES ====================
 }
 

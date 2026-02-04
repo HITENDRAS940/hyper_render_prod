@@ -36,7 +36,7 @@ public class EmailOtpService {
         String email = request.getEmail().toLowerCase().trim();
 
         // Generate 6-digit OTP
-        String otpCode = generateOtpCode();
+        String otpCode = generateOtpCode(email);
 
         log.info("Generating OTP for email: {}", email);
 
@@ -154,12 +154,15 @@ public class EmailOtpService {
     /**
      * Generate 6-digit OTP code
      */
-    private String generateOtpCode() {
+    private String generateOtpCode(String email) {
+        // For testing: return "000000" for googletest@hyper.com
+        if ("googletest@hyper.com".equalsIgnoreCase(email)) {
+            log.info("Using hardcoded OTP for test email: {}", email);
+            return "000000";
+        }
+
         // For production, use random OTP
         return String.format("%06d", new Random().nextInt(1000000));
-
-        // For development/testing, you can use a fixed OTP
-        // return "000000";
     }
 }
 

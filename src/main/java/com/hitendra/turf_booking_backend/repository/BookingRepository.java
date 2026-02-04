@@ -4,6 +4,10 @@ import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
 import com.hitendra.turf_booking_backend.entity.PaymentStatus;
 import com.hitendra.turf_booking_backend.entity.ServiceResource;
+import com.hitendra.turf_booking_backend.repository.projection.BookingListProjection;
+import com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection;
+import com.hitendra.turf_booking_backend.repository.projection.BookingCountProjection;
+import com.hitendra.turf_booking_backend.repository.projection.SlotOverlapProjection;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,6 +29,284 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByUserId(Long userId, Pageable pageable);
 
     Page<Booking> findByStatus(BookingStatus status, Pageable pageable);
+
+    // ==================== OPTIMIZED PROJECTION QUERIES ====================
+
+    /**
+     * Get lightweight booking list for a service (projection-based).
+     * Avoids loading full entities and their relationships.
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.id = :serviceId
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByServiceIdProjected(@Param("serviceId") Long serviceId, Pageable pageable);
+
+    /**
+     * Get lightweight booking list for a user (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               b.createdAt as createdAt,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName
+        FROM Booking b
+        WHERE b.user.id = :userId
+        ORDER BY b.createdAt DESC
+        """)
+    List<UserBookingProjection> findUserBookingsProjected(@Param("userId") Long userId);
+
+    /**
+     * Get paginated lightweight booking list for a user (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               b.createdAt as createdAt,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName
+        FROM Booking b
+        WHERE b.user.id = :userId
+        ORDER BY b.createdAt DESC
+        """)
+    Page<UserBookingProjection> findUserBookingsProjectedPaged(@Param("userId") Long userId, Pageable pageable);
+
+    /**
+     * Get last booking for a user (optimized - only fetches one record).
+     */
+    @Query("""
+        SELECT b.id as id, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               b.createdAt as createdAt,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName
+        FROM Booking b
+        WHERE b.user.id = :userId
+        ORDER BY b.createdAt DESC
+        LIMIT 1
+        """)
+    UserBookingProjection findLastUserBookingProjected(@Param("userId") Long userId);
+
+    /**
+     * Get booking counts by status for a user (for statistics).
+     */
+    @Query("""
+        SELECT CAST(b.status AS string) as status, COUNT(b) as count
+        FROM Booking b
+        WHERE b.user.id = :userId
+        GROUP BY b.status
+        """)
+    List<BookingCountProjection> getBookingCountsByStatusForUser(@Param("userId") Long userId);
+
+    /**
+     * Get lightweight booking list for admin (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByAdminIdProjected(@Param("adminId") Long adminId, Pageable pageable);
+
+    /**
+     * Get lightweight booking list for admin filtered by date (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.createdBy.id = :adminId AND b.bookingDate = :date
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByAdminIdAndDateProjected(
+            @Param("adminId") Long adminId, @Param("date") LocalDate date, Pageable pageable);
+
+    /**
+     * Get lightweight booking list for admin filtered by status (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.createdBy.id = :adminId AND b.status = :status
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByAdminIdAndStatusProjected(
+            @Param("adminId") Long adminId, @Param("status") BookingStatus status, Pageable pageable);
+
+    /**
+     * Get lightweight booking list for admin filtered by date and status (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.createdBy.id = :adminId AND b.bookingDate = :date AND b.status = :status
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByAdminIdAndDateAndStatusProjected(
+            @Param("adminId") Long adminId, @Param("date") LocalDate date,
+            @Param("status") BookingStatus status, Pageable pageable);
+
+    /**
+     * Get lightweight booking list by status (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.status = :status
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByStatusProjected(@Param("status") BookingStatus status, Pageable pageable);
+
+    /**
+     * Get lightweight booking list by resource (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.resource.id = :resourceId
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByResourceIdProjected(@Param("resourceId") Long resourceId, Pageable pageable);
+
+    /**
+     * Get lightweight booking list by resource and date (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.resource.id = :resourceId AND b.bookingDate = :date
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByResourceIdAndDateProjected(
+            @Param("resourceId") Long resourceId, @Param("date") LocalDate date, Pageable pageable);
+
+    /**
+     * Optimized overlap check - returns only IDs and essential fields.
+     * Used for fast availability checking without loading full entities.
+     */
+    @Query("""
+        SELECT b.id as id, b.resource.id as resourceId, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime,
+               CAST(b.status AS string) as status, CAST(b.paymentStatusEnum AS string) as paymentStatus
+        FROM Booking b 
+        WHERE b.resource.id = :resourceId 
+        AND b.bookingDate = :date 
+        AND b.startTime < :endTime AND b.endTime > :startTime 
+        AND (
+            b.status = 'CONFIRMED' 
+            OR (
+                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
+                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
+            )
+        )
+        """)
+    List<SlotOverlapProjection> findOverlappingBookingsProjected(
+            @Param("resourceId") Long resourceId,
+            @Param("date") LocalDate date,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime
+    );
+
+    /**
+     * Check if any overlapping booking exists (returns boolean for fast check).
+     */
+    @Query("""
+        SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END
+        FROM Booking b 
+        WHERE b.resource.id = :resourceId 
+        AND b.bookingDate = :date 
+        AND b.startTime < :endTime AND b.endTime > :startTime 
+        AND (
+            b.status = 'CONFIRMED' 
+            OR (
+                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
+                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
+            )
+        )
+        """)
+    boolean existsOverlappingBooking(
+            @Param("resourceId") Long resourceId,
+            @Param("date") LocalDate date,
+            @Param("startTime") java.time.LocalTime startTime,
+            @Param("endTime") java.time.LocalTime endTime
+    );
+
+    // ==================== END OPTIMIZED PROJECTION QUERIES ====================
 
     java.util.Optional<Booking> findByReference(String reference);
 
