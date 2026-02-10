@@ -414,6 +414,14 @@ public class BookingService {
                 .endTime(projection.getEndTime().toString())
                 .build());
 
+        // Extract paid and due amounts from projection
+        Double paidAmount = projection.getOnlineAmountPaid() != null
+                ? projection.getOnlineAmountPaid().doubleValue()
+                : 0.0;
+        Double dueAmount = projection.getVenueAmountDue() != null
+                ? projection.getVenueAmountDue().doubleValue()
+                : (projection.getAmount() != null ? projection.getAmount() - paidAmount : 0.0);
+
         return UserBookingDto.builder()
                 .id(projection.getId())
                 .serviceId(projection.getServiceId())
@@ -424,6 +432,8 @@ public class BookingService {
                 .date(projection.getBookingDate())
                 .slots(slotTimes)
                 .totalAmount(projection.getAmount())
+                .paidAmount(paidAmount)
+                .dueAmount(dueAmount)
                 .createdAt(projection.getCreatedAt())
                 .build();
     }
@@ -622,6 +632,14 @@ public class BookingService {
                 .endTime(booking.getEndTime().toString())
                 .build());
 
+        // Extract paid and due amounts from booking
+        Double paidAmount = booking.getOnlineAmountPaid() != null
+                ? booking.getOnlineAmountPaid().doubleValue()
+                : 0.0;
+        Double dueAmount = booking.getVenueAmountDue() != null
+                ? booking.getVenueAmountDue().doubleValue()
+                : (booking.getAmount() != null ? booking.getAmount() - paidAmount : 0.0);
+
         return UserBookingDto.builder()
                 .id(booking.getId())
                 .serviceId(booking.getService().getId())
@@ -632,6 +650,8 @@ public class BookingService {
                 .date(booking.getBookingDate())
                 .slots(slotTimes)
                 .totalAmount(booking.getAmount())
+                .paidAmount(paidAmount)
+                .dueAmount(dueAmount)
                 .createdAt(booking.getCreatedAt())
                 .build();
     }

@@ -32,6 +32,7 @@ public class ResourceSlotService {
     private final ServiceResourceRepository serviceResourceRepository;
     private final BookingRepository bookingRepository;
     private final SlotGeneratorService slotGeneratorService;
+    private final ServiceRepository serviceRepository;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a");
 
@@ -232,6 +233,152 @@ public class ResourceSlotService {
         }
 
         return details;
+    }
+
+    /**
+     * Get comprehensive slot analysis for all resources of a service on a specific date.
+     * Used by admin for viewing and analyzing slot status across all resources.
+     */
+    @Transactional(readOnly = true)
+    public ServiceSlotsAnalysisDto getServiceSlotsAnalysis(Long serviceId, LocalDate date) {
+        // Get the service
+        com.hitendra.turf_booking_backend.entity.Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new RuntimeException("Service not found: " + serviceId));
+
+        // Get all resources for this service
+        List<ServiceResource> resources = serviceResourceRepository.findByServiceId(serviceId);
+
+        if (resources.isEmpty()) {
+            throw new RuntimeException("No resources found for service: " + serviceId);
+        }
+
+        boolean isWeekend = isWeekend(date);
+        DayType dayType = isWeekend ? DayType.WEEKEND : DayType.WEEKDAY;
+
+        List<ServiceSlotsAnalysisDto.ResourceSlotsDto> resourceSlotsList = new ArrayList<>();
+
+        int totalSlotsCount = 0;
+        int totalAvailableCount = 0;
+        int totalBookedCount = 0;
+        int totalDisabledCount = 0;
+
+        // Process each resource
+        for (ServiceResource resource : resources) {
+            ResourceSlotConfig config = resourceSlotConfigRepository.findByResourceId(resource.getId())
+                    .orElse(null);
+
+            if (config == null) {
+                log.warn("No slot config found for resource: {}", resource.getId());
+                continue;
+            }
+
+            // Generate slots for this resource
+            List<GeneratedSlot> generatedSlots = slotGeneratorService.generateSlots(config);
+
+            // Get bookings for this resource on this date
+            List<Booking> bookings = bookingRepository.findByResourceIdAndBookingDate(resource.getId(), date).stream()
+                    .filter(this::isBookingLockingSlot)
+                    .toList();
+
+            // Get price rules
+            List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(resource.getId());
+
+            List<ServiceSlotsAnalysisDto.SlotDetailDto> slotDetails = new ArrayList<>();
+            int resourceAvailable = 0;
+            int resourceBooked = 0;
+            int resourceDisabled = 0;
+
+            for (GeneratedSlot slot : generatedSlots) {
+                boolean isBooked = bookings.stream().anyMatch(b ->
+                        isTimeOverlap(slot.getStartTime(), slot.getEndTime(), b.getStartTime(), b.getEndTime()));
+
+                SlotStatus status;
+                String statusReason = null;
+
+                if (!config.isEnabled() || !resource.isEnabled()) {
+                    status = SlotStatus.DISABLED;
+                    statusReason = !resource.isEnabled() ? "Resource disabled" : "Slot configuration disabled";
+                    resourceDisabled++;
+                } else if (isBooked) {
+                    status = SlotStatus.BOOKED;
+                    statusReason = "Already booked";
+                    resourceBooked++;
+                } else {
+                    status = SlotStatus.AVAILABLE;
+                    resourceAvailable++;
+                }
+
+                Double basePrice = slot.getBasePrice();
+                Double totalPrice = calculateSlotPrice(slot, config, priceRules, dayType);
+                boolean hasAppliedRules = !basePrice.equals(totalPrice);
+
+                // Build tags
+                List<String> tags = new ArrayList<>();
+                if (slot.getStartTime().getHour() >= 18 || slot.getStartTime().getHour() < 6) {
+                    tags.add("NIGHT");
+                } else {
+                    tags.add("DAY");
+                }
+                if (isWeekend) {
+                    tags.add("WEEKEND");
+                } else {
+                    tags.add("WEEKDAY");
+                }
+                if (hasAppliedRules) {
+                    tags.add("DYNAMIC_PRICING");
+                }
+
+                ServiceSlotsAnalysisDto.SlotDetailDto slotDetail = ServiceSlotsAnalysisDto.SlotDetailDto.builder()
+                        .slotId(resource.getId() + "-" + date + "-" + slot.getStartTime())
+                        .startTime(slot.getStartTime().format(TIME_FORMATTER))
+                        .endTime(slot.getEndTime().format(TIME_FORMATTER))
+                        .displayName(slot.getDisplayName())
+                        .durationMinutes(slot.getDurationMinutes())
+                        .basePrice(basePrice)
+                        .totalPrice(totalPrice)
+                        .status(status)
+                        .statusReason(statusReason)
+                        .hasAppliedPriceRules(hasAppliedRules)
+                        .tags(tags)
+                        .build();
+
+                slotDetails.add(slotDetail);
+            }
+
+            ServiceSlotsAnalysisDto.ResourceSlotsDto resourceSlots = ServiceSlotsAnalysisDto.ResourceSlotsDto.builder()
+                    .resourceId(resource.getId())
+                    .resourceName(resource.getName())
+                    .resourceEnabled(resource.isEnabled())
+                    .openingTime(config.getOpeningTime().format(TIME_FORMATTER))
+                    .closingTime(config.getClosingTime().format(TIME_FORMATTER))
+                    .slotDurationMinutes(config.getSlotDurationMinutes())
+                    .basePrice(config.getBasePrice())
+                    .totalSlots(generatedSlots.size())
+                    .availableSlots(resourceAvailable)
+                    .bookedSlots(resourceBooked)
+                    .disabledSlots(resourceDisabled)
+                    .slots(slotDetails)
+                    .build();
+
+            resourceSlotsList.add(resourceSlots);
+
+            totalSlotsCount += generatedSlots.size();
+            totalAvailableCount += resourceAvailable;
+            totalBookedCount += resourceBooked;
+            totalDisabledCount += resourceDisabled;
+        }
+
+        return ServiceSlotsAnalysisDto.builder()
+                .serviceId(serviceId)
+                .serviceName(service.getName())
+                .analysisDate(date)
+                .totalResources(resources.size())
+                .totalSlots(totalSlotsCount)
+                .availableSlots(totalAvailableCount)
+                .bookedSlots(totalBookedCount)
+                .disabledSlots(totalDisabledCount)
+                .resources(resourceSlotsList)
+                .build();
     }
 
     // ==================== Helper Methods ====================

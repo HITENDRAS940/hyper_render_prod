@@ -23,6 +23,8 @@ public class UserBookingDto {
     private LocalDate date;
     private List<SlotTimeDto> slots;
     private Double totalAmount;
+    private Double paidAmount;      // Amount already paid (online payment)
+    private Double dueAmount;       // Amount due at venue
     private Instant createdAt;
 
     @Data

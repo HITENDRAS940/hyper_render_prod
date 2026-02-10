@@ -46,6 +46,11 @@ public class DataInitializer implements CommandLineRunner {
             initializeExpenseCategories();
         }
 
+        // Create manager user
+        if (userRepository.findByEmail("gethyperadmin@gmail.com").isEmpty()) {
+            initializeManagerUser();
+        }
+
         // Add minimal test service in Mumbai
         if (serviceRepository.count() == 0) {
             initializeMinimalTestService();
@@ -128,9 +133,9 @@ public class DataInitializer implements CommandLineRunner {
                     .availability(true)
                     .amenities(List.of("Floodlights", "Parking", "Changing Rooms", "Washrooms", "Drinking Water", "First Aid", "Equipment Rental"))
                     .images(List.of(
-                        "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800",
-                        "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=800",
-                        "https://images.unsplash.com/photo-1518605348416-72580200d3f8?w=800"
+                            "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800",
+                            "https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=800",
+                            "https://images.unsplash.com/photo-1518605348416-72580200d3f8?w=800"
                     ))
                     .activities(List.of(cricket, football))
                     .build();
@@ -154,9 +159,9 @@ public class DataInitializer implements CommandLineRunner {
                     .availability(true)
                     .amenities(List.of("Floodlights", "Free Parking", "Changing Rooms", "Washrooms", "Cafeteria", "Seating Area", "Equipment Rental", "Coaching Available"))
                     .images(List.of(
-                        "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800",
-                        "https://images.unsplash.com/photo-1593341646782-e0b495cffd32?w=800",
-                        "https://images.unsplash.com/photo-1624526267942-ab0ff8a3e972?w=800"
+                            "https://images.unsplash.com/photo-1531415074968-036ba1b575da?w=800",
+                            "https://images.unsplash.com/photo-1593341646782-e0b495cffd32?w=800",
+                            "https://images.unsplash.com/photo-1624526267942-ab0ff8a3e972?w=800"
                     ))
                     .activities(List.of(cricket, football))
                     .build();
@@ -1087,4 +1092,27 @@ public class DataInitializer implements CommandLineRunner {
         }
     }
     */
+
+    /**
+     * Initialize manager user
+     */
+    private void initializeManagerUser() {
+        try {
+            log.info("🏗️ Creating manager user...");
+
+            User manager = User.builder()
+                    .email("gethyperadmin@gmail.com")
+                    .name("Hyper Manager")
+                    .phone("+919876543200")
+                    .role(Role.MANAGER)
+                    .enabled(true)
+                    .build();
+
+            manager = userRepository.save(manager);
+            log.info("✅ Created manager user: {} with email: {}", manager.getName(), manager.getEmail());
+
+        } catch (Exception e) {
+            log.error("❌ Failed to create manager user: {}", e.getMessage());
+        }
+    }
 }

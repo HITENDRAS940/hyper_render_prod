@@ -236,6 +236,18 @@ public class AdminController {
         return ResponseEntity.ok(slots);
     }
 
+    @GetMapping("/services/{serviceId}/slots/analysis")
+    @Operation(summary = "Get comprehensive slot analysis for a service",
+            description = "Get detailed analysis of all slots across all resources for a service on a specific date. " +
+                    "Shows each slot's status (AVAILABLE, BOOKED, DISABLED), pricing, and availability statistics. " +
+                    "Useful for admin to analyze booking patterns and resource utilization.")
+    public ResponseEntity<ServiceSlotsAnalysisDto> getServiceSlotsAnalysis(
+            @PathVariable Long serviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        ServiceSlotsAnalysisDto analysis = resourceSlotService.getServiceSlotsAnalysis(serviceId, date);
+        return ResponseEntity.ok(analysis);
+    }
+
     // ==================== Price Rules Management ====================
 
     @GetMapping("/resources/{resourceId}/price-rules")
