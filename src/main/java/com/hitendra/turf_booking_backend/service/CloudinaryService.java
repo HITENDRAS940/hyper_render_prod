@@ -3,8 +3,8 @@ package com.hitendra.turf_booking_backend.service;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -14,18 +14,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class CloudinaryService {
 
     private final Cloudinary cloudinary;
-    // Thread pool for parallel image uploads (max 4 threads for up to 4 images)
-    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+    private final ExecutorService executorService;
+
+    /**
+     * Constructor with dependency injection.
+     * ExecutorService is injected to allow shared thread pool management.
+     */
+    @Autowired
+    public CloudinaryService(Cloudinary cloudinary, ExecutorService imageUploadExecutor) {
+        this.cloudinary = cloudinary;
+        this.executorService = imageUploadExecutor;
+    }
 
     /**
      * Shutdown executor service gracefully when application context closes.
@@ -116,8 +123,10 @@ public class CloudinaryService {
                 try {
                     return uploadImage(file);
                 } catch (Exception e) {
-                    log.error("Failed to upload image at index {} ({}): {}", index, fileName, e.getMessage());
-                    throw new RuntimeException("Image " + index + " (" + fileName + ")", e);
+                    String errorMsg = String.format("Failed to upload image at index %d (%s): %s", 
+                            index, fileName, e.getMessage());
+                    log.error(errorMsg);
+                    throw new RuntimeException(errorMsg, e);
                 }
             }, executorService);
             

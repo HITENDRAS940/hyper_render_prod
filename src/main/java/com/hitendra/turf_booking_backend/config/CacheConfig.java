@@ -6,6 +6,9 @@ import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 /**
  * Cache configuration for the application.
  * Uses in-memory caching with ConcurrentMapCacheManager for simplicity.
@@ -21,5 +24,20 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         // Simple in-memory cache for static/semi-static data
         return new ConcurrentMapCacheManager("activities");
+    }
+
+    /**
+     * Shared ExecutorService bean for parallel image uploads in CloudinaryService.
+     * Using a fixed thread pool of 4 threads (max images that can be uploaded at once).
+     * This is a singleton bean shared across the application to avoid thread proliferation.
+     */
+    @Bean(name = "imageUploadExecutor")
+    public ExecutorService imageUploadExecutor() {
+        return Executors.newFixedThreadPool(4, r -> {
+            Thread thread = new Thread(r);
+            thread.setName("image-upload-" + thread.getId());
+            thread.setDaemon(false);
+            return thread;
+        });
     }
 }

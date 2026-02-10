@@ -1,7 +1,8 @@
 -- V8: Add performance indexes for frequently queried columns
 -- These indexes improve query performance for scheduled jobs and common queries
 
--- Index for PaymentTimeoutScheduler: frequently queries AWAITING_CONFIRMATION with lockExpiresAt
+-- Index for both PaymentTimeoutScheduler and BookingExpiryScheduler
+-- Covers both AWAITING_CONFIRMATION and PAYMENT_PENDING statuses with lockExpiresAt
 -- This prevents full table scans when checking for expired bookings
 -- Partial index only includes rows where lock_expires_at is not null (saves space)
 CREATE INDEX IF NOT EXISTS idx_bookings_status_lock_expires 
@@ -21,13 +22,6 @@ ON services(LOWER(city));
 -- Index for booking status queries (admin dashboard and filters)
 CREATE INDEX IF NOT EXISTS idx_bookings_status 
 ON bookings(status);
-
--- Index for payment-pending bookings with lock expiration
--- Used by BookingExpiryScheduler
--- Partial index only includes rows where lock_expires_at is not null (saves space)
-CREATE INDEX IF NOT EXISTS idx_bookings_payment_pending_lock 
-ON bookings(status, lock_expires_at) 
-WHERE lock_expires_at IS NOT NULL;
 
 -- Composite index for service resources lookups
 -- Used in SlotBookingService for activity and service filtering
