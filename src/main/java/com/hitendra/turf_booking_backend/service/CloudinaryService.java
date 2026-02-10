@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -24,6 +26,26 @@ public class CloudinaryService {
     private final Cloudinary cloudinary;
     // Thread pool for parallel image uploads (max 4 threads for up to 4 images)
     private final ExecutorService executorService = Executors.newFixedThreadPool(4);
+
+    /**
+     * Shutdown executor service gracefully when application context closes.
+     * This prevents resource leaks and allows JVM to terminate properly.
+     */
+    @PreDestroy
+    public void shutdown() {
+        log.info("Shutting down CloudinaryService executor service");
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+                log.warn("Executor service did not terminate in 30 seconds, forcing shutdown");
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.error("Interrupted while waiting for executor service shutdown", e);
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     /**
      * Upload a single image to Cloudinary
@@ -80,10 +102,22 @@ public class CloudinaryService {
 
         log.info("Starting parallel upload of {} images", validFiles.size());
 
-        // Create CompletableFuture for each upload
-        List<CompletableFuture<String>> uploadFutures = validFiles.stream()
-                .map(file -> CompletableFuture.supplyAsync(() -> uploadImage(file), executorService))
-                .collect(Collectors.toList());
+        // Create CompletableFuture for each upload with indexed tracking
+        List<CompletableFuture<String>> uploadFutures = new ArrayList<>();
+        for (int i = 0; i < validFiles.size(); i++) {
+            final int index = i;
+            final MultipartFile file = validFiles.get(i);
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return uploadImage(file);
+                } catch (Exception e) {
+                    String fileName = file.getOriginalFilename();
+                    log.error("Failed to upload image at index {} ({}): {}", index, fileName, e.getMessage());
+                    throw new RuntimeException("Failed to upload image at index " + index + " (" + fileName + "): " + e.getMessage(), e);
+                }
+            }, executorService);
+            uploadFutures.add(future);
+        }
 
         // Wait for all uploads to complete and collect results
         try {
@@ -104,7 +138,21 @@ public class CloudinaryService {
 
         } catch (Exception e) {
             log.error("Error during parallel image upload: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to upload one or more images: " + e.getMessage(), e);
+            // Extract specific failure information
+            String failureDetails = uploadFutures.stream()
+                    .filter(f -> f.isCompletedExceptionally())
+                    .map(f -> {
+                        try {
+                            f.join();
+                            return "";
+                        } catch (Exception ex) {
+                            return ex.getMessage();
+                        }
+                    })
+                    .filter(msg -> !msg.isEmpty())
+                    .collect(Collectors.joining("; "));
+            
+            throw new RuntimeException("Failed to upload one or more images: " + failureDetails, e);
         }
     }
 
