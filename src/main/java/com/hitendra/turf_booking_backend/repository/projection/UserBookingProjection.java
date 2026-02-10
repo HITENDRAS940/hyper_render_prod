@@ -11,6 +11,7 @@ import java.math.BigDecimal;
  */
 public interface UserBookingProjection {
     Long getId();
+    String getReference();
     String getStatus();
     LocalDate getBookingDate();
     LocalTime getStartTime();

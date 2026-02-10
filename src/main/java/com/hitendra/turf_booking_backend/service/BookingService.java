@@ -424,6 +424,7 @@ public class BookingService {
 
         return UserBookingDto.builder()
                 .id(projection.getId())
+                .reference(projection.getReference())
                 .serviceId(projection.getServiceId())
                 .serviceName(projection.getServiceName())
                 .resourceId(projection.getResourceId())
@@ -642,6 +643,7 @@ public class BookingService {
 
         return UserBookingDto.builder()
                 .id(booking.getId())
+                .reference(booking.getReference())
                 .serviceId(booking.getService().getId())
                 .serviceName(booking.getService().getName())
                 .resourceId(booking.getResource() != null ? booking.getResource().getId() : null)

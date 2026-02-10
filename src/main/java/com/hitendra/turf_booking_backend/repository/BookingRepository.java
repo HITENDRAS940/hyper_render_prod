@@ -57,7 +57,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Get lightweight booking list for a user (projection-based).
      */
     @Query("""
-        SELECT b.id as id, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
+        SELECT b.id as id, b.reference as reference, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
                b.startTime as startTime, b.endTime as endTime, b.amount as amount,
                b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
@@ -73,7 +73,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Get paginated lightweight booking list for a user (projection-based).
      */
     @Query("""
-        SELECT b.id as id, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
+        SELECT b.id as id, b.reference as reference, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
                b.startTime as startTime, b.endTime as endTime, b.amount as amount,
                b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,

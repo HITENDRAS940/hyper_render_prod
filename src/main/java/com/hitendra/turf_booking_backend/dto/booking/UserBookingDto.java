@@ -15,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 public class UserBookingDto {
     private Long id;
+    private String reference;                  // Booking reference ID
     private Long serviceId;
     private String serviceName;
     private Long resourceId;
