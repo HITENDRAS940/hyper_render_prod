@@ -533,6 +533,8 @@ public class RazorpayPaymentService {
                             .startTime(booking.getStartTime().toString())
                             .endTime(booking.getEndTime().toString())
                             .totalAmount(booking.getAmount())
+                            .onlineAmountPaid(booking.getOnlineAmountPaid() != null ? booking.getOnlineAmountPaid().doubleValue() : booking.getAmount())
+                            .venueAmountDue(booking.getVenueAmountDue() != null ? booking.getVenueAmountDue().doubleValue() : 0.0)
                             .location(booking.getService().getLocation())
                             .contactNumber(booking.getService().getContactNumber())
                             .build();

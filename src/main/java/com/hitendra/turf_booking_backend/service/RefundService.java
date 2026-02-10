@@ -41,6 +41,8 @@ public class RefundService {
     private final RefundConfig refundConfig;
     private final AuthUtil authUtil;
     private final RazorpayClient razorpayClient;
+    private final EmailService emailService;
+    private final SmsService smsService;
 
     @Value("${pricing.online-payment-percent:30}")
     private Double onlinePaymentPercent;
@@ -178,6 +180,14 @@ public class RefundService {
         BigDecimal refundAmount = originalAmount
                 .multiply(BigDecimal.valueOf(refundPercent))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        // Deduct 3% transaction fee from refund amount
+        BigDecimal transactionFeePercent = BigDecimal.valueOf(3);
+        BigDecimal transactionFee = refundAmount
+                .multiply(transactionFeePercent)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        refundAmount = refundAmount.subtract(transactionFee);
+
         BigDecimal deductionAmount = originalAmount.subtract(refundAmount);
 
         // Build user-friendly messages
@@ -254,6 +264,9 @@ public class RefundService {
 
         // Create refund record
         Refund refund = createRefundRecord(booking, preview);
+
+        // Send refund notifications (email and SMS)
+        sendRefundNotifications(booking, preview, refund);
 
         // Initiate Razorpay refund if payment was made via Razorpay
         if (booking.getRazorpayPaymentId() != null) {
@@ -442,5 +455,52 @@ public class RefundService {
                 "Booking cancelled successfully. ₹%.2f will be refunded to %s within 5-7 business days.",
                 refundAmount, destination
         );
+    }
+
+    /**
+     * Send refund initiated notifications via SMS and Email
+     */
+    private void sendRefundNotifications(Booking booking, RefundPreviewDto preview, Refund refund) {
+        if (booking.getUser() == null) {
+            log.warn("No user associated with booking {}, skipping notifications", booking.getReference());
+            return;
+        }
+
+        try {
+            // Send SMS notification
+            String userMessage = String.format(
+                    "Refund initiated! Booking: %s, Refund Amount: ₹%.2f, Status: %s, Reference: %s",
+                    booking.getService().getName(),
+                    preview.getRefundAmount(),
+                    refund.getStatus(),
+                    booking.getReference()
+            );
+            smsService.sendBookingConfirmation(booking.getUser().getPhone(), userMessage);
+
+            // Send detailed email notification
+            if (booking.getUser().getEmail() != null && !booking.getUser().getEmail().isEmpty()) {
+                try {
+                    EmailService.RefundDetails refundDetails = EmailService.RefundDetails.builder()
+                            .bookingReference(booking.getReference())
+                            .refundStatus(refund.getStatus().toString())
+                            .originalAmount(preview.getOriginalAmount())
+                            .refundAmount(preview.getRefundAmount())
+                            .refundPercent(preview.getRefundPercent())
+                            .build();
+
+                    emailService.sendRefundInitiatedEmail(
+                            booking.getUser().getEmail(),
+                            booking.getUser().getName(),
+                            refundDetails
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to send refund email for booking {}", booking.getReference(), e);
+                }
+            }
+
+            log.info("Refund notifications sent for booking {}", booking.getReference());
+        } catch (Exception e) {
+            log.error("Failed to send refund notifications for booking {}", booking.getReference(), e);
+        }
     }
 }
