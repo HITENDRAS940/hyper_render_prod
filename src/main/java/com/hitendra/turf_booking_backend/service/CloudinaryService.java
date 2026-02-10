@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -18,6 +22,8 @@ import java.util.Map;
 public class CloudinaryService {
 
     private final Cloudinary cloudinary;
+    // Thread pool for parallel image uploads (max 4 threads for up to 4 images)
+    private final ExecutorService executorService = Executors.newFixedThreadPool(4);
 
     /**
      * Upload a single image to Cloudinary
@@ -51,21 +57,55 @@ public class CloudinaryService {
     }
 
     /**
-     * Upload multiple images to Cloudinary
+     * Upload multiple images to Cloudinary in parallel.
+     * OPTIMIZED: Uses CompletableFuture for parallel uploads instead of sequential processing.
+     * This significantly reduces total upload time when uploading multiple images.
+     * 
      * @param files List of image files to upload
      * @return List of secure URLs of uploaded images
      */
     public List<String> uploadImages(List<MultipartFile> files) {
-        List<String> imageUrls = new ArrayList<>();
-
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-                String imageUrl = uploadImage(file);
-                imageUrls.add(imageUrl);
-            }
+        if (files == null || files.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        return imageUrls;
+        // Filter out null/empty files first
+        List<MultipartFile> validFiles = files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .collect(Collectors.toList());
+
+        if (validFiles.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        log.info("Starting parallel upload of {} images", validFiles.size());
+
+        // Create CompletableFuture for each upload
+        List<CompletableFuture<String>> uploadFutures = validFiles.stream()
+                .map(file -> CompletableFuture.supplyAsync(() -> uploadImage(file), executorService))
+                .collect(Collectors.toList());
+
+        // Wait for all uploads to complete and collect results
+        try {
+            CompletableFuture<Void> allUploads = CompletableFuture.allOf(
+                    uploadFutures.toArray(new CompletableFuture[0])
+            );
+
+            // Wait for completion
+            allUploads.join();
+
+            // Collect all successful URLs
+            List<String> imageUrls = uploadFutures.stream()
+                    .map(CompletableFuture::join)
+                    .collect(Collectors.toList());
+
+            log.info("Successfully uploaded {} images in parallel", imageUrls.size());
+            return imageUrls;
+
+        } catch (Exception e) {
+            log.error("Error during parallel image upload: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload one or more images: " + e.getMessage(), e);
+        }
     }
 
     /**

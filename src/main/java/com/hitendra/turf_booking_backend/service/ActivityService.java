@@ -6,6 +6,7 @@ import com.hitendra.turf_booking_backend.repository.ActivityRepository;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +20,12 @@ public class ActivityService {
 
     private final ActivityRepository activityRepository;
 
+    /**
+     * Get all activities with caching.
+     * OPTIMIZED: Activities are cached since they rarely change.
+     * Cache will be automatically managed by Spring's cache abstraction.
+     */
+    @Cacheable(value = "activities", unless = "#result == null || #result.isEmpty()")
     public List<GetActivityDto> getAllActivities(){
         List<Activity> activities = activityRepository.findAll();
 

@@ -595,6 +595,19 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findExpiredPaymentPendingBookings(@Param("now") Instant now);
 
     /**
+     * Find all expired awaiting-confirmation bookings that need to be marked as EXPIRED.
+     * Used by PaymentTimeoutScheduler to efficiently query bookings without loading all records.
+     * OPTIMIZED: Database-level filtering instead of loading all bookings into memory.
+     */
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.status = 'AWAITING_CONFIRMATION'
+        AND b.lockExpiresAt IS NOT NULL
+        AND b.lockExpiresAt < :now
+    """)
+    List<Booking> findExpiredAwaitingConfirmationBookings(@Param("now") Instant now);
+
+    /**
      * Find user's active payment-pending booking for specific slots (for resume booking).
      */
     @Query("""

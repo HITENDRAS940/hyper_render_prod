@@ -29,6 +29,7 @@ public class PaymentTimeoutScheduler {
      * Runs every minute.
      *
      * Timeout: 10 minutes from payment initiation
+     * OPTIMIZED: Uses database-level query instead of loading all bookings into memory.
      */
     @Scheduled(fixedDelay = 60000, initialDelay = 60000) // Every 1 minute
     @Transactional
@@ -37,12 +38,8 @@ public class PaymentTimeoutScheduler {
 
         log.debug("Running payment timeout scheduler check");
 
-        // Find all bookings in AWAITING_CONFIRMATION state with expired lock
-        List<Booking> expiredBookings = bookingRepository.findAll().stream()
-                .filter(b -> b.getStatus() == BookingStatus.AWAITING_CONFIRMATION)
-                .filter(b -> b.getLockExpiresAt() != null)
-                .filter(b -> b.getLockExpiresAt().isBefore(now))
-                .toList();
+        // OPTIMIZED: Database-level filtering instead of findAll().stream().filter()
+        List<Booking> expiredBookings = bookingRepository.findExpiredAwaitingConfirmationBookings(now);
 
         if (expiredBookings.isEmpty()) {
             log.debug("No expired payments found");
@@ -51,14 +48,13 @@ public class PaymentTimeoutScheduler {
 
         log.info("Found {} bookings with expired payment timeout", expiredBookings.size());
 
+        // OPTIMIZED: Update all bookings in memory first, then save in batch
         for (Booking booking : expiredBookings) {
             try {
                 // STATE TRANSITION: AWAITING_CONFIRMATION -> EXPIRED
                 booking.setStatus(BookingStatus.EXPIRED);
                 booking.setPaymentStatusEnum(PaymentStatus.FAILED);
                 booking.setLockExpiresAt(null);
-
-                bookingRepository.save(booking);
 
                 log.info("⏰ Booking expired due to payment timeout. Booking ID: {}, Reference: {}, " +
                         "Initiated at: {}, Expired at: {}",
@@ -71,6 +67,9 @@ public class PaymentTimeoutScheduler {
                 log.error("Failed to expire booking ID: {}", booking.getId(), e);
             }
         }
+
+        // OPTIMIZED: Batch save all updated bookings at once
+        bookingRepository.saveAll(expiredBookings);
 
         log.info("Payment timeout scheduler completed. Expired {} bookings", expiredBookings.size());
     }
