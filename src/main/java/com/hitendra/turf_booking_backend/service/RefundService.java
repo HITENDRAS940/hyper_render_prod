@@ -181,12 +181,6 @@ public class RefundService {
                 .multiply(BigDecimal.valueOf(refundPercent))
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
 
-        // Deduct 3% transaction fee from refund amount
-        BigDecimal transactionFeePercent = BigDecimal.valueOf(3);
-        BigDecimal transactionFee = refundAmount
-                .multiply(transactionFeePercent)
-                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        refundAmount = refundAmount.subtract(transactionFee);
 
         BigDecimal deductionAmount = originalAmount.subtract(refundAmount);
 
