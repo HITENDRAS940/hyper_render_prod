@@ -6,6 +6,7 @@ import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.repository.*;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 @org.springframework.stereotype.Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class ServiceService {
 
     private final ServiceRepository serviceRepository;
@@ -39,7 +41,16 @@ public class ServiceService {
     private final ResourceSlotConfigRepository resourceSlotConfigRepository;
     private final ActivityRepository activityRepository;
 
+    /**
+     * Get all services without pagination.
+     * 
+     * @deprecated Use {@link #getAllServicesCard(int, int)} instead for better performance with large datasets.
+     * This method loads all services into memory which can cause performance issues.
+     */
+    @Deprecated
     public List<ServiceDto> getAllServices() {
+        log.warn("PERFORMANCE WARNING: getAllServices() called without pagination. " +
+                 "Consider using getAllServicesCard(page, size) for better performance.");
         return serviceRepository.findAll().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());

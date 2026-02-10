@@ -2,8 +2,9 @@ package com.hitendra.turf_booking_backend.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -11,13 +12,53 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class CloudinaryService {
 
     private final Cloudinary cloudinary;
+    private final ExecutorService executorService;
+
+    /**
+     * Constructor with dependency injection.
+     * ExecutorService is injected to allow shared thread pool management.
+     */
+    @Autowired
+    public CloudinaryService(Cloudinary cloudinary, ExecutorService imageUploadExecutor) {
+        this.cloudinary = cloudinary;
+        this.executorService = imageUploadExecutor;
+    }
+
+    /**
+     * Shutdown executor service gracefully when application context closes.
+     * This prevents resource leaks and allows JVM to terminate properly.
+     * Allows up to 60 seconds for in-progress uploads to complete.
+     */
+    @PreDestroy
+    public void shutdown() {
+        log.info("Shutting down CloudinaryService executor service");
+        executorService.shutdown();
+        try {
+            // Allow 60 seconds for uploads to complete (sufficient for most scenarios)
+            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                log.warn("Executor service did not terminate in 60 seconds, forcing shutdown");
+                executorService.shutdownNow();
+                // Wait briefly for tasks to respond to cancellation
+                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                    log.error("Executor service did not terminate after forced shutdown");
+                }
+            }
+        } catch (InterruptedException e) {
+            log.error("Interrupted while waiting for executor service shutdown", e);
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
 
     /**
      * Upload a single image to Cloudinary
@@ -51,21 +92,74 @@ public class CloudinaryService {
     }
 
     /**
-     * Upload multiple images to Cloudinary
+     * Upload multiple images to Cloudinary in parallel.
+     * OPTIMIZED: Uses CompletableFuture for parallel uploads instead of sequential processing.
+     * This significantly reduces total upload time when uploading multiple images.
+     * 
      * @param files List of image files to upload
      * @return List of secure URLs of uploaded images
      */
     public List<String> uploadImages(List<MultipartFile> files) {
-        List<String> imageUrls = new ArrayList<>();
-
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-                String imageUrl = uploadImage(file);
-                imageUrls.add(imageUrl);
-            }
+        if (files == null || files.isEmpty()) {
+            return new ArrayList<>();
         }
 
-        return imageUrls;
+        // Filter out null/empty files first
+        List<MultipartFile> validFiles = files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .collect(Collectors.toList());
+
+        if (validFiles.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        log.info("Starting parallel upload of {} images", validFiles.size());
+
+        // Create CompletableFuture for each upload with error tracking
+        List<CompletableFuture<String>> uploadFutures = new ArrayList<>();
+        List<String> fileNames = new ArrayList<>();
+        
+        for (int i = 0; i < validFiles.size(); i++) {
+            final int index = i;
+            final MultipartFile file = validFiles.get(i);
+            final String fileName = file.getOriginalFilename();
+            fileNames.add(fileName);
+            
+            CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return uploadImage(file);
+                } catch (Exception e) {
+                    String errorMsg = String.format("Failed to upload image at index %d (%s): %s", 
+                            index, fileName, e.getMessage());
+                    log.error(errorMsg);
+                    throw new RuntimeException(errorMsg, e);
+                }
+            }, executorService);
+            
+            uploadFutures.add(future);
+        }
+
+        // Wait for all uploads to complete and collect results
+        try {
+            CompletableFuture<Void> allUploads = CompletableFuture.allOf(
+                    uploadFutures.toArray(new CompletableFuture[0])
+            );
+
+            // Wait for completion
+            allUploads.join();
+
+            // Collect all successful URLs
+            List<String> imageUrls = uploadFutures.stream()
+                    .map(CompletableFuture::join)
+                    .collect(Collectors.toList());
+
+            log.info("Successfully uploaded {} images in parallel", imageUrls.size());
+            return imageUrls;
+
+        } catch (Exception e) {
+            // Log and rethrow with simplified message
+            throw new RuntimeException("Failed to upload one or more images. Check logs for details.", e);
+        }
     }
 
     /**
