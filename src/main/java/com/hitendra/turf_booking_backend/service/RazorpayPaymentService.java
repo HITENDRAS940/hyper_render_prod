@@ -71,6 +71,15 @@ public class RazorpayPaymentService {
             throw new PaymentException("Booking is " + booking.getStatus().name().toLowerCase() + " and cannot be paid");
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // CRITICAL: CHECK BOOKING EXPIRY (5-MINUTE WINDOW)
+        // ═══════════════════════════════════════════════════════════════════════
+        // A pending status booking must complete payment within 5 minutes of creation.
+        // If the Razorpay order is being created after 5 minutes, the booking has expired.
+        // User should try booking again.
+
+        checkBookingExpiry(booking);
+
         // DUPLICATE PREVENTION: Check if order already exists and payment is in progress
         if (booking.getRazorpayOrderId() != null &&
             booking.getPaymentStatusEnum() == PaymentStatus.IN_PROGRESS) {
@@ -379,6 +388,37 @@ public class RazorpayPaymentService {
                     abandoned.getUser().getEmail(),
                     abandoned.getStatus());
         }
+    }
+
+    /**
+     * Check if booking has expired (5-minute window from creation).
+     * Throws PaymentException with BOOKING_EXPIRED error code if expired.
+     */
+    private void checkBookingExpiry(Booking booking) {
+        final long EXPIRY_WINDOW_SECONDS = 300; // 5 minutes
+
+        // Calculate time elapsed since booking creation
+        Instant now = Instant.now();
+        long elapsedSeconds = now.getEpochSecond() - booking.getCreatedAt().getEpochSecond();
+
+        if (elapsedSeconds >= EXPIRY_WINDOW_SECONDS) {
+            log.warn("Booking expired: ID={}, CreatedAt={}, Now={}, ElapsedSeconds={}, ExpiryWindow={}s",
+                    booking.getId(),
+                    booking.getCreatedAt(),
+                    now,
+                    elapsedSeconds,
+                    EXPIRY_WINDOW_SECONDS);
+
+            throw new PaymentException(
+                    "Booking expired. Your booking is no longer valid. Please try booking again.",
+                    PaymentException.PaymentErrorCode.BOOKING_EXPIRED,
+                    "Booking created at " + booking.getCreatedAt() + " is now expired (5-minute window exceeded)"
+            );
+        }
+
+        // Log remaining time for monitoring
+        long remainingSeconds = EXPIRY_WINDOW_SECONDS - elapsedSeconds;
+        log.info("Booking ID={} is valid. Remaining time for payment: {}s", booking.getId(), remainingSeconds);
     }
 
     /**

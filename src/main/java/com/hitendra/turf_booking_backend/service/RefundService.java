@@ -13,6 +13,7 @@ import com.razorpay.RazorpayException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,9 @@ public class RefundService {
     private final RefundConfig refundConfig;
     private final AuthUtil authUtil;
     private final RazorpayClient razorpayClient;
+
+    @Value("${pricing.online-payment-percent:30}")
+    private Double onlinePaymentPercent;
 
     private static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
 
@@ -75,7 +79,19 @@ public class RefundService {
      * NO DATABASE WRITES.
      */
     private RefundPreviewDto calculateRefundPreview(Booking booking) {
-        BigDecimal originalAmount = BigDecimal.valueOf(booking.getAmount());
+        // Use the actual amount paid online (not total booking amount)
+        // since users only pay online payment percentage upfront
+        BigDecimal originalAmount;
+        if (booking.getOnlineAmountPaid() != null) {
+            // Use stored online amount paid
+            originalAmount = booking.getOnlineAmountPaid();
+        } else {
+            // For backward compatibility: calculate from total amount using online payment percentage
+            double totalAmount = booking.getAmount();
+            double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            originalAmount = BigDecimal.valueOf(onlineAmount);
+        }
+
         String reference = booking.getReference();
         Long bookingId = booking.getId();
 

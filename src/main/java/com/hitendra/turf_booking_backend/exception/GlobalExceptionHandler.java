@@ -29,6 +29,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getHttpStatus()).body(error);
     }
 
+    @ExceptionHandler(PaymentException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentException(PaymentException ex) {
+        log.error("Payment exception: {} - {}", ex.getErrorCode(), ex.getMessage());
+        ErrorResponse error = new ErrorResponse(
+                ex.getHttpStatus(),
+                ex.getMessage(),
+                Instant.now(),
+                ex.getErrorCode().name(),
+                ex.getDetails()
+        );
+        return ResponseEntity.status(ex.getHttpStatus()).body(error);
+    }
 
     @ExceptionHandler(AuthException.class)
     public ResponseEntity<AuthErrorResponse> handleAuthException(AuthException ex) {
