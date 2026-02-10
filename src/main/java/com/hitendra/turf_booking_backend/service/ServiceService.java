@@ -6,6 +6,7 @@ import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.repository.*;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 @org.springframework.stereotype.Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class ServiceService {
 
     private final ServiceRepository serviceRepository;
