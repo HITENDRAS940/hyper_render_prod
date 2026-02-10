@@ -34,10 +34,9 @@ CREATE INDEX IF NOT EXISTS idx_activities_code
 ON activities(code);
 
 -- Add comments for documentation
-COMMENT ON INDEX idx_bookings_status_lock_expires IS 'Optimizes PaymentTimeoutScheduler queries for expired AWAITING_CONFIRMATION bookings';
+COMMENT ON INDEX idx_bookings_status_lock_expires IS 'Optimizes both PaymentTimeoutScheduler and BookingExpiryScheduler queries for expired bookings';
 COMMENT ON INDEX idx_bookings_resource_date IS 'Optimizes slot availability queries by resource and date';
 COMMENT ON INDEX idx_services_city IS 'Optimizes service searches by city (case-insensitive)';
 COMMENT ON INDEX idx_bookings_status IS 'Optimizes status-based filtering queries';
-COMMENT ON INDEX idx_bookings_payment_pending_lock IS 'Optimizes BookingExpiryScheduler queries for expired PAYMENT_PENDING bookings';
 COMMENT ON INDEX idx_service_resources_service_enabled IS 'Optimizes service resource lookups with enabled filter';
 COMMENT ON INDEX idx_activities_code IS 'Optimizes activity lookups by code';

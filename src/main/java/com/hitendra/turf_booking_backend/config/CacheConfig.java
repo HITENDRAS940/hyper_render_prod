@@ -30,13 +30,14 @@ public class CacheConfig {
      * Shared ExecutorService bean for parallel image uploads in CloudinaryService.
      * Using a fixed thread pool of 4 threads (max images that can be uploaded at once).
      * This is a singleton bean shared across the application to avoid thread proliferation.
+     * Threads are daemon threads to allow JVM shutdown even if uploads are in progress.
      */
     @Bean(name = "imageUploadExecutor")
     public ExecutorService imageUploadExecutor() {
         return Executors.newFixedThreadPool(4, r -> {
             Thread thread = new Thread(r);
             thread.setName("image-upload-" + thread.getId());
-            thread.setDaemon(false);
+            thread.setDaemon(true); // Allow JVM to shutdown even if uploads are in progress
             return thread;
         });
     }
