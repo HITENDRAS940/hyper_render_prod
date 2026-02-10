@@ -102,20 +102,25 @@ public class CloudinaryService {
 
         log.info("Starting parallel upload of {} images", validFiles.size());
 
-        // Create CompletableFuture for each upload with indexed tracking
+        // Create CompletableFuture for each upload with error tracking
         List<CompletableFuture<String>> uploadFutures = new ArrayList<>();
+        List<String> fileNames = new ArrayList<>();
+        
         for (int i = 0; i < validFiles.size(); i++) {
             final int index = i;
             final MultipartFile file = validFiles.get(i);
+            final String fileName = file.getOriginalFilename();
+            fileNames.add(fileName);
+            
             CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> {
                 try {
                     return uploadImage(file);
                 } catch (Exception e) {
-                    String fileName = file.getOriginalFilename();
                     log.error("Failed to upload image at index {} ({}): {}", index, fileName, e.getMessage());
-                    throw new RuntimeException("Failed to upload image at index " + index + " (" + fileName + "): " + e.getMessage(), e);
+                    throw new RuntimeException("Image " + index + " (" + fileName + ")", e);
                 }
             }, executorService);
+            
             uploadFutures.add(future);
         }
 
@@ -137,22 +142,8 @@ public class CloudinaryService {
             return imageUrls;
 
         } catch (Exception e) {
-            log.error("Error during parallel image upload: {}", e.getMessage(), e);
-            // Extract specific failure information
-            String failureDetails = uploadFutures.stream()
-                    .filter(f -> f.isCompletedExceptionally())
-                    .map(f -> {
-                        try {
-                            f.join();
-                            return "";
-                        } catch (Exception ex) {
-                            return ex.getMessage();
-                        }
-                    })
-                    .filter(msg -> !msg.isEmpty())
-                    .collect(Collectors.joining("; "));
-            
-            throw new RuntimeException("Failed to upload one or more images: " + failureDetails, e);
+            // Log and rethrow with simplified message
+            throw new RuntimeException("Failed to upload one or more images. Check logs for details.", e);
         }
     }
 

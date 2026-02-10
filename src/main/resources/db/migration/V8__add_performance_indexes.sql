@@ -3,9 +3,10 @@
 
 -- Index for PaymentTimeoutScheduler: frequently queries AWAITING_CONFIRMATION with lockExpiresAt
 -- This prevents full table scans when checking for expired bookings
+-- Partial index only includes rows where lock_expires_at is not null (saves space)
 CREATE INDEX IF NOT EXISTS idx_bookings_status_lock_expires 
 ON bookings(status, lock_expires_at) 
-WHERE status = 'AWAITING_CONFIRMATION' AND lock_expires_at IS NOT NULL;
+WHERE lock_expires_at IS NOT NULL;
 
 -- Index for booking date and resource queries (slot availability checks)
 -- Used frequently in ResourceSlotService.getSlotAvailability()
@@ -23,9 +24,10 @@ ON bookings(status);
 
 -- Index for payment-pending bookings with lock expiration
 -- Used by BookingExpiryScheduler
+-- Partial index only includes rows where lock_expires_at is not null (saves space)
 CREATE INDEX IF NOT EXISTS idx_bookings_payment_pending_lock 
 ON bookings(status, lock_expires_at) 
-WHERE status = 'PAYMENT_PENDING' AND lock_expires_at IS NOT NULL;
+WHERE lock_expires_at IS NOT NULL;
 
 -- Composite index for service resources lookups
 -- Used in SlotBookingService for activity and service filtering
