@@ -37,15 +37,21 @@ public class CloudinaryService {
     /**
      * Shutdown executor service gracefully when application context closes.
      * This prevents resource leaks and allows JVM to terminate properly.
+     * Allows up to 60 seconds for in-progress uploads to complete.
      */
     @PreDestroy
     public void shutdown() {
         log.info("Shutting down CloudinaryService executor service");
         executorService.shutdown();
         try {
-            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
-                log.warn("Executor service did not terminate in 30 seconds, forcing shutdown");
+            // Allow 60 seconds for uploads to complete (sufficient for most scenarios)
+            if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                log.warn("Executor service did not terminate in 60 seconds, forcing shutdown");
                 executorService.shutdownNow();
+                // Wait briefly for tasks to respond to cancellation
+                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
+                    log.error("Executor service did not terminate after forced shutdown");
+                }
             }
         } catch (InterruptedException e) {
             log.error("Interrupted while waiting for executor service shutdown", e);
