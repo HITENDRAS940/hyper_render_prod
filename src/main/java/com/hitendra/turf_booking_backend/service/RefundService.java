@@ -299,6 +299,85 @@ public class RefundService {
     }
 
     /**
+     * Process refund for a booking that was already cancelled by admin or system.
+     * This method creates a refund record and initiates the refund process
+     * for bookings that were cancelled outside the normal user cancellation flow.
+     *
+     * @param booking The already cancelled booking
+     * @param reason Reason for the refund
+     * @return Refund entity that was created
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public Refund processRefundForCancelledBooking(Booking booking, String reason) {
+        log.info("Processing refund for cancelled booking: {}", booking.getReference());
+
+        // Check if booking was paid and is eligible for refund
+        if (booking.getOnlineAmountPaid() == null || booking.getOnlineAmountPaid().compareTo(BigDecimal.ZERO) <= 0) {
+            log.info("Booking {} has no online payment, skipping refund", booking.getReference());
+            return null;
+        }
+
+        // Check if refund already exists
+        if (refundRepository.existsByBookingId(booking.getId())) {
+            log.warn("Refund already exists for booking {}", booking.getReference());
+            return null;
+        }
+
+        // Calculate refund preview
+        RefundPreviewDto preview = calculateRefundPreview(booking);
+
+        // If no refund is applicable, return null
+        if (preview.getRefundAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            log.info("No refund applicable for booking {}", booking.getReference());
+            return null;
+        }
+
+        // Create refund record with admin reason
+        String refundType = booking.getRazorpayPaymentId() != null ? "RAZORPAY" : "MANUAL";
+
+        Refund refund = Refund.builder()
+                .booking(booking)
+                .user(booking.getUser())
+                .originalAmount(preview.getOriginalAmount())
+                .refundAmount(preview.getRefundAmount())
+                .refundPercent(preview.getRefundPercent())
+                .minutesBeforeSlot(preview.getMinutesBeforeSlot())
+                .refundType(refundType)
+                .razorpayPaymentId(booking.getRazorpayPaymentId())
+                .reason(reason != null ? reason : "Booking cancelled by admin/system")
+                .status(RefundStatus.INITIATED)
+                .build();
+
+        refund = refundRepository.save(refund);
+
+        // Send refund notifications
+        sendRefundNotifications(booking, preview, refund);
+
+        // Initiate Razorpay refund if applicable
+        if (booking.getRazorpayPaymentId() != null) {
+            try {
+                initiateRazorpayRefund(refund);
+            } catch (Exception e) {
+                log.error("Failed to initiate Razorpay refund for booking {}: {}",
+                        booking.getReference(), e.getMessage());
+                refund.setStatus(RefundStatus.FAILED);
+                refund.setErrorMessage(e.getMessage());
+                refundRepository.save(refund);
+            }
+        } else {
+            // For other payment methods, mark for manual processing
+            refund.setRefundType("MANUAL");
+            refund.setStatus(RefundStatus.PROCESSING);
+            refundRepository.save(refund);
+        }
+
+        log.info("Refund processed for booking {}: amount={}, status={}",
+                booking.getReference(), preview.getRefundAmount(), refund.getStatus());
+
+        return refund;
+    }
+
+    /**
      * Create refund record in database.
      */
     private Refund createRefundRecord(Booking booking, RefundPreviewDto preview) {

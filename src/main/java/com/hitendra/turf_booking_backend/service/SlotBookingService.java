@@ -107,10 +107,12 @@ public class SlotBookingService {
     private final ResourcePriceRuleRepository priceRuleRepository;
     private final DisabledSlotRepository disabledSlotRepository;
     private final ActivityRepository activityRepository;
+    private final AdminProfileRepository adminProfileRepository;
     private final AuthUtil authUtil;
     private final SlotGeneratorService slotGeneratorService;
     private final CryptoUtil cryptoUtil;
     private final ObjectMapper objectMapper;
+    private final RefundService refundService;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -774,6 +776,14 @@ public class SlotBookingService {
 
         log.info("Cancelled booking {} - slot is now available for rebooking", reference);
 
+        // Process refund if applicable
+        try {
+            refundService.processRefundForCancelledBooking(savedBooking, "Booking cancelled");
+        } catch (Exception e) {
+            log.error("Failed to process refund for booking {}: {}", reference, e.getMessage());
+            // Don't fail the cancellation if refund processing fails
+        }
+
         // Note: Slot is automatically available for rebooking because
         // we filter by status IN ('CONFIRMED', 'PENDING') in availability checks
 
@@ -1028,6 +1038,217 @@ public class SlotBookingService {
                 .amountBreakdown(amountBreakdown)
                 .status(booking.getStatus().name())
                 .build();
+    }
+
+    // ==================== ADMIN MANUAL BOOKING ====================
+
+    /**
+     * Create manual booking for admin (walk-in customers).
+     * Similar to createSlotBooking but:
+     * - No user required (user_id = null)
+     * - Sets created_by_admin_id
+     * - Status = CONFIRMED (not PENDING)
+     * - No payment webhooks required
+     * - Generates idempotency key automatically
+     *
+     * @param request Admin manual booking request
+     * @param adminProfileId Admin profile ID who is creating the booking
+     * @return BookingResponseDto with booking details
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public BookingResponseDto createAdminManualBooking(AdminManualBookingRequestDto request, Long adminProfileId) {
+
+        log.info("Processing admin manual booking request with {} slotKeys",
+                request.getSlotKeys() != null ? request.getSlotKeys().size() : 0);
+
+        if (request.getSlotKeys() == null || request.getSlotKeys().isEmpty()) {
+            throw new BookingException("At least one slot must be selected");
+        }
+
+        // Generate idempotency key automatically for admin bookings
+        String idempotencyKey = "ADMIN-" + UUID.randomUUID();
+
+        // Decrypt and parse all slot keys
+        List<SlotKeyPayload> payloads = new ArrayList<>();
+        for (String slotKey : request.getSlotKeys()) {
+            try {
+                String jsonPayload = cryptoUtil.decrypt(slotKey);
+                SlotKeyPayload payload = objectMapper.readValue(jsonPayload, SlotKeyPayload.class);
+
+                if (payload.getExpiresAt() < Instant.now().getEpochSecond()) {
+                    throw new BookingException("One or more slot keys have expired. Please refresh availability.");
+                }
+                payloads.add(payload);
+            } catch (Exception e) {
+                log.error("Error decrypting slot key", e);
+                throw new BookingException("Invalid or expired slot key");
+            }
+        }
+
+        // Validate all slots are for same service and date
+        Long serviceId = payloads.get(0).getServiceId();
+        String activityCode = payloads.get(0).getActivityCode();
+        LocalDate bookingDate = payloads.get(0).getDate();
+
+        for (SlotKeyPayload payload : payloads) {
+            if (!payload.getServiceId().equals(serviceId)) {
+                throw new BookingException("All slots must be for the same service");
+            }
+            if (!payload.getActivityCode().equals(activityCode)) {
+                throw new BookingException("All slots must be for the same activity");
+            }
+            if (!payload.getDate().equals(bookingDate)) {
+                throw new BookingException("All slots must be for the same date");
+            }
+        }
+
+        // Get service
+        com.hitendra.turf_booking_backend.entity.Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new BookingException("Service not found with ID: " + serviceId));
+
+        // Validate service is active
+        if (!service.isAvailability()) {
+            throw new BookingException("Service is currently unavailable");
+        }
+
+        // Get admin profile
+        AdminProfile adminProfile = adminProfileRepository.findById(adminProfileId)
+                .orElseThrow(() -> new BookingException("Admin profile not found"));
+
+        // Find pooled resources (same activity, same price)
+        List<Long> resourceIdsList = payloads.stream()
+                .flatMap(p -> p.getResourceIds().stream())
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<ServiceResource> pooledResources = resourceRepository.findAllById(resourceIdsList).stream()
+                .filter(r -> r.getActivities().stream().anyMatch(a -> a.getCode().equals(activityCode)))
+                .collect(Collectors.toList());
+
+        if (pooledResources.isEmpty()) {
+            throw new BookingException("No resources found supporting activity: " + activityCode);
+        }
+
+        // Sort payloads by time to get start and end
+        payloads.sort(Comparator.comparing(SlotKeyPayload::getStartTime));
+        LocalTime startTime = payloads.get(0).getStartTime();
+        LocalTime endTime = payloads.get(payloads.size() - 1).getEndTime();
+
+        // Lock resources and find overlapping bookings
+        List<Long> pooledResourceIdsList = pooledResources.stream()
+                .map(ServiceResource::getId)
+                .toList();
+
+        // Find overlapping bookings with pessimistic lock
+        List<Booking> overlappingBookings = bookingRepository.findOverlappingBookingsForResourcesWithLock(
+                pooledResourceIdsList, bookingDate, startTime, endTime);
+
+        // Find disabled slots
+        List<DisabledSlot> disabledSlots = disabledSlotRepository.findOverlappingDisabledSlots(
+                pooledResourceIdsList, bookingDate, startTime, endTime);
+
+        // Categorize resources by activity count
+        List<ServiceResource> exclusiveResources = pooledResources.stream()
+                .filter(r -> r.getActivities().size() == 1)
+                .toList();
+
+        List<ServiceResource> multiActivityResources = pooledResources.stream()
+                .filter(r -> r.getActivities().size() > 1)
+                .toList();
+
+        // Try to find available resource
+        ServiceResource availableResource = null;
+        String allocationReason = null;
+
+        // PRIORITY 1: Exclusive
+        for (ServiceResource resource : exclusiveResources) {
+            if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
+                availableResource = resource;
+                allocationReason = "EXCLUSIVE (supports only " + activityCode + ")";
+                break;
+            }
+        }
+
+        // PRIORITY 2: Multi-activity
+        if (availableResource == null) {
+            for (ServiceResource resource : multiActivityResources) {
+                if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
+                    availableResource = resource;
+                    allocationReason = "MULTI-ACTIVITY";
+                    break;
+                }
+            }
+        }
+
+        if (availableResource == null) {
+            throw new BookingException("No available resource found for the requested slots");
+        }
+
+        log.info("Selected resource {} ({}) for admin manual booking - Allocation: {}",
+                availableResource.getName(), availableResource.getId(), allocationReason);
+
+        // Calculate total amount using quoted prices from payloads
+        double totalAmount = 0.0;
+        for (SlotKeyPayload payload : payloads) {
+            double slotPrice = payload.getQuotedPrice() != null ? payload.getQuotedPrice() : 0.0;
+            totalAmount += slotPrice;
+        }
+
+        // Round to 2 decimal places
+        totalAmount = Math.round(totalAmount * 100.0) / 100.0;
+
+        // Use amounts from request or default to 0
+        java.math.BigDecimal onlineAmountPaid = request.getOnlineAmountPaid() != null
+                ? request.getOnlineAmountPaid()
+                : java.math.BigDecimal.ZERO;
+
+        java.math.BigDecimal venueAmountDue = java.math.BigDecimal.valueOf(totalAmount).subtract(onlineAmountPaid);
+
+        Boolean venueAmountCollected = request.getVenueAmountCollected() != null
+                && request.getVenueAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0;
+
+        String reference = generateBookingReference();
+
+        // Create booking with CONFIRMED status
+        Booking booking = Booking.builder()
+                .user(null) // No user for admin manual bookings
+                .adminProfile(adminProfile) // Set admin who created this
+                .service(service)
+                .resource(availableResource)
+                .activityCode(activityCode)
+                .startTime(startTime)
+                .endTime(endTime)
+                .bookingDate(bookingDate)
+                .amount(totalAmount)
+                .onlineAmountPaid(onlineAmountPaid)
+                .venueAmountDue(venueAmountDue)
+                .venueAmountCollected(venueAmountCollected)
+                .reference(reference)
+                .status(BookingStatus.CONFIRMED) // Immediately confirmed
+                .paymentMode("MANUAL")
+                .createdAt(Instant.now())
+                .paymentSource(PaymentSource.BY_ADMIN) // Mark as admin-created
+                .idempotencyKey(idempotencyKey)
+                .paymentStatusEnum(PaymentStatus.SUCCESS) // Mark payment as complete
+                .build();
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        log.info("Admin manual booking created: reference={}, adminId={}", reference, adminProfileId);
+
+        return convertToResponseDto(savedBooking);
+    }
+
+    /**
+     * Cancel a booking by reference (for admin).
+     * Same as user cancellation but accessible by admin.
+     *
+     * @param reference Booking reference
+     * @return Cancelled booking details
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public BookingResponseDto cancelBookingByReference(String reference) {
+        return cancelBooking(reference);
     }
 }
 

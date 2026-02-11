@@ -831,4 +831,130 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Modifying
     @Query("UPDATE Booking b SET b.adminProfile = NULL WHERE b.adminProfile.id = :adminProfileId")
     int unlinkBookingsFromAdmin(@Param("adminProfileId") Long adminProfileId);
+
+    // ==================== ADMIN DASHBOARD STATISTICS ====================
+
+    /**
+     * Count online bookings for admin's services on a specific date
+     */
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate = :date
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource IN ('BY_USER', 'ONLINE', 'WALLET_PLUS_ONLINE')
+        """)
+    Long countOnlineBookingsByAdminAndDate(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Count offline bookings for admin's services on a specific date
+     */
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate = :date
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource = 'BY_ADMIN'
+        """)
+    Long countOfflineBookingsByAdminAndDate(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Sum online revenue for admin's services on a specific date
+     */
+    @Query("""
+        SELECT COALESCE(SUM(b.amount), 0) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate = :date
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource IN ('BY_USER', 'ONLINE', 'WALLET_PLUS_ONLINE')
+        """)
+    Double sumOnlineRevenueByAdminAndDate(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Sum offline revenue for admin's services on a specific date
+     */
+    @Query("""
+        SELECT COALESCE(SUM(b.amount), 0) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate = :date
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource = 'BY_ADMIN'
+        """)
+    Double sumOfflineRevenueByAdminAndDate(
+            @Param("adminId") Long adminId,
+            @Param("date") LocalDate date
+    );
+
+    /**
+     * Count online bookings for admin's services in a date range
+     */
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate BETWEEN :startDate AND :endDate
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource IN ('BY_USER', 'ONLINE', 'WALLET_PLUS_ONLINE')
+        """)
+    Long countOnlineBookingsByAdminAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Count offline bookings for admin's services in a date range
+     */
+    @Query("""
+        SELECT COUNT(b) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate BETWEEN :startDate AND :endDate
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource = 'BY_ADMIN'
+        """)
+    Long countOfflineBookingsByAdminAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Sum online revenue for admin's services in a date range
+     */
+    @Query("""
+        SELECT COALESCE(SUM(b.amount), 0) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate BETWEEN :startDate AND :endDate
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource IN ('BY_USER', 'ONLINE', 'WALLET_PLUS_ONLINE')
+        """)
+    Double sumOnlineRevenueByAdminAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
+
+    /**
+     * Sum offline revenue for admin's services in a date range
+     */
+    @Query("""
+        SELECT COALESCE(SUM(b.amount), 0) FROM Booking b
+        WHERE b.service.createdBy.id = :adminId
+        AND b.bookingDate BETWEEN :startDate AND :endDate
+        AND b.status IN ('CONFIRMED', 'COMPLETED')
+        AND b.paymentSource = 'BY_ADMIN'
+        """)
+    Double sumOfflineRevenueByAdminAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate
+    );
 }

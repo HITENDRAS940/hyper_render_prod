@@ -1,14 +1,23 @@
 package com.hitendra.turf_booking_backend.controller;
 
 import com.hitendra.turf_booking_backend.dto.booking.AdminBookingRequestDTO;
+import com.hitendra.turf_booking_backend.dto.booking.AdminManualBookingRequestDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
+import com.hitendra.turf_booking_backend.dto.booking.SlotAvailabilityResponseDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
+import com.hitendra.turf_booking_backend.dto.dashboard.AdminDashboardStatsDto;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
+import com.hitendra.turf_booking_backend.dto.slot.BulkDisableSlotRequestDto;
+import com.hitendra.turf_booking_backend.dto.slot.DisableSlotRequestDto;
+import com.hitendra.turf_booking_backend.dto.slot.DisabledSlotDto;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.DeleteProfileRequest;
+import com.hitendra.turf_booking_backend.entity.Booking;
+import com.hitendra.turf_booking_backend.entity.Refund;
+import com.hitendra.turf_booking_backend.repository.BookingRepository;
 import com.hitendra.turf_booking_backend.security.service.UserDetailsImplementation;
 import com.hitendra.turf_booking_backend.service.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +25,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,11 +36,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
+@Slf4j
 @SecurityRequirement(name = "Bearer Authentication")
 @Tag(name = "Admin", description = "Admin APIs for managing services, resources, and bookings")
 @PreAuthorize("hasRole('ADMIN')")
@@ -43,6 +55,11 @@ public class AdminController {
     private final ResourceSlotService resourceSlotService;
     private final PricingService pricingService;
     private final RevenueService revenueService;
+    private final DashboardService dashboardService;
+    private final SlotBookingService slotBookingService;
+    private final DisabledSlotService disabledSlotService;
+    private final RefundService refundService;
+    private final BookingRepository bookingRepository;
 
     // ==================== Profile Management ====================
 
@@ -72,6 +89,19 @@ public class AdminController {
         return ResponseEntity.ok("Your account has been permanently deleted. " +
                 "All personal data has been removed. " +
                 "You will be logged out and cannot access this account again.");
+    }
+
+    // ==================== Dashboard Statistics ====================
+
+    @GetMapping("/dashboard/stats")
+    @Operation(summary = "Get dashboard statistics",
+            description = "Get comprehensive dashboard statistics for the current admin including today's and monthly booking counts " +
+                    "and revenue broken down by online vs offline bookings. Includes all services managed by the admin.")
+    public ResponseEntity<AdminDashboardStatsDto> getDashboardStats() {
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+        AdminDashboardStatsDto stats = dashboardService.getAdminDashboardStats(adminProfile.getId());
+        return ResponseEntity.ok(stats);
     }
 
     // ==================== Service Management ====================
@@ -375,10 +405,251 @@ public class AdminController {
     }
 
     @PutMapping("/bookings/{bookingId}/cancel")
-    @Operation(summary = "Cancel booking", description = "Cancel a booking. Slots will be released.")
+    @Operation(summary = "Cancel booking and process refund",
+            description = "Cancel a booking by admin. Automatically initiates refund if applicable. " +
+                    "Refund amount is calculated based on cancellation policy. Slots will be released.")
     public ResponseEntity<String> cancelBooking(@PathVariable Long bookingId) {
+        // Get the booking first
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        // Cancel the booking
         bookingService.cancelBookingById(bookingId);
+
+        // Process refund if applicable
+        try {
+            Refund refund = refundService.processRefundForCancelledBooking(booking, "Cancelled by admin");
+            if (refund != null) {
+                return ResponseEntity.ok("Booking cancelled successfully. Refund initiated: ₹" +
+                        refund.getRefundAmount() + " (" + refund.getRefundPercent() + "%)");
+            }
+        } catch (Exception e) {
+            log.error("Failed to process refund for booking {}: {}", bookingId, e.getMessage());
+            // Don't fail the cancellation if refund processing fails
+        }
+
         return ResponseEntity.ok("Booking cancelled successfully");
+    }
+
+    // ==================== Manual Booking (Walk-in Customers) ====================
+
+    @GetMapping("/slots/availability")
+    @Operation(summary = "Get slot availability for manual booking",
+            description = "Get aggregated slot availability for a service activity to create manual bookings for walk-in customers. " +
+                    "Same as user slot availability API but accessible for admin.")
+    public ResponseEntity<SlotAvailabilityResponseDto> getSlotAvailabilityForManualBooking(
+            @RequestParam Long serviceId,
+            @RequestParam String activityCode,
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+
+        SlotAvailabilityResponseDto availability = slotBookingService
+                .getAggregatedSlotAvailability(serviceId, activityCode, date);
+
+        return ResponseEntity.ok(availability);
+    }
+
+    @PostMapping("/slots/book")
+    @Operation(summary = "Create manual booking for walk-in customer",
+            description = """
+                Create a manual booking for walk-in customers. This is similar to the user booking API but:
+                - No user authentication required (user_id will be null)
+                - Sets created_by_admin_id to current admin
+                - Booking is immediately CONFIRMED (no payment webhook required)
+                - Payment details are recorded as provided by admin
+                - Idempotency key is auto-generated
+                
+                **Intent-Based Booking:**
+                - Send `slotKeys` from the availability response
+                - Backend assigns an available resource automatically
+                - Slots must be contiguous
+                
+                **Payment Details:**
+                - Set onlineAmountPaid if customer paid via UPI/card to admin
+                - Set venueAmountCollected if cash was collected
+                - Can set both if partial payment was made
+                
+                **Customer Info:**
+                - customerName and customerPhone are optional
+                - Useful for tracking walk-in customers
+                """)
+    public ResponseEntity<BookingResponseDto> createManualBooking(
+            @Valid @RequestBody AdminManualBookingRequestDto request) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        BookingResponseDto booking = slotBookingService.createAdminManualBooking(request, adminProfile.getId());
+
+        return ResponseEntity.status(201).body(booking);
+    }
+
+    @PostMapping("/slots/cancel/{reference}")
+    @Operation(summary = "Cancel booking by reference",
+            description = "Cancel any booking by its reference number. " +
+                    "Can be used to cancel both user bookings and walk-in bookings. " +
+                    "The slot will become available for rebooking.")
+    public ResponseEntity<BookingResponseDto> cancelBookingByReference(
+            @PathVariable String reference) {
+
+        BookingResponseDto booking = slotBookingService.cancelBookingByReference(reference);
+
+        return ResponseEntity.ok(booking);
+    }
+
+    // ==================== Slot Disabling Management ====================
+
+    @PostMapping("/slots/disable")
+    @Operation(summary = "Disable slot or time range",
+            description = """
+                Disable a single slot or time range for a resource on a specific date.
+                
+                **Single Slot:**
+                - Provide resourceId, date, and startTime
+                - System will automatically disable the single slot starting at that time
+                
+                **Time Range:**
+                - Provide resourceId, date, startTime, and endTime
+                - System will disable all slots within that time range
+                
+                **Validations:**
+                - Cannot disable slots with existing confirmed bookings
+                - Start time must match a valid slot boundary
+                - Time range must contain at least one valid slot
+                
+                **Use Cases:**
+                - Maintenance windows
+                - Private events
+                - Resource cleaning
+                - Holiday closures for specific time periods
+                """)
+    public ResponseEntity<List<DisabledSlotDto>> disableSlot(
+            @Valid @RequestBody DisableSlotRequestDto request) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        List<DisabledSlotDto> disabledSlots = disabledSlotService.disableSlot(request, adminProfile.getId());
+
+        return ResponseEntity.ok(disabledSlots);
+    }
+
+    @PostMapping("/slots/disable/bulk")
+    @Operation(summary = "Bulk disable slots",
+            description = """
+                Bulk disable slots for multiple resources, dates, or time ranges.
+                
+                **Disable Entire Day(s):**
+                - Provide startDate (and optionally endDate)
+                - Omit startTime and endTime to disable all slots
+                
+                **Disable Specific Time Range Across Multiple Days:**
+                - Provide startDate, endDate, startTime, endTime
+                - System will disable that time range on each day
+                
+                **Multiple Resources:**
+                - Provide list of resourceIds
+                - OR provide serviceId to disable for all resources in that service
+                
+                **Examples:**
+                
+                1. Close entire service for 3 days:
+                ```json
+                {
+                  "serviceId": 1,
+                  "startDate": "2026-02-15",
+                  "endDate": "2026-02-17",
+                  "reason": "Annual maintenance"
+                }
+                ```
+                
+                2. Disable morning slots (6 AM - 12 PM) for a week:
+                ```json
+                {
+                  "resourceIds": [1, 2],
+                  "startDate": "2026-02-15",
+                  "endDate": "2026-02-21",
+                  "startTime": "06:00",
+                  "endTime": "12:00",
+                  "reason": "Morning maintenance"
+                }
+                ```
+                
+                Returns the total number of slots disabled.
+                """)
+    public ResponseEntity<Integer> bulkDisableSlots(
+            @Valid @RequestBody BulkDisableSlotRequestDto request) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        int disabledCount = disabledSlotService.bulkDisableSlots(request, adminProfile.getId());
+
+        return ResponseEntity.ok(disabledCount);
+    }
+
+    @DeleteMapping("/slots/disabled/{disabledSlotId}")
+    @Operation(summary = "Enable a disabled slot",
+            description = "Remove a slot from disabled state, making it available for booking again")
+    public ResponseEntity<String> enableSlot(@PathVariable Long disabledSlotId) {
+        disabledSlotService.enableSlot(disabledSlotId);
+        return ResponseEntity.ok("Slot enabled successfully");
+    }
+
+    @DeleteMapping("/slots/disabled/by-time")
+    @Operation(summary = "Enable slot by time",
+            description = "Enable a specific disabled slot by resource, date, and start time")
+    public ResponseEntity<String> enableSlotByTime(
+            @RequestParam Long resourceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime startTime) {
+
+        disabledSlotService.enableSlotByTime(resourceId, date, startTime);
+        return ResponseEntity.ok("Slot enabled successfully");
+    }
+
+    @DeleteMapping("/resources/{resourceId}/slots/disabled/date/{date}")
+    @Operation(summary = "Enable all disabled slots on a date",
+            description = "Remove all disabled slots for a resource on a specific date, making them all available")
+    public ResponseEntity<Integer> enableAllSlotsOnDate(
+            @PathVariable Long resourceId,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        int enabledCount = disabledSlotService.enableAllSlotsOnDate(resourceId, date);
+        return ResponseEntity.ok(enabledCount);
+    }
+
+    @GetMapping("/resources/{resourceId}/slots/disabled")
+    @Operation(summary = "Get disabled slots for resource",
+            description = "Get all disabled slots for a resource on a specific date")
+    public ResponseEntity<List<DisabledSlotDto>> getDisabledSlots(
+            @PathVariable Long resourceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlots(resourceId, date);
+        return ResponseEntity.ok(disabledSlots);
+    }
+
+    @GetMapping("/services/{serviceId}/slots/disabled")
+    @Operation(summary = "Get disabled slots for service",
+            description = "Get all disabled slots for all resources of a service on a specific date")
+    public ResponseEntity<List<DisabledSlotDto>> getDisabledSlotsByService(
+            @PathVariable Long serviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlotsByService(serviceId, date);
+        return ResponseEntity.ok(disabledSlots);
+    }
+
+    @GetMapping("/resources/{resourceId}/slots/disabled/range")
+    @Operation(summary = "Get disabled slots in date range",
+            description = "Get all disabled slots for a resource within a date range")
+    public ResponseEntity<List<DisabledSlotDto>> getDisabledSlotsInRange(
+            @PathVariable Long resourceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlotsInRange(resourceId, startDate, endDate);
+        return ResponseEntity.ok(disabledSlots);
     }
 
     // ==================== Revenue Reporting ====================
