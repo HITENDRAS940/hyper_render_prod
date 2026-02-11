@@ -158,6 +158,15 @@ public class BookingService {
     }
 
     /**
+     * Get booking by reference
+     */
+    public BookingResponseDto getBookingByReference(String reference) {
+        Booking booking = bookingRepository.findByReference(reference)
+                .orElseThrow(() -> new RuntimeException("Booking not found with reference: " + reference));
+        return convertToResponseDto(booking);
+    }
+
+    /**
      * Get booking by ID
      */
     public BookingResponseDto getBookingById(Long bookingId) {

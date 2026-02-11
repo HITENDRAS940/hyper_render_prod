@@ -382,6 +382,15 @@ public class AdminController {
         return ResponseEntity.ok(booking);
     }
 
+    @GetMapping("/bookings/by-reference/{reference}")
+    @Operation(summary = "Get booking by reference",
+            description = "Get detailed information about a booking using its reference number (e.g., BK-ABC123XYZ). " +
+                    "This is useful for quick lookup without needing to know the booking ID.")
+    public ResponseEntity<BookingResponseDto> getBookingByReference(@PathVariable String reference) {
+        BookingResponseDto booking = bookingService.getBookingByReference(reference);
+        return ResponseEntity.ok(booking);
+    }
+
     @PostMapping("/bookings")
     @Operation(summary = "Create booking", description = "Create a booking on behalf of a walk-in customer (auto-confirmed)")
     public ResponseEntity<BookingResponseDto> createAdminBooking(
