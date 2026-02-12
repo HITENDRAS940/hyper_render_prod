@@ -451,6 +451,7 @@ public class ResourceSlotService {
      *
      * RULE: A booking locks a slot if:
      * - status is CONFIRMED, or
+     * - status is COMPLETED, or
      * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
      *
      * Bookings with payment_status = NOT_STARTED are NOT considered locking the slot.
@@ -464,8 +465,8 @@ public class ResourceSlotService {
         BookingStatus status = booking.getStatus();
         PaymentStatus paymentStatus = booking.getPaymentStatusEnum();
 
-        // Confirmed bookings always lock the slot
-        if (status == BookingStatus.CONFIRMED) {
+        // Confirmed or Completed bookings always lock the slot
+        if (status == BookingStatus.CONFIRMED || status == BookingStatus.COMPLETED) {
             return true;
         }
 
