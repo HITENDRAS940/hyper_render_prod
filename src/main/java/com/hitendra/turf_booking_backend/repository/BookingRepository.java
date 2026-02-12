@@ -114,6 +114,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Get lightweight booking list for admin (projection-based).
+     * Includes both user bookings for admin's services and manual bookings created by admin.
      */
     @Query("""
         SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
@@ -127,13 +128,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
         FROM Booking b
-        WHERE b.service.createdBy.id = :adminId
+        WHERE b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdProjected(@Param("adminId") Long adminId, Pageable pageable);
 
     /**
      * Get lightweight booking list for admin filtered by date (projection-based).
+     * Includes both user bookings for admin's services and manual bookings created by admin.
      */
     @Query("""
         SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
@@ -147,7 +149,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
         FROM Booking b
-        WHERE b.service.createdBy.id = :adminId AND b.bookingDate = :date
+        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.bookingDate = :date
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndDateProjected(
@@ -155,6 +157,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Get lightweight booking list for admin filtered by status (projection-based).
+     * Includes both user bookings for admin's services and manual bookings created by admin.
      */
     @Query("""
         SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
@@ -168,7 +171,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
         FROM Booking b
-        WHERE b.service.createdBy.id = :adminId AND b.status = :status
+        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.status = :status
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndStatusProjected(
@@ -176,6 +179,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Get lightweight booking list for admin filtered by date and status (projection-based).
+     * Includes both user bookings for admin's services and manual bookings created by admin.
      */
     @Query("""
         SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
@@ -189,7 +193,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
         FROM Booking b
-        WHERE b.service.createdBy.id = :adminId AND b.bookingDate = :date AND b.status = :status
+        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.bookingDate = :date AND b.status = :status
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndDateAndStatusProjected(
