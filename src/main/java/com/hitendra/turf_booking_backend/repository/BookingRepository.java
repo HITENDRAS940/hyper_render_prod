@@ -742,11 +742,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     int expireAbandonedBookings(@Param("bookingIds") List<Long> bookingIds);
 
     /**
-     * Find all bookings for services created by a specific admin
+     * Find all bookings for services created by a specific admin or manually created by this admin
+     * Includes both user bookings for admin's services and manual bookings created by admin
      * Used for admin dashboard
      */
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.service.createdBy.id = :adminId " +
+           "WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findByServiceCreatedById(
             @Param("adminId") Long adminId,
@@ -754,11 +755,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
-     * Find all bookings for services created by a specific admin filtered by date
+     * Find all bookings for services created by a specific admin or manually created by this admin filtered by date
+     * Includes both user bookings for admin's services and manual bookings created by admin
      * Used for admin dashboard with date filtering
      */
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.service.createdBy.id = :adminId " +
+           "WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) " +
            "AND b.bookingDate = :date " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findByServiceCreatedByIdAndDate(
@@ -768,11 +770,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
-     * Find all bookings for services created by a specific admin filtered by status
+     * Find all bookings for services created by a specific admin or manually created by this admin filtered by status
+     * Includes both user bookings for admin's services and manual bookings created by admin
      * Used for admin dashboard with status filtering
      */
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.service.createdBy.id = :adminId " +
+           "WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) " +
            "AND b.status = :status " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findByServiceCreatedByIdAndStatus(
@@ -782,11 +785,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
-     * Find all bookings for services created by a specific admin filtered by date and status
+     * Find all bookings for services created by a specific admin or manually created by this admin filtered by date and status
+     * Includes both user bookings for admin's services and manual bookings created by admin
      * Used for admin dashboard with both filters
      */
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.service.createdBy.id = :adminId " +
+           "WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) " +
            "AND b.bookingDate = :date " +
            "AND b.status = :status " +
            "ORDER BY b.createdAt DESC")
@@ -798,11 +802,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
 
     /**
-     * Find all pending bookings for services created by a specific admin
+     * Find all pending bookings for services created by a specific admin or manually created by this admin
+     * Includes both user bookings for admin's services and manual bookings created by admin
      * Used for admin dashboard
      */
     @Query("SELECT b FROM Booking b " +
-           "WHERE b.service.createdBy.id = :adminId " +
+           "WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) " +
            "AND b.status = 'PENDING' " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findPendingByServiceCreatedById(

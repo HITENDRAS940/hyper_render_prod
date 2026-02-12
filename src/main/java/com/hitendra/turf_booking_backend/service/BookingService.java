@@ -690,6 +690,7 @@ public class BookingService {
             dto.setResourceName(projection.getResourceName());
         }
 
+        // Set user info - if null, it's a walk-in booking (admin-created manual booking)
         if (projection.getUserId() != null) {
             BookingResponseDto.UserInfo userInfo = BookingResponseDto.UserInfo.builder()
                     .id(projection.getUserId())
@@ -698,6 +699,15 @@ public class BookingService {
                     .phone(projection.getUserPhone())
                     .build();
             dto.setUser(userInfo);
+        } else {
+            // Admin-created manual booking (no user) - show as WALK-IN BOOKING
+            BookingResponseDto.UserInfo walkinUser = BookingResponseDto.UserInfo.builder()
+                    .id(null)
+                    .name("WALK-IN BOOKING")
+                    .email(null)
+                    .phone(null)
+                    .build();
+            dto.setUser(walkinUser);
         }
 
         // Use stored amounts from projection (already calculated during booking creation)
@@ -758,6 +768,7 @@ public class BookingService {
             dto.setResourceName(booking.getResource().getName());
         }
 
+        // Set user info - if null, it's a walk-in booking (admin-created manual booking)
         if (booking.getUser() != null) {
             BookingResponseDto.UserInfo userInfo = BookingResponseDto.UserInfo.builder()
                     .id(booking.getUser().getId())
@@ -766,6 +777,15 @@ public class BookingService {
                     .phone(booking.getUser().getPhone())
                     .build();
             dto.setUser(userInfo);
+        } else {
+            // Admin-created manual booking (no user) - show as WALK-IN BOOKING
+            BookingResponseDto.UserInfo walkinUser = BookingResponseDto.UserInfo.builder()
+                    .id(null)
+                    .name("WALK-IN BOOKING")
+                    .email(null)
+                    .phone(null)
+                    .build();
+            dto.setUser(walkinUser);
         }
 
         // Calculate accurate price breakdown using PricingService
@@ -881,13 +901,21 @@ public class BookingService {
     }
 
     private PendingBookingDto convertToPendingBookingDto(Booking booking) {
-        PendingBookingDto.UserInfo userInfo = null;
+        PendingBookingDto.UserInfo userInfo;
         if (booking.getUser() != null) {
             userInfo = PendingBookingDto.UserInfo.builder()
                     .id(booking.getUser().getId())
                     .name(booking.getUser().getName())
                     .email(booking.getUser().getEmail())
                     .phone(booking.getUser().getPhone())
+                    .build();
+        } else {
+            // Admin-created manual booking (no user) - show as WALK-IN BOOKING
+            userInfo = PendingBookingDto.UserInfo.builder()
+                    .id(null)
+                    .name("WALK-IN BOOKING")
+                    .email(null)
+                    .phone(null)
                     .build();
         }
 
