@@ -3,6 +3,7 @@ package com.hitendra.turf_booking_backend.controller;
 import com.hitendra.turf_booking_backend.dto.booking.AdminBookingRequestDTO;
 import com.hitendra.turf_booking_backend.dto.booking.AdminManualBookingRequestDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
+import com.hitendra.turf_booking_backend.dto.booking.DirectManualBookingRequestDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.booking.SlotAvailabilityResponseDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
@@ -501,6 +502,95 @@ public class AdminController {
             @PathVariable String reference) {
 
         BookingResponseDto booking = slotBookingService.cancelBookingByReference(reference);
+
+        return ResponseEntity.ok(booking);
+    }
+
+    // ==================== Direct Manual Booking (No Slot Keys) ====================
+
+    @PostMapping("/manual-bookings")
+    @Operation(
+            summary = "Create direct manual booking for walk-in customer",
+            description = """
+                Create a manual booking for walk-in customers by providing booking details directly.
+                No slot key generation required - just provide all details.
+                
+                **Booking Details:**
+                - Booking is **immediately CONFIRMED** (no payment webhook)
+                - No user_id (walk-in customer without account)
+                - created_by_admin_id set to current admin
+                - Payment details recorded as-is
+                - Reference auto-generated (BK-ABC123XYZ)
+                - payment_mode: MANUAL
+                - payment_source: BY_ADMIN
+                
+                **Required Fields:**
+                - serviceId: ID of service
+                - resourceId: Specific resource to book
+                - activityCode: Activity code (CRICKET, FOOTBALL, etc.)
+                - bookingDate: Date of booking (yyyy-MM-dd)
+                - startTime: Start time (HH:mm:ss)
+                - endTime: End time (HH:mm:ss)
+                - amount: Total booking amount
+                
+                **Optional Fields:**
+                - onlineAmountPaid: Amount paid online (UPI/Card). Default: 0
+                - venueAmountCollected: Amount collected at venue (Cash). Default: 0
+                - remarks: Notes/tracking info (customer name, phone, etc.)
+                
+                **Example Request:**
+                ```json
+                {
+                  "serviceId": 1,
+                  "resourceId": 5,
+                  "activityCode": "CRICKET",
+                  "bookingDate": "2026-02-15",
+                  "startTime": "06:00:00",
+                  "endTime": "08:00:00",
+                  "amount": 1000,
+                  "onlineAmountPaid": 500,
+                  "venueAmountCollected": 500,
+                  "remarks": "John Doe, +919876543210, Birthday party"
+                }
+                ```
+                
+                **Response:**
+                Returns booking with reference and CONFIRMED status
+                """)
+    public ResponseEntity<BookingResponseDto> createDirectManualBooking(
+            @Valid @RequestBody DirectManualBookingRequestDto request) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        log.info("Admin {} creating direct manual booking - Service: {}, Resource: {}, Date: {}, Time: {} to {}",
+                adminProfile.getId(),
+                request.getServiceId(),
+                request.getResourceId(),
+                request.getBookingDate(),
+                request.getStartTime(),
+                request.getEndTime());
+
+        BookingResponseDto booking = slotBookingService.createDirectManualBooking(request, adminProfile.getId());
+
+        log.info("Direct manual booking created successfully - Reference: {}, Admin: {}",
+                booking.getReference(), adminProfile.getId());
+
+        return ResponseEntity.status(201).body(booking);
+    }
+
+    @GetMapping("/manual-bookings/{reference}")
+    @Operation(
+            summary = "Get manual booking details by reference",
+            description = """
+                Retrieve detailed information about a manual booking using its reference number.
+                """)
+    public ResponseEntity<BookingResponseDto> getManualBookingByReference(
+            @PathVariable String reference) {
+
+        log.info("Fetching manual booking details - Reference: {}", reference);
+
+        BookingResponseDto booking = bookingService.getBookingByReference(reference);
 
         return ResponseEntity.ok(booking);
     }

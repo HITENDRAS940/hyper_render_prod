@@ -1250,5 +1250,122 @@ public class SlotBookingService {
     public BookingResponseDto cancelBookingByReference(String reference) {
         return cancelBooking(reference);
     }
+
+    /**
+     * Create direct manual booking with all details provided directly.
+     * No slot key encryption/decryption required.
+     *
+     * @param request DirectManualBookingRequestDto with all booking details
+     * @param adminProfileId Admin profile ID who is creating the booking
+     * @return BookingResponseDto with CONFIRMED status
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public BookingResponseDto createDirectManualBooking(DirectManualBookingRequestDto request, Long adminProfileId) {
+
+        log.info("Processing direct manual booking - Service: {}, Resource: {}, Date: {}, Time: {} to {}",
+                request.getServiceId(),
+                request.getResourceId(),
+                request.getBookingDate(),
+                request.getStartTime(),
+                request.getEndTime());
+
+        // Validate booking date is not in the past
+        if (request.getBookingDate().isBefore(LocalDate.now())) {
+            throw new BookingException("Booking date cannot be in the past");
+        }
+
+        // Validate start time before end time
+        if (request.getStartTime().isAfter(request.getEndTime()) || request.getStartTime().equals(request.getEndTime())) {
+            throw new BookingException("Start time must be before end time");
+        }
+
+        // Get service
+        com.hitendra.turf_booking_backend.entity.Service service = serviceRepository.findById(request.getServiceId())
+                .orElseThrow(() -> new BookingException("Service not found with ID: " + request.getServiceId()));
+
+        if (!service.isAvailability()) {
+            throw new BookingException("Service is currently unavailable");
+        }
+
+        // Get resource
+        ServiceResource resource = resourceRepository.findById(request.getResourceId())
+                .orElseThrow(() -> new BookingException("Resource not found with ID: " + request.getResourceId()));
+
+        if (!resource.isEnabled()) {
+            throw new BookingException("Resource is currently disabled");
+        }
+
+        // Validate resource belongs to service
+        if (!resource.getService().getId().equals(request.getServiceId())) {
+            throw new BookingException("Resource does not belong to the specified service");
+        }
+
+        // Get admin profile
+        AdminProfile adminProfile = adminProfileRepository.findById(adminProfileId)
+                .orElseThrow(() -> new BookingException("Admin profile not found"));
+
+        // Check for overlapping bookings
+        List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(
+                request.getResourceId(),
+                request.getBookingDate(),
+                request.getStartTime(),
+                request.getEndTime());
+
+        if (!overlappingBookings.isEmpty()) {
+            throw new BookingException("Resource is already booked for the requested time slot");
+        }
+
+        // Check for disabled slots
+        List<DisabledSlot> disabledSlots = disabledSlotRepository.findOverlappingDisabledSlots(
+                Collections.singletonList(request.getResourceId()),
+                request.getBookingDate(),
+                request.getStartTime(),
+                request.getEndTime());
+
+        if (!disabledSlots.isEmpty()) {
+            throw new BookingException("Some slots are disabled for the requested time period");
+        }
+
+        // Generate idempotency key and reference
+        String idempotencyKey = "ADMIN-" + UUID.randomUUID();
+        String reference = generateBookingReference();
+
+        // Process payment amounts
+        java.math.BigDecimal onlineAmountPaid = request.getOnlineAmountPaid() != null
+                ? request.getOnlineAmountPaid()
+                : java.math.BigDecimal.ZERO;
+
+        java.math.BigDecimal venueAmountCollected = request.getVenueAmountCollected() != null
+                ? request.getVenueAmountCollected()
+                : java.math.BigDecimal.ZERO;
+
+        // Create booking with CONFIRMED status
+        Booking booking = Booking.builder()
+                .user(null)  // No user for admin manual bookings
+                .adminProfile(adminProfile)  // Set admin who created this
+                .service(service)
+                .resource(resource)
+                .activityCode(request.getActivityCode())
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .bookingDate(request.getBookingDate())
+                .amount(request.getAmount().doubleValue())
+                .onlineAmountPaid(onlineAmountPaid)
+                .status(BookingStatus.CONFIRMED)  // Immediately confirmed
+                .paymentMode("MANUAL")
+                .createdAt(Instant.now())
+                .paymentSource(PaymentSource.BY_ADMIN)  // Mark as admin-created
+                .idempotencyKey(idempotencyKey)
+                .paymentStatusEnum(PaymentStatus.SUCCESS)  // Mark payment as complete
+                .reference(reference)
+                .build();
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        log.info("Direct manual booking created: reference={}, adminId={}, resourceId={}, amount={}",
+                reference, adminProfileId, request.getResourceId(), request.getAmount());
+
+        return convertToResponseDto(savedBooking);
+    }
 }
 
