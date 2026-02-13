@@ -4,6 +4,8 @@ import com.hitendra.turf_booking_backend.dto.slot.BulkDisableSlotRequestDto;
 import com.hitendra.turf_booking_backend.dto.slot.DisableSlotRequestDto;
 import com.hitendra.turf_booking_backend.dto.slot.DisabledSlotDto;
 import com.hitendra.turf_booking_backend.dto.slot.GeneratedSlot;
+import com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotRequestDto;
+import com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto;
 import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.exception.BookingException;
 import com.hitendra.turf_booking_backend.repository.*;
@@ -228,6 +230,193 @@ public class DisabledSlotService {
     }
 
     /**
+     * Unified method to disable slots - handles all scenarios:
+     * - Single slot
+     * - Time range (single day)
+     * - Entire day(s)
+     * - Multiple resources
+     * - Multiple dates
+     * - Service-wide disable
+     *
+     * @param request Unified disable request
+     * @param adminProfileId Admin who is disabling the slots
+     * @return Response with count and details of disabled slots
+     */
+    @Transactional
+    public UnifiedDisableSlotResponseDto disableSlots(UnifiedDisableSlotRequestDto request, Long adminProfileId) {
+        log.info("Disabling slots - resources: {}, serviceId: {}, dates: {} to {}, time: {} to {}",
+                request.getResourceIds(), request.getServiceId(),
+                request.getStartDate(), request.getEndDate(),
+                request.getStartTime(), request.getEndTime());
+
+        // Validate request
+        if ((request.getResourceIds() == null || request.getResourceIds().isEmpty()) && request.getServiceId() == null) {
+            throw new BookingException("Either resourceIds or serviceId must be provided");
+        }
+
+        // Get admin profile
+        AdminProfile adminProfile = adminProfileRepository.findById(adminProfileId)
+                .orElseThrow(() -> new BookingException("Admin profile not found"));
+
+        // Determine which resources to disable
+        List<Long> resourceIds = request.getResourceIds();
+        if (resourceIds == null || resourceIds.isEmpty()) {
+            // Get all resources for the service
+            resourceIds = resourceRepository.findByServiceId(request.getServiceId()).stream()
+                    .map(ServiceResource::getId)
+                    .toList();
+
+            if (resourceIds.isEmpty()) {
+                throw new BookingException("No resources found for service ID: " + request.getServiceId());
+            }
+        }
+
+        // Determine date range
+        LocalDate endDate = request.getEndDate() != null ? request.getEndDate() : request.getStartDate();
+
+        List<DisabledSlotDto> allDisabledSlots = new ArrayList<>();
+        int totalDisabled = 0;
+
+        // Iterate through each resource and each date
+        for (Long resourceId : resourceIds) {
+            ServiceResource resource = resourceRepository.findById(resourceId)
+                    .orElseThrow(() -> new BookingException("Resource not found: " + resourceId));
+
+            ResourceSlotConfig config = slotConfigRepository.findByResourceId(resourceId).orElse(null);
+            if (config == null) {
+                log.warn("No slot config for resource {}, skipping", resourceId);
+                continue;
+            }
+
+            List<GeneratedSlot> allSlots = slotGeneratorService.generateSlots(config);
+
+            // Iterate through date range
+            LocalDate currentDate = request.getStartDate();
+            while (!currentDate.isAfter(endDate)) {
+
+                // Determine which slots to disable on this date
+                List<GeneratedSlot> slotsToDisable;
+
+                if (request.getStartTime() != null) {
+                    LocalTime reqStart = request.getStartTime();
+                    LocalTime reqEnd = request.getEndTime();
+
+                    if (reqEnd == null) {
+                        // Single slot - find the slot that starts at this time
+                        GeneratedSlot matchingSlot = allSlots.stream()
+                                .filter(s -> s.getStartTime().equals(reqStart))
+                                .findFirst()
+                                .orElseThrow(() -> new BookingException(
+                                        "Invalid start time. No slot found at " + reqStart + " for resource " + resourceId));
+
+                        slotsToDisable = List.of(matchingSlot);
+                    } else {
+                        // Time range - disable all slots in the range
+                        slotsToDisable = allSlots.stream()
+                                .filter(slot -> !slot.getStartTime().isBefore(reqStart) &&
+                                              (slot.getEndTime().isBefore(reqEnd) || slot.getEndTime().equals(reqEnd)))
+                                .toList();
+
+                        if (slotsToDisable.isEmpty()) {
+                            log.warn("No slots found in time range {} to {} for resource {} on {}",
+                                    reqStart, reqEnd, resourceId, currentDate);
+                        }
+                    }
+                } else {
+                    // No time specified - disable entire day (all slots)
+                    slotsToDisable = allSlots;
+                }
+
+                // Check for existing confirmed bookings before disabling
+                if (!slotsToDisable.isEmpty()) {
+                    LocalTime firstStart = slotsToDisable.get(0).getStartTime();
+                    LocalTime lastEnd = slotsToDisable.get(slotsToDisable.size() - 1).getEndTime();
+
+                    List<Booking> existingBookings = bookingRepository.findByResourceIdAndBookingDate(
+                            resourceId, currentDate);
+
+                    List<Booking> confirmedBookings = existingBookings.stream()
+                            .filter(b -> (b.getStatus() == BookingStatus.CONFIRMED || b.getStatus() == BookingStatus.COMPLETED) &&
+                                       b.getStartTime().isBefore(lastEnd) && b.getEndTime().isAfter(firstStart))
+                            .toList();
+
+                    if (!confirmedBookings.isEmpty()) {
+                        log.warn("Skipping {} slots on {} for resource {} due to {} confirmed booking(s)",
+                                slotsToDisable.size(), currentDate, resourceId, confirmedBookings.size());
+                        currentDate = currentDate.plusDays(1);
+                        continue;
+                    }
+                }
+
+                // Create disabled slot entries
+                for (GeneratedSlot slot : slotsToDisable) {
+                    if (!disabledSlotRepository.existsByResourceIdAndStartTimeAndDisabledDate(
+                            resourceId, slot.getStartTime(), currentDate)) {
+
+                        DisabledSlot disabledSlot = DisabledSlot.builder()
+                                .resource(resource)
+                                .startTime(slot.getStartTime())
+                                .endTime(slot.getEndTime())
+                                .disabledDate(currentDate)
+                                .reason(request.getReason())
+                                .disabledBy(adminProfile)
+                                .createdAt(Instant.now())
+                                .build();
+
+                        DisabledSlot saved = disabledSlotRepository.save(disabledSlot);
+                        allDisabledSlots.add(convertToDto(saved));
+                        totalDisabled++;
+                    }
+                }
+
+                currentDate = currentDate.plusDays(1);
+            }
+        }
+
+        log.info("Disabled {} slot(s) total", totalDisabled);
+
+        // Generate summary message
+        String message = generateSummaryMessage(request, resourceIds.size(), totalDisabled);
+
+        return UnifiedDisableSlotResponseDto.builder()
+                .totalDisabledCount(totalDisabled)
+                .disabledSlots(allDisabledSlots)
+                .message(message)
+                .build();
+    }
+
+    /**
+     * Generate a human-readable summary message for the disable operation.
+     */
+    private String generateSummaryMessage(UnifiedDisableSlotRequestDto request, int resourceCount, int totalDisabled) {
+        StringBuilder message = new StringBuilder();
+        message.append("Successfully disabled ").append(totalDisabled).append(" slot(s)");
+
+        if (resourceCount > 1) {
+            message.append(" across ").append(resourceCount).append(" resource(s)");
+        }
+
+        if (request.getEndDate() != null && !request.getEndDate().equals(request.getStartDate())) {
+            long days = java.time.temporal.ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate()) + 1;
+            message.append(" over ").append(days).append(" day(s)");
+        }
+
+        if (request.getStartTime() != null) {
+            if (request.getEndTime() != null) {
+                message.append(" (").append(request.getStartTime()).append(" to ").append(request.getEndTime()).append(")");
+            } else {
+                message.append(" (starting at ").append(request.getStartTime()).append(")");
+            }
+        }
+
+        if (request.getReason() != null && !request.getReason().isEmpty()) {
+            message.append(". Reason: ").append(request.getReason());
+        }
+
+        return message.toString();
+    }
+
+    /**
      * Enable a previously disabled slot.
      *
      * @param disabledSlotId ID of the disabled slot to enable
@@ -330,6 +519,116 @@ public class DisabledSlotService {
 
         log.info("Enabled {} slot(s) for resource {} on {}", count, resourceId, date);
         return count;
+    }
+
+    /**
+     * Get all disabled slots for all services managed by an admin.
+     * Optionally filter by date range.
+     *
+     * @param adminProfileId Admin profile ID
+     * @param startDate Start date (optional - defaults to today)
+     * @param endDate End date (optional - defaults to far future)
+     * @return List of disabled slots
+     */
+    @Transactional(readOnly = true)
+    public List<DisabledSlotDto> getAllDisabledSlotsForAdmin(Long adminProfileId, LocalDate startDate, LocalDate endDate) {
+        // Default to today if no start date provided
+        LocalDate effectiveStartDate = startDate != null ? startDate : LocalDate.now();
+        // Default to far future if no end date provided (e.g., 1 year from now)
+        LocalDate effectiveEndDate = endDate != null ? endDate : LocalDate.now().plusYears(1);
+
+        log.info("Fetching disabled slots for admin {} from {} to {}",
+                adminProfileId, effectiveStartDate, effectiveEndDate);
+
+        // Get all services for this admin
+        List<Long> serviceIds = resourceRepository.findAll().stream()
+                .filter(r -> r.getService().getCreatedBy().getId().equals(adminProfileId))
+                .map(r -> r.getService().getId())
+                .distinct()
+                .toList();
+
+        if (serviceIds.isEmpty()) {
+            log.info("No services found for admin {}", adminProfileId);
+            return List.of();
+        }
+
+        // Get all disabled slots for these services within the date range
+        List<DisabledSlot> disabledSlots = new ArrayList<>();
+        for (Long serviceId : serviceIds) {
+            List<DisabledSlot> serviceSlots = disabledSlotRepository.findByServiceIdAndDateRange(
+                    serviceId, effectiveStartDate, effectiveEndDate);
+            disabledSlots.addAll(serviceSlots);
+        }
+
+        log.info("Found {} disabled slot(s) for admin {}", disabledSlots.size(), adminProfileId);
+
+        return disabledSlots.stream()
+                .sorted((a, b) -> {
+                    // Sort by date first, then by start time
+                    int dateCompare = a.getDisabledDate().compareTo(b.getDisabledDate());
+                    if (dateCompare != 0) return dateCompare;
+                    return a.getStartTime().compareTo(b.getStartTime());
+                })
+                .map(this::convertToDto)
+                .toList();
+    }
+
+    /**
+     * Delete specific disabled slots by their IDs.
+     * Only allows deletion if the admin owns the service.
+     *
+     * @param disabledSlotIds List of disabled slot IDs to delete
+     * @param adminProfileId Admin profile ID requesting the deletion
+     * @return Number of slots successfully deleted
+     */
+    @Transactional
+    public int deleteDisabledSlotsByIds(List<Long> disabledSlotIds, Long adminProfileId) {
+        if (disabledSlotIds == null || disabledSlotIds.isEmpty()) {
+            return 0;
+        }
+
+        log.info("Admin {} attempting to delete {} disabled slot(s): {}",
+                adminProfileId, disabledSlotIds.size(), disabledSlotIds);
+
+        int deletedCount = 0;
+
+        for (Long disabledSlotId : disabledSlotIds) {
+            try {
+                DisabledSlot disabledSlot = disabledSlotRepository.findById(disabledSlotId).orElse(null);
+
+                if (disabledSlot == null) {
+                    log.warn("Disabled slot {} not found, skipping", disabledSlotId);
+                    continue;
+                }
+
+                // Verify that the admin owns the service
+                Long serviceOwnerId = disabledSlot.getResource().getService().getCreatedBy().getId();
+                if (!serviceOwnerId.equals(adminProfileId)) {
+                    log.warn("Admin {} does not own service for disabled slot {}, skipping",
+                            adminProfileId, disabledSlotId);
+                    continue;
+                }
+
+                // Delete the disabled slot
+                disabledSlotRepository.delete(disabledSlot);
+                deletedCount++;
+
+                log.info("Deleted disabled slot {} for resource {} on {} at {}",
+                        disabledSlotId,
+                        disabledSlot.getResource().getName(),
+                        disabledSlot.getDisabledDate(),
+                        disabledSlot.getStartTime());
+
+            } catch (Exception e) {
+                log.error("Failed to delete disabled slot {}: {}", disabledSlotId, e.getMessage());
+                // Continue with next slot
+            }
+        }
+
+        log.info("Successfully deleted {} out of {} disabled slot(s) for admin {}",
+                deletedCount, disabledSlotIds.size(), adminProfileId);
+
+        return deletedCount;
     }
 
     /**

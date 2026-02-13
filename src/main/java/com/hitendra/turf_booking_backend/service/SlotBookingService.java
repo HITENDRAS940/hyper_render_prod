@@ -269,6 +269,16 @@ public class SlotBookingService {
         List<Booking> activeBookings = bookingRepository.findActiveBookingsForResources(resourceIds, date);
 
         // ═══════════════════════════════════════════════════════════════════════════
+        // STEP 6.5: GET DISABLED SLOTS
+        // ═══════════════════════════════════════════════════════════════════════════
+
+        List<DisabledSlot> disabledSlots = disabledSlotRepository.findOverlappingDisabledSlots(
+                resourceIds, date, LocalTime.MIN, LocalTime.MAX);
+
+        log.debug("Found {} disabled slot(s) for {} resources on {}",
+                disabledSlots.size(), resourceIds.size(), date);
+
+        // ═══════════════════════════════════════════════════════════════════════════
         // STEP 7: BUILD AGGREGATED SLOT AVAILABILITY
         // ═══════════════════════════════════════════════════════════════════════════
 
@@ -288,7 +298,16 @@ public class SlotBookingService {
             // Count TOTAL booked resources for this slot
             // ───────────────────────────────────────────────────────────────────────
             int totalBookedCount = countBookedResources(activeBookings, slot.getStartTime(), slot.getEndTime());
-            int totalAvailableCount = pooledResources.size() - totalBookedCount;
+
+            // ───────────────────────────────────────────────────────────────────────
+            // Count TOTAL disabled resources for this slot
+            // ───────────────────────────────────────────────────────────────────────
+            int totalDisabledCount = countDisabledResources(disabledSlots, slot.getStartTime(), slot.getEndTime());
+
+            // ───────────────────────────────────────────────────────────────────────
+            // Calculate availability (subtract both booked AND disabled)
+            // ───────────────────────────────────────────────────────────────────────
+            int totalAvailableCount = pooledResources.size() - totalBookedCount - totalDisabledCount;
 
             // ───────────────────────────────────────────────────────────────────────
             // Calculate pricing using dynamic price rules
@@ -912,6 +931,17 @@ public class SlotBookingService {
         return (int) bookings.stream()
                 .filter(b -> isTimeRangeOverlap(startTime, endTime, b.getStartTime(), b.getEndTime()))
                 .map(b -> b.getResource().getId())
+                .distinct()
+                .count();
+    }
+
+    /**
+     * Count how many resources are disabled for a specific time range.
+     */
+    private int countDisabledResources(List<DisabledSlot> disabledSlots, LocalTime startTime, LocalTime endTime) {
+        return (int) disabledSlots.stream()
+                .filter(ds -> isTimeRangeOverlap(startTime, endTime, ds.getStartTime(), ds.getEndTime()))
+                .map(ds -> ds.getResource().getId())
                 .distinct()
                 .count();
     }

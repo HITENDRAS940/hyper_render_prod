@@ -12,6 +12,7 @@ import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
 import com.hitendra.turf_booking_backend.dto.slot.BulkDisableSlotRequestDto;
+import com.hitendra.turf_booking_backend.dto.slot.DeleteDisabledSlotsRequest;
 import com.hitendra.turf_booking_backend.dto.slot.DisableSlotRequestDto;
 import com.hitendra.turf_booking_backend.dto.slot.DisabledSlotDto;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
@@ -698,92 +699,100 @@ public class AdminController {
     // ==================== Slot Disabling Management ====================
 
     @PostMapping("/slots/disable")
-    @Operation(summary = "Disable slot or time range",
+    @Operation(summary = "Disable slots (Unified API)",
             description = """
-                Disable a single slot or time range for a resource on a specific date.
+                Unified API to disable slots - handles all scenarios in a single request:
                 
-                **Single Slot:**
-                - Provide resourceId, date, and startTime
-                - System will automatically disable the single slot starting at that time
-                
-                **Time Range:**
-                - Provide resourceId, date, startTime, and endTime
-                - System will disable all slots within that time range
-                
-                **Validations:**
-                - Cannot disable slots with existing confirmed bookings
-                - Start time must match a valid slot boundary
-                - Time range must contain at least one valid slot
-                
-                **Use Cases:**
-                - Maintenance windows
-                - Private events
-                - Resource cleaning
-                - Holiday closures for specific time periods
-                """)
-    public ResponseEntity<List<DisabledSlotDto>> disableSlot(
-            @Valid @RequestBody DisableSlotRequestDto request) {
-
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-
-        List<DisabledSlotDto> disabledSlots = disabledSlotService.disableSlot(request, adminProfile.getId());
-
-        return ResponseEntity.ok(disabledSlots);
-    }
-
-    @PostMapping("/slots/disable/bulk")
-    @Operation(summary = "Bulk disable slots",
-            description = """
-                Bulk disable slots for multiple resources, dates, or time ranges.
-                
-                **Disable Entire Day(s):**
-                - Provide startDate (and optionally endDate)
-                - Omit startTime and endTime to disable all slots
-                
-                **Disable Specific Time Range Across Multiple Days:**
-                - Provide startDate, endDate, startTime, endTime
-                - System will disable that time range on each day
-                
-                **Multiple Resources:**
-                - Provide list of resourceIds
-                - OR provide serviceId to disable for all resources in that service
-                
-                **Examples:**
-                
-                1. Close entire service for 3 days:
+                **1. Single Slot:**
                 ```json
                 {
-                  "serviceId": 1,
+                  "resourceIds": [1],
                   "startDate": "2026-02-15",
-                  "endDate": "2026-02-17",
-                  "reason": "Annual maintenance"
+                  "startTime": "10:00",
+                  "reason": "Maintenance"
                 }
                 ```
                 
-                2. Disable morning slots (6 AM - 12 PM) for a week:
+                **2. Time Range (Same Day):**
+                ```json
+                {
+                  "resourceIds": [1],
+                  "startDate": "2026-02-15",
+                  "startTime": "10:00",
+                  "endTime": "14:00",
+                  "reason": "Private event"
+                }
+                ```
+                
+                **3. Entire Day:**
                 ```json
                 {
                   "resourceIds": [1, 2],
                   "startDate": "2026-02-15",
-                  "endDate": "2026-02-21",
-                  "startTime": "06:00",
-                  "endTime": "12:00",
-                  "reason": "Morning maintenance"
+                  "reason": "Holiday"
                 }
                 ```
                 
-                Returns the total number of slots disabled.
+                **4. Multiple Days (Date Range - All Slots):**
+                ```json
+                {
+                  "serviceId": 1,
+                  "startDate": "2026-02-15",
+                  "endDate": "2026-02-20",
+                  "reason": "Annual maintenance"
+                }
+                ```
+                
+                **5. Time Range Across Multiple Days:**
+                ```json
+                {
+                  "resourceIds": [1],
+                  "startDate": "2026-02-15",
+                  "endDate": "2026-02-20",
+                  "startTime": "06:00",
+                  "endTime": "12:00",
+                  "reason": "Morning renovation"
+                }
+                ```
+                
+                **6. Service-Wide Disable:**
+                ```json
+                {
+                  "serviceId": 1,
+                  "startDate": "2026-02-15",
+                  "startTime": "18:00",
+                  "endTime": "22:00",
+                  "reason": "Evening maintenance"
+                }
+                ```
+                
+                **Parameters:**
+                - `resourceIds`: List of resource IDs (use this OR serviceId)
+                - `serviceId`: Service ID to disable all its resources (use this OR resourceIds)
+                - `startDate`: Required - start date for disable
+                - `endDate`: Optional - if provided, disables from startDate to endDate (inclusive)
+                - `startTime`: Optional - if not provided, disables entire day(s)
+                - `endTime`: Optional - if not provided with startTime, disables single slot
+                - `reason`: Optional - reason for disabling
+                
+                **Validations:**
+                - Cannot disable slots with existing confirmed bookings
+                - At least one of resourceIds or serviceId must be provided
+                - Start time must match a valid slot boundary
+                
+                **Response:**
+                Returns total count, list of disabled slots, and a summary message.
                 """)
-    public ResponseEntity<Integer> bulkDisableSlots(
-            @Valid @RequestBody BulkDisableSlotRequestDto request) {
+    public ResponseEntity<com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto> disableSlots(
+            @Valid @RequestBody com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotRequestDto request) {
 
         Long userId = getCurrentUserId();
         AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
 
-        int disabledCount = disabledSlotService.bulkDisableSlots(request, adminProfile.getId());
+        com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto response =
+                disabledSlotService.disableSlots(request, adminProfile.getId());
 
-        return ResponseEntity.ok(disabledCount);
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/slots/disabled/{disabledSlotId}")
@@ -849,6 +858,90 @@ public class AdminController {
 
         List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlotsInRange(resourceId, startDate, endDate);
         return ResponseEntity.ok(disabledSlots);
+    }
+
+    @GetMapping("/slots/disabled/all")
+    @Operation(summary = "Get all disabled slots for admin's services",
+            description = """
+                Get all disabled slots across all services managed by the current admin.
+                Optionally filter by date range.
+                
+                **Without Date Filter:**
+                Returns all future disabled slots (from today onwards)
+                
+                **With Date Filter:**
+                Returns disabled slots within the specified date range
+                
+                **Use Cases:**
+                - View all upcoming disabled slots across all services
+                - Manage disabled slots from a central dashboard
+                - Audit which slots are currently disabled
+                
+                **Response:**
+                Each disabled slot includes:
+                - Disabled slot ID (for deletion)
+                - Resource information
+                - Date and time range
+                - Reason for disabling
+                - Who disabled it and when
+                """)
+    public ResponseEntity<List<DisabledSlotDto>> getAllDisabledSlotsForAdmin(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        List<DisabledSlotDto> disabledSlots = disabledSlotService.getAllDisabledSlotsForAdmin(
+                adminProfile.getId(), startDate, endDate);
+
+        return ResponseEntity.ok(disabledSlots);
+    }
+
+    @DeleteMapping("/slots/disabled")
+    @Operation(summary = "Delete specific disabled slots by IDs",
+            description = """
+                Delete one or more disabled slots by their IDs, making them available for booking again.
+                
+                **Request Body:**
+                Can be either:
+                - Single ID: `{ "disabledSlotIds": [123] }`
+                - Multiple IDs: `{ "disabledSlotIds": [123, 456, 789] }`
+                
+                **Use Cases:**
+                - Remove multiple disabled slots at once
+                - Bulk enable slots after maintenance completion
+                - Clean up expired disabled slots
+                
+                **Response:**
+                Returns the count of successfully deleted (enabled) slots
+                
+                **Example:**
+                ```json
+                {
+                  "disabledSlotIds": [1, 2, 3, 4, 5]
+                }
+                ```
+                
+                **Validation:**
+                - Only the admin who owns the service can delete its disabled slots
+                - Non-existent IDs are silently skipped
+                - Returns count of actually deleted slots
+                """)
+    public ResponseEntity<String> deleteDisabledSlots(
+            @RequestBody DeleteDisabledSlotsRequest request) {
+
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        int deletedCount = disabledSlotService.deleteDisabledSlotsByIds(
+                request.getDisabledSlotIds(), adminProfile.getId());
+
+        String message = deletedCount == 1
+                ? "1 disabled slot enabled successfully"
+                : deletedCount + " disabled slots enabled successfully";
+
+        return ResponseEntity.ok(message);
     }
 
     // ==================== Revenue Reporting ====================
