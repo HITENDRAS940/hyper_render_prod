@@ -272,8 +272,17 @@ public class SlotBookingService {
         // STEP 6.5: GET DISABLED SLOTS
         // ═══════════════════════════════════════════════════════════════════════════
 
-        List<DisabledSlot> disabledSlots = disabledSlotRepository.findOverlappingDisabledSlots(
-                resourceIds, date, LocalTime.MIN, LocalTime.MAX);
+        log.info("Querying disabled slots for resource IDs: {}, date: {}", resourceIds, date);
+
+        // Fetch ALL disabled slots for the date (not time-filtered)
+        // We will filter by time range later in countDisabledResources()
+        List<DisabledSlot> allDisabledSlotsForDate = new ArrayList<>();
+        for (Long resourceId : resourceIds) {
+            List<DisabledSlot> resourceDisabledSlots = disabledSlotRepository.findByResourceIdAndDisabledDate(resourceId, date);
+            allDisabledSlotsForDate.addAll(resourceDisabledSlots);
+        }
+
+        List<DisabledSlot> disabledSlots = allDisabledSlotsForDate;
 
         log.info("Found {} disabled slot(s) for {} resources on {}",
                 disabledSlots.size(), resourceIds.size(), date);
@@ -282,12 +291,15 @@ public class SlotBookingService {
         if (!disabledSlots.isEmpty()) {
             log.info("Disabled slots details:");
             for (DisabledSlot ds : disabledSlots) {
-                log.info("  - Resource {}: {} to {} on {}",
+                log.info("  - Resource ID {}, Resource Name: {}, Time: {} to {} on {}",
                         ds.getResource().getId(),
+                        ds.getResource().getName(),
                         ds.getStartTime(),
                         ds.getEndTime(),
                         ds.getDisabledDate());
             }
+        } else {
+            log.warn("No disabled slots found for resources {} on date {}", resourceIds, date);
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -322,11 +334,9 @@ public class SlotBookingService {
             int totalAvailableCount = pooledResources.size() - totalBookedCount - totalDisabledCount;
 
             // Log for debugging availability calculation
-            if (totalDisabledCount > 0 || totalBookedCount > 0) {
-                log.info("Slot {} to {}: Total={}, Booked={}, Disabled={}, Available={}",
-                        slot.getStartTime(), slot.getEndTime(),
-                        pooledResources.size(), totalBookedCount, totalDisabledCount, totalAvailableCount);
-            }
+            log.info("Slot {} to {}: Total Resources={}, Booked={}, Disabled={}, Available={}",
+                    slot.getStartTime(), slot.getEndTime(),
+                    pooledResources.size(), totalBookedCount, totalDisabledCount, totalAvailableCount);
 
             // ───────────────────────────────────────────────────────────────────────
             // Calculate pricing using dynamic price rules
@@ -958,11 +968,24 @@ public class SlotBookingService {
      * Count how many resources are disabled for a specific time range.
      */
     private int countDisabledResources(List<DisabledSlot> disabledSlots, LocalTime startTime, LocalTime endTime) {
-        return (int) disabledSlots.stream()
-                .filter(ds -> isTimeRangeOverlap(startTime, endTime, ds.getStartTime(), ds.getEndTime()))
+        log.debug("Counting disabled resources for slot {} to {}", startTime, endTime);
+        log.debug("Total disabled slots in list: {}", disabledSlots.size());
+
+        List<Long> disabledResourceIds = disabledSlots.stream()
+                .filter(ds -> {
+                    boolean overlaps = isTimeRangeOverlap(startTime, endTime, ds.getStartTime(), ds.getEndTime());
+                    if (overlaps) {
+                        log.debug("  - Disabled slot overlaps: Resource {}, Time {} to {}",
+                                ds.getResource().getId(), ds.getStartTime(), ds.getEndTime());
+                    }
+                    return overlaps;
+                })
                 .map(ds -> ds.getResource().getId())
                 .distinct()
-                .count();
+                .toList();
+
+        log.debug("Disabled resource IDs for this slot: {}", disabledResourceIds);
+        return disabledResourceIds.size();
     }
 
     /**
