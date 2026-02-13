@@ -159,10 +159,18 @@ public class BookingService {
 
     /**
      * Get booking by reference
+     * Only accessible by the admin who owns the service
      */
     public BookingResponseDto getBookingByReference(String reference) {
         Booking booking = bookingRepository.findByReference(reference)
                 .orElseThrow(() -> new RuntimeException("Booking not found with reference: " + reference));
+
+        // Verify that the current admin owns the service
+        AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
+        if (!booking.getService().getCreatedBy().getId().equals(currentAdmin.getId())) {
+            throw new RuntimeException("Access denied: You can only view bookings for your own services");
+        }
+
         return convertToResponseDto(booking);
     }
 
@@ -570,10 +578,17 @@ public class BookingService {
     /**
      * Mark a booking as completed (service has been delivered)
      * Only CONFIRMED bookings can be marked as completed
+     * Only the admin who owns the service can mark it as complete
      */
     public BookingResponseDto completeBooking(Long bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
+
+        // Verify that the current admin owns the service
+        AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
+        if (!booking.getService().getCreatedBy().getId().equals(currentAdmin.getId())) {
+            throw new RuntimeException("Access denied: You can only complete bookings for your own services");
+        }
 
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new RuntimeException("Only CONFIRMED bookings can be marked as completed. Current status: " + booking.getStatus());
@@ -582,7 +597,7 @@ public class BookingService {
         booking.setStatus(BookingStatus.COMPLETED);
         Booking savedBooking = bookingRepository.save(booking);
 
-        log.info("Booking {} marked as completed", bookingId);
+        log.info("Booking {} marked as completed by admin {}", bookingId, currentAdmin.getId());
 
         return convertToResponseDto(savedBooking);
     }
