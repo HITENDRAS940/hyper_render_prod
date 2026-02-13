@@ -275,8 +275,20 @@ public class SlotBookingService {
         List<DisabledSlot> disabledSlots = disabledSlotRepository.findOverlappingDisabledSlots(
                 resourceIds, date, LocalTime.MIN, LocalTime.MAX);
 
-        log.debug("Found {} disabled slot(s) for {} resources on {}",
+        log.info("Found {} disabled slot(s) for {} resources on {}",
                 disabledSlots.size(), resourceIds.size(), date);
+
+        // Log disabled slots for debugging
+        if (!disabledSlots.isEmpty()) {
+            log.info("Disabled slots details:");
+            for (DisabledSlot ds : disabledSlots) {
+                log.info("  - Resource {}: {} to {} on {}",
+                        ds.getResource().getId(),
+                        ds.getStartTime(),
+                        ds.getEndTime(),
+                        ds.getDisabledDate());
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════════
         // STEP 7: BUILD AGGREGATED SLOT AVAILABILITY
@@ -308,6 +320,13 @@ public class SlotBookingService {
             // Calculate availability (subtract both booked AND disabled)
             // ───────────────────────────────────────────────────────────────────────
             int totalAvailableCount = pooledResources.size() - totalBookedCount - totalDisabledCount;
+
+            // Log for debugging availability calculation
+            if (totalDisabledCount > 0 || totalBookedCount > 0) {
+                log.info("Slot {} to {}: Total={}, Booked={}, Disabled={}, Available={}",
+                        slot.getStartTime(), slot.getEndTime(),
+                        pooledResources.size(), totalBookedCount, totalDisabledCount, totalAvailableCount);
+            }
 
             // ───────────────────────────────────────────────────────────────────────
             // Calculate pricing using dynamic price rules
