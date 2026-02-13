@@ -338,22 +338,52 @@ public class BookingService {
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByAdminIdWithFilters(
             Long adminId, java.time.LocalDate date, BookingStatus status, int page, int size) {
+        log.info("Fetching bookings for adminId: {}, date: {}, status: {}, page: {}, size: {}",
+                adminId, date, status, page, size);
+
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
         Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
         if (date != null && status != null) {
+            log.info("Using query: findBookingsByAdminIdAndDateAndStatusProjected");
             bookingPage = bookingRepository.findBookingsByAdminIdAndDateAndStatusProjected(adminId, date, status, pageable);
         } else if (date != null) {
+            log.info("Using query: findBookingsByAdminIdAndDateProjected");
             bookingPage = bookingRepository.findBookingsByAdminIdAndDateProjected(adminId, date, pageable);
         } else if (status != null) {
+            log.info("Using query: findBookingsByAdminIdAndStatusProjected");
             bookingPage = bookingRepository.findBookingsByAdminIdAndStatusProjected(adminId, status, pageable);
         } else {
+            log.info("Using query: findBookingsByAdminIdProjected (no filters)");
             bookingPage = bookingRepository.findBookingsByAdminIdProjected(adminId, pageable);
         }
 
+        log.info("Query executed - Found {} total bookings for adminId: {}",
+                bookingPage.getTotalElements(), adminId);
+        log.info("Current page has {} bookings (page {}/{})",
+                bookingPage.getContent().size(),
+                bookingPage.getNumber() + 1,
+                bookingPage.getTotalPages());
+
+        // Log each booking found
+        for (com.hitendra.turf_booking_backend.repository.projection.BookingListProjection projection : bookingPage.getContent()) {
+            log.info("  - Booking ID: {}, Ref: {}, Status: {}, Date: {}",
+                    projection.getId(),
+                    projection.getReference(),
+                    projection.getStatus(),
+                    projection.getBookingDate());
+        }
+
+        log.info("Converting {} projections to DTOs...", bookingPage.getContent().size());
         List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertProjectionToResponseDto)
+                .map(projection -> {
+                    BookingResponseDto dto = convertProjectionToResponseDto(projection);
+                    log.info("  - Converted Booking ID: {} to DTO", dto.getId());
+                    return dto;
+                })
                 .collect(Collectors.toList());
+
+        log.info("Successfully converted {} bookings to DTOs", content.size());
 
         return new PaginatedResponse<>(
                 content,

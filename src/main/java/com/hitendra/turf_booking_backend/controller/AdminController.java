@@ -330,6 +330,98 @@ public class AdminController {
 
     // ==================== Booking Management ====================
 
+    @GetMapping("/bookings/debug")
+    @Operation(summary = "Debug bookings query", description = "Debug endpoint to see raw booking data for troubleshooting")
+    public ResponseEntity<String> debugBookings() {
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        // Get bookings with eager loading using a dedicated query
+        List<com.hitendra.turf_booking_backend.entity.Booking> allBookings =
+                bookingRepository.findTop50ByOrderByCreatedAtDesc();
+
+        StringBuilder debug = new StringBuilder();
+        debug.append("Current Admin Profile ID: ").append(adminProfile.getId()).append("\n");
+        debug.append("Current User ID: ").append(userId).append("\n\n");
+        debug.append("Recent Bookings (Top 50):\n");
+        debug.append("=".repeat(80)).append("\n");
+
+        for (com.hitendra.turf_booking_backend.entity.Booking booking : allBookings) {
+            debug.append("ID: ").append(booking.getId())
+                    .append(" | Ref: ").append(booking.getReference())
+                    .append(" | Status: ").append(booking.getStatus())
+                    .append(" | PaymentSource: ").append(booking.getPaymentSource())
+                    .append("\n");
+
+            // Safely access properties
+            Long bookingUserId = booking.getUser() != null ? booking.getUser().getId() : null;
+            Long bookingAdminProfileId = booking.getAdminProfile() != null ? booking.getAdminProfile().getId() : null;
+            Long serviceId = booking.getService() != null ? booking.getService().getId() : null;
+            Long serviceCreatedById = (booking.getService() != null && booking.getService().getCreatedBy() != null)
+                    ? booking.getService().getCreatedBy().getId() : null;
+
+            debug.append("  User ID: ").append(bookingUserId != null ? bookingUserId : "NULL")
+                    .append(" | Admin Profile ID (created_by_admin_id): ")
+                    .append(bookingAdminProfileId != null ? bookingAdminProfileId : "NULL")
+                    .append("\n");
+            debug.append("  Service ID: ").append(serviceId != null ? serviceId : "NULL")
+                    .append(" | Service CreatedBy ID: ")
+                    .append(serviceCreatedById != null ? serviceCreatedById : "NULL")
+                    .append("\n");
+            debug.append("  Date: ").append(booking.getBookingDate())
+                    .append(" | Amount: ").append(booking.getAmount())
+                    .append("\n");
+
+            // Check if this booking should appear for current admin
+            boolean shouldAppear = false;
+            String reason = "";
+            if (serviceCreatedById != null && serviceCreatedById.equals(adminProfile.getId())) {
+                shouldAppear = true;
+                reason = "service.createdBy matches";
+            }
+            if (bookingAdminProfileId != null && bookingAdminProfileId.equals(adminProfile.getId())) {
+                shouldAppear = true;
+                reason += (reason.isEmpty() ? "" : " AND ") + "adminProfile matches";
+            }
+
+            debug.append("  >>> Should appear for current admin: ").append(shouldAppear)
+                    .append(shouldAppear ? " (" + reason + ")" : "")
+                    .append("\n");
+            debug.append("-".repeat(80)).append("\n");
+        }
+
+        return ResponseEntity.ok(debug.toString());
+    }
+
+    @GetMapping("/bookings/test")
+    @Operation(summary = "Test booking query", description = "Test endpoint to directly query bookings")
+    public ResponseEntity<String> testBookingQuery() {
+        Long userId = getCurrentUserId();
+        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        log.info("TEST: Querying bookings for adminId: {}", adminProfile.getId());
+
+        // Try to get projections directly
+        var projections = bookingRepository.findBookingsByAdminIdProjected(
+                adminProfile.getId(),
+                org.springframework.data.domain.PageRequest.of(0, 100)
+        );
+
+        StringBuilder result = new StringBuilder();
+        result.append("Admin Profile ID: ").append(adminProfile.getId()).append("\n");
+        result.append("Total bookings found: ").append(projections.getTotalElements()).append("\n");
+        result.append("Page content size: ").append(projections.getContent().size()).append("\n\n");
+
+        for (var proj : projections.getContent()) {
+            result.append("ID: ").append(proj.getId())
+                    .append(" | Ref: ").append(proj.getReference())
+                    .append(" | Status: ").append(proj.getStatus())
+                    .append("\n");
+        }
+
+        return ResponseEntity.ok(result.toString());
+    }
+
     @GetMapping("/bookings")
     @Operation(summary = "Get all my bookings", description = "Get all bookings for services created by this admin. Optionally filter by date and/or status.")
     public ResponseEntity<PaginatedResponse<BookingResponseDto>> getMyBookings(
@@ -339,8 +431,16 @@ public class AdminController {
             @RequestParam(defaultValue = "10") int size) {
         Long userId = getCurrentUserId();
         AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
+
+        log.info("GET /admin/bookings - userId: {}, adminProfileId: {}, date: {}, status: {}, page: {}, size: {}",
+                userId, adminProfile.getId(), date, status, page, size);
+
         PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByAdminIdWithFilters(
                 adminProfile.getId(), date, status, page, size);
+
+        log.info("Returning {} bookings for adminProfileId: {}, page content size: {}",
+                bookings.getTotalElements(), adminProfile.getId(), bookings.getContent().size());
+
         return ResponseEntity.ok(bookings);
     }
 

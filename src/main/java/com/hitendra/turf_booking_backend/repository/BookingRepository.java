@@ -30,6 +30,20 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     Page<Booking> findByStatus(BookingStatus status, Pageable pageable);
 
+    /**
+     * Get top 50 bookings with eager loading for debug purposes.
+     * Uses JOIN FETCH to avoid LazyInitializationException.
+     */
+    @Query("""
+        SELECT DISTINCT b FROM Booking b
+        LEFT JOIN FETCH b.user
+        LEFT JOIN FETCH b.adminProfile
+        LEFT JOIN FETCH b.service s
+        LEFT JOIN FETCH s.createdBy
+        ORDER BY b.createdAt DESC
+        """)
+    List<Booking> findTop50ByOrderByCreatedAtDesc();
+
     // ==================== OPTIMIZED PROJECTION QUERIES ====================
 
     /**
@@ -123,12 +137,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
-               b.service.id as serviceId, b.service.name as serviceName,
-               b.resource.id as resourceId, b.resource.name as resourceName,
-               b.user.id as userId, b.user.name as userName, 
-               b.user.email as userEmail, b.user.phone as userPhone
+               s.id as serviceId, s.name as serviceName,
+               r.id as resourceId, r.name as resourceName,
+               u.id as userId, u.name as userName, 
+               u.email as userEmail, u.phone as userPhone
         FROM Booking b
-        WHERE b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId
+        LEFT JOIN b.service s
+        LEFT JOIN s.createdBy sc
+        LEFT JOIN b.adminProfile ap
+        LEFT JOIN b.resource r
+        LEFT JOIN b.user u
+        WHERE sc.id = :adminId OR ap.id = :adminId
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdProjected(@Param("adminId") Long adminId, Pageable pageable);
@@ -144,12 +163,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
-               b.service.id as serviceId, b.service.name as serviceName,
-               b.resource.id as resourceId, b.resource.name as resourceName,
-               b.user.id as userId, b.user.name as userName, 
-               b.user.email as userEmail, b.user.phone as userPhone
+               s.id as serviceId, s.name as serviceName,
+               r.id as resourceId, r.name as resourceName,
+               u.id as userId, u.name as userName, 
+               u.email as userEmail, u.phone as userPhone
         FROM Booking b
-        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.bookingDate = :date
+        LEFT JOIN b.service s
+        LEFT JOIN s.createdBy sc
+        LEFT JOIN b.adminProfile ap
+        LEFT JOIN b.resource r
+        LEFT JOIN b.user u
+        WHERE (sc.id = :adminId OR ap.id = :adminId) AND b.bookingDate = :date
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndDateProjected(
@@ -166,12 +190,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
-               b.service.id as serviceId, b.service.name as serviceName,
-               b.resource.id as resourceId, b.resource.name as resourceName,
-               b.user.id as userId, b.user.name as userName, 
-               b.user.email as userEmail, b.user.phone as userPhone
+               s.id as serviceId, s.name as serviceName,
+               r.id as resourceId, r.name as resourceName,
+               u.id as userId, u.name as userName, 
+               u.email as userEmail, u.phone as userPhone
         FROM Booking b
-        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.status = :status
+        LEFT JOIN b.service s
+        LEFT JOIN s.createdBy sc
+        LEFT JOIN b.adminProfile ap
+        LEFT JOIN b.resource r
+        LEFT JOIN b.user u
+        WHERE (sc.id = :adminId OR ap.id = :adminId) AND b.status = :status
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndStatusProjected(
@@ -188,12 +217,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
-               b.service.id as serviceId, b.service.name as serviceName,
-               b.resource.id as resourceId, b.resource.name as resourceName,
-               b.user.id as userId, b.user.name as userName, 
-               b.user.email as userEmail, b.user.phone as userPhone
+               s.id as serviceId, s.name as serviceName,
+               r.id as resourceId, r.name as resourceName,
+               u.id as userId, u.name as userName, 
+               u.email as userEmail, u.phone as userPhone
         FROM Booking b
-        WHERE (b.service.createdBy.id = :adminId OR b.adminProfile.id = :adminId) AND b.bookingDate = :date AND b.status = :status
+        LEFT JOIN b.service s
+        LEFT JOIN s.createdBy sc
+        LEFT JOIN b.adminProfile ap
+        LEFT JOIN b.resource r
+        LEFT JOIN b.user u
+        WHERE (sc.id = :adminId OR ap.id = :adminId) AND b.bookingDate = :date AND b.status = :status
         ORDER BY b.createdAt DESC
         """)
     Page<BookingListProjection> findBookingsByAdminIdAndDateAndStatusProjected(

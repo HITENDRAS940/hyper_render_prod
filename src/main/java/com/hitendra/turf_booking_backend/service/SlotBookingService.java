@@ -1300,9 +1300,13 @@ public class SlotBookingService {
             throw new BookingException("Resource does not belong to the specified service");
         }
 
-        // Get admin profile
+        // Get admin profile - ensure it's a managed entity
         AdminProfile adminProfile = adminProfileRepository.findById(adminProfileId)
                 .orElseThrow(() -> new BookingException("Admin profile not found"));
+
+        log.info("Retrieved AdminProfile - ID: {}, User ID: {}",
+                adminProfile.getId(),
+                adminProfile.getUser() != null ? adminProfile.getUser().getId() : "null");
 
         // Check for overlapping bookings
         List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(
@@ -1339,6 +1343,12 @@ public class SlotBookingService {
                 ? request.getVenueAmountCollected()
                 : java.math.BigDecimal.ZERO;
 
+        // Calculate venue amount due (total - online paid)
+        java.math.BigDecimal venueAmountDue = request.getAmount().subtract(onlineAmountPaid);
+
+        // Check if venue amount has been collected
+        Boolean venueCollected = venueAmountCollected.compareTo(java.math.BigDecimal.ZERO) > 0;
+
         // Create booking with CONFIRMED status
         Booking booking = Booking.builder()
                 .user(null)  // No user for admin manual bookings
@@ -1351,6 +1361,8 @@ public class SlotBookingService {
                 .bookingDate(request.getBookingDate())
                 .amount(request.getAmount().doubleValue())
                 .onlineAmountPaid(onlineAmountPaid)
+                .venueAmountDue(venueAmountDue)
+                .venueAmountCollected(venueCollected)
                 .status(BookingStatus.CONFIRMED)  // Immediately confirmed
                 .paymentMode("MANUAL")
                 .createdAt(Instant.now())
@@ -1362,8 +1374,17 @@ public class SlotBookingService {
 
         Booking savedBooking = bookingRepository.save(booking);
 
-        log.info("Direct manual booking created: reference={}, adminId={}, resourceId={}, amount={}",
-                reference, adminProfileId, request.getResourceId(), request.getAmount());
+        log.info("Direct manual booking created: reference={}, adminId={}, adminProfile set={}, resourceId={}, amount={}",
+                reference, adminProfileId, savedBooking.getAdminProfile() != null,
+                request.getResourceId(), request.getAmount());
+
+        if (savedBooking.getAdminProfile() != null) {
+            log.info("AdminProfile details: id={}, userId={}",
+                    savedBooking.getAdminProfile().getId(),
+                    savedBooking.getAdminProfile().getUser() != null ? savedBooking.getAdminProfile().getUser().getId() : "null");
+        } else {
+            log.warn("WARNING: AdminProfile was not set on the booking even though it was specified!");
+        }
 
         return convertToResponseDto(savedBooking);
     }
