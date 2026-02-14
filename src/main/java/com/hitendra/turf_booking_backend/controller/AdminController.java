@@ -457,12 +457,13 @@ public class AdminController {
     }
 
     @GetMapping("/services/{serviceId}/bookings")
-    @Operation(summary = "Get bookings by service", description = "Get all bookings for a specific service")
+    @Operation(summary = "Get bookings by service", description = "Get all bookings for a specific service, optionally filtered by date")
     public ResponseEntity<PaginatedResponse<BookingResponseDto>> getBookingsByService(
             @PathVariable Long serviceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByService(serviceId, page, size);
+        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByService(serviceId, date, page, size);
         return ResponseEntity.ok(bookings);
     }
 
@@ -964,6 +965,32 @@ public class AdminController {
                     "Shows which resource generated how much revenue.")
     public ResponseEntity<ServiceRevenueDto> getServiceRevenueReport(@PathVariable Long serviceId) {
         ServiceRevenueDto report = revenueService.getServiceRevenueReport(serviceId);
+        return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/services/{serviceId}/revenue/today")
+    @Operation(summary = "Get today's revenue for service",
+            description = """
+                Get today's revenue summary for a specific service including:
+                - Total bookings confirmed/completed today
+                - Total revenue (sum of booking amounts)
+                - Amount due today (online amount paid/received)
+                - Amount pending at venue (cash to be collected)
+                
+                **Metrics:**
+                - Total Revenue: Sum of all booking amounts for today (₹)
+                - Amount Due: Online payments already received (₹)
+                - Amount Pending: Cash due to be collected at venue (₹)
+                
+                **Useful for:**
+                - Daily revenue tracking
+                - End-of-day cash reconciliation
+                - Payment settlement reports
+                """)
+    public ResponseEntity<com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto> getServiceTodayRevenueReport(
+            @PathVariable Long serviceId) {
+        com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto report =
+                revenueService.getServiceTodayRevenueReport(serviceId);
         return ResponseEntity.ok(report);
     }
 

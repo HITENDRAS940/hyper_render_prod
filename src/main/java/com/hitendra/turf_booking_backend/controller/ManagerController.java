@@ -93,12 +93,13 @@ public class ManagerController {
     }
 
     @GetMapping("/services/{serviceId}/bookings")
-    @Operation(summary = "Get bookings by service", description = "Get all bookings for a specific service")
+    @Operation(summary = "Get bookings by service", description = "Get all bookings for a specific service, optionally filtered by date")
     public ResponseEntity<PaginatedResponse<BookingResponseDto>> getBookingsByService(
             @PathVariable Long serviceId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByService(serviceId, page, size);
+        PaginatedResponse<BookingResponseDto> bookings = bookingService.getBookingsByService(serviceId, date, page, size);
         return ResponseEntity.ok(bookings);
     }
 

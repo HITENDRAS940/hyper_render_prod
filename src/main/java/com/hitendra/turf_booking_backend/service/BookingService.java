@@ -206,11 +206,19 @@ public class BookingService {
 
     /**
      * Get bookings by service (optimized with projection)
+     * Optionally filter by date
      */
-    public PaginatedResponse<BookingResponseDto> getBookingsByService(Long serviceId, int page, int size) {
+    public PaginatedResponse<BookingResponseDto> getBookingsByService(Long serviceId, LocalDate date, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
-                bookingRepository.findBookingsByServiceIdProjected(serviceId, pageable);
+        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
+
+        if (date != null) {
+            // Filter by service and date
+            bookingPage = bookingRepository.findBookingsByServiceIdAndDateProjected(serviceId, date, pageable);
+        } else {
+            // Get all bookings for service without date filter
+            bookingPage = bookingRepository.findBookingsByServiceIdProjected(serviceId, pageable);
+        }
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
                 .map(this::convertProjectionToResponseDto)

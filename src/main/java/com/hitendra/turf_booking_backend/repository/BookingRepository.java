@@ -88,6 +88,29 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<BookingListProjection> findBookingsByServiceIdProjected(@Param("serviceId") Long serviceId, Pageable pageable);
 
     /**
+     * Get lightweight booking list for a service filtered by date (projection-based).
+     */
+    @Query("""
+        SELECT b.id as id, b.reference as reference, b.bookingDate as bookingDate,
+               b.startTime as startTime, b.endTime as endTime, b.amount as amount,
+               CAST(b.status AS string) as status, b.createdAt as createdAt,
+               b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.venueAmountCollected as venueAmountCollected,
+               CAST(b.paymentStatusEnum AS string) as paymentStatus,
+               b.service.id as serviceId, b.service.name as serviceName,
+               b.resource.id as resourceId, b.resource.name as resourceName,
+               b.user.id as userId, b.user.name as userName, 
+               b.user.email as userEmail, b.user.phone as userPhone
+        FROM Booking b
+        WHERE b.service.id = :serviceId AND b.bookingDate = :date
+        ORDER BY b.createdAt DESC
+        """)
+    Page<BookingListProjection> findBookingsByServiceIdAndDateProjected(
+            @Param("serviceId") Long serviceId,
+            @Param("date") java.time.LocalDate date,
+            Pageable pageable);
+
+    /**
      * Get lightweight booking list for a user (projection-based).
      */
     @Query("""

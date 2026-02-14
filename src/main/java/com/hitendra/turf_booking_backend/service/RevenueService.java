@@ -11,9 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.LocalDate;
+    import java.time.LocalDateTime;
+    import java.util.*;
+    import java.util.stream.Collectors;
 
 /**
  * Service for generating revenue reports
@@ -149,6 +150,53 @@ public class RevenueService {
         service.setId(serviceId);
 
         return generateServiceRevenueDto(service, serviceBookings);
+    }
+
+    /**
+     * Get today's revenue report for a specific service
+     * Shows total bookings, total revenue, and amount due today
+     *
+     * - Total Revenue: Sum of all booking amounts for today
+     * - Amount Due Today: Sum of onlineAmountPaid (payments received)
+     * - Amount Pending: Sum of venueAmountDue (cash to be collected at venue)
+     */
+    @Transactional(readOnly = true)
+    public com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto getServiceTodayRevenueReport(Long serviceId) {
+        LocalDate today = LocalDate.now();
+
+        // Get all confirmed/completed bookings for today
+        List<Booking> todayBookings = bookingRepository.findByServiceIdAndStatusIn(
+                serviceId,
+                List.of(BookingStatus.CONFIRMED, BookingStatus.COMPLETED)
+        ).stream()
+                .filter(booking -> booking.getBookingDate().equals(today))
+                .collect(Collectors.toList());
+
+        // Calculate metrics
+        long totalBookings = todayBookings.size();
+        double totalRevenue = todayBookings.stream()
+                .mapToDouble(Booking::getAmount)
+                .sum();
+        double amountDue = todayBookings.stream()
+                .mapToDouble(booking -> booking.getOnlineAmountPaid() != null ? booking.getOnlineAmountPaid().doubleValue() : 0.0)
+                .sum();
+        double amountPending = todayBookings.stream()
+                .mapToDouble(booking -> booking.getVenueAmountDue() != null ? booking.getVenueAmountDue().doubleValue() : 0.0)
+                .sum();
+
+        log.info("Today's revenue for service {}: {} bookings, ₹{} total, ₹{} due, ₹{} pending at venue",
+                serviceId, totalBookings, totalRevenue, amountDue, amountPending);
+
+        return com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto.builder()
+                .serviceId(serviceId)
+                .serviceName("")  // Will be fetched from service lookup if needed
+                .date(today)
+                .totalBookingsToday(totalBookings)
+                .totalRevenueToday(Math.round(totalRevenue * 100.0) / 100.0)
+                .amountDueToday(Math.round(amountDue * 100.0) / 100.0)
+                .amountPendingAtVenue(Math.round(amountPending * 100.0) / 100.0)
+                .currency("INR")
+                .build();
     }
 }
 
