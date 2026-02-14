@@ -1,0 +1,227 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║         TOGGLE ENDPOINTS FOR RESOURCES & SERVICES - IMPLEMENTED ✅            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ IMPLEMENTATION COMPLETE
+
+Replaced separate enable/disable endpoints with unified toggle endpoints for both
+resources and services. Single API call to toggle availability status.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 CHANGES MADE
+
+1. ✅ Resource Toggle Endpoint (REPLACED)
+   OLD:
+     - GET /admin/resources/{resourceId}/enable
+     - GET /admin/resources/{resourceId}/disable
+
+   NEW:
+     - PATCH /admin/resources/{resourceId}/toggle
+
+2. ✅ Service Toggle Endpoint (NEW)
+   NEW:
+     - PATCH /admin/services/{serviceId}/toggle
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔌 API ENDPOINTS
+
+RESOURCE TOGGLE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Endpoint: PATCH /admin/resources/{resourceId}/toggle
+Method: PATCH
+Authentication: Bearer Token (ADMIN role required)
+
+Example Request:
+  curl -X PATCH "http://localhost:8080/admin/resources/1/toggle" \
+    -H "Authorization: Bearer YOUR_TOKEN"
+
+Behavior:
+  - If resource is ENABLED → Will be DISABLED
+  - If resource is DISABLED → Will be ENABLED
+
+Example Response:
+  {
+    "id": 1,
+    "serviceId": 1,
+    "serviceName": "Vellore Champions Sports Complex",
+    "name": "Vellore Ground 1",
+    "description": "Main ground with better facilities",
+    "enabled": false,    // ← Toggled from true to false
+    "activities": [...]
+  }
+
+
+SERVICE TOGGLE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Endpoint: PATCH /admin/services/{serviceId}/toggle
+Method: PATCH
+Authentication: Bearer Token (ADMIN role required)
+
+Example Request:
+  curl -X PATCH "http://localhost:8080/admin/services/1/toggle" \
+    -H "Authorization: Bearer YOUR_TOKEN"
+
+Behavior:
+  - If service is AVAILABLE → Will be UNAVAILABLE
+  - If service is UNAVAILABLE → Will be AVAILABLE
+
+Example Response:
+  {
+    "id": 1,
+    "name": "Vellore Champions Sports Complex",
+    "location": "Vellore City",
+    "city": "Vellore",
+    "latitude": 12.9716,
+    "longitude": 79.1373,
+    "description": "Premium sports complex",
+    "contactNumber": "+919876543210",
+    "availability": false,    // ← Toggled from true to false
+    "amenities": [...],
+    "images": [...],
+    "activities": [...]
+  }
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ BENEFITS OF TOGGLE ENDPOINTS
+
+✅ Single API Call
+   - No need to call separate enable/disable endpoints
+   - Simpler client logic
+
+✅ Reduced API Calls
+   - One endpoint instead of two
+   - Better performance
+
+✅ Intuitive
+   - Clear intent: toggle status
+   - Easy to understand
+
+✅ Atomic Operation
+   - Status is toggled in one operation
+   - No race conditions
+
+✅ Status Check Not Needed
+   - No need to fetch current status first
+   - Client doesn't need to know current state
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 USE CASES
+
+Resource Toggle:
+  - Temporarily disable a ground for maintenance
+  - Enable a ground after maintenance
+  - Quick toggle from UI without page refresh
+
+Service Toggle:
+  - Close service temporarily (e.g., for renovations)
+  - Reopen service
+  - Quick availability management
+  - No need to delete and recreate service
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 TESTING WITH SWAGGER UI
+
+1. Open: http://localhost:8080/swagger-ui.html
+
+2. For Resource Toggle:
+   - Expand: Admin
+   - Find: PATCH /admin/resources/{resourceId}/toggle
+   - Click: "Try it out"
+   - Enter: resourceId (e.g., 1)
+   - Click: "Execute"
+   - See: Resource with toggled enabled status
+
+3. For Service Toggle:
+   - Expand: Admin
+   - Find: PATCH /admin/services/{serviceId}/toggle
+   - Click: "Try it out"
+   - Enter: serviceId (e.g., 1)
+   - Click: "Execute"
+   - See: Service with toggled availability status
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 ENDPOINT COMPARISON
+
+OLD APPROACH (Enable/Disable):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ To toggle resource from enabled to disabled:                                │
+│ 1. Check current status: GET /admin/resources/1                             │
+│ 2. If enabled, call: GET /admin/resources/1/disable                         │
+│ 3. If disabled, call: GET /admin/resources/1/enable                         │
+│                                                                              │
+│ Result: 1-2 API calls required                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+NEW APPROACH (Toggle):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ To toggle resource:                                                         │
+│ 1. Call: PATCH /admin/resources/1/toggle                                    │
+│                                                                              │
+│ Result: 1 API call required ✅                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 IMPLEMENTATION DETAILS
+
+Resource Toggle Logic:
+  1. Get current enabled status from ServiceResourceDto
+  2. If enabled → call disableResource(resourceId)
+  3. If disabled → call enableResource(resourceId)
+  4. Return updated ServiceResourceDto
+
+Service Toggle Logic:
+  1. Get current availability status using isServiceAvailable()
+  2. If available → call serviceNotAvailable(serviceId)
+  3. If unavailable → call serviceAvailable(serviceId)
+  4. Fetch and return updated ServiceDto
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 BACKWARD COMPATIBILITY
+
+⚠️  Breaking Change:
+  Old endpoints removed:
+    - /admin/resources/{resourceId}/enable
+    - /admin/resources/{resourceId}/disable
+
+  Migration Guide:
+    OLD: GET /admin/resources/1/enable
+    NEW: PATCH /admin/resources/1/toggle
+
+    OLD: GET /admin/resources/1/disable
+    NEW: PATCH /admin/resources/1/toggle
+
+  ✅ Service toggle endpoints are NEW, no migration needed
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 JAR BUILT AND READY
+
+File: target/Hyper_backend-0.0.1-SNAPSHOT.jar
+
+✅ Compilation: SUCCESS
+✅ Build: SUCCESS
+✅ Ready to Deploy
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 COMPLETE!
+
+Both resource and service toggle endpoints are implemented and ready to use.
+Single API call to toggle availability status for both resources and services.
+

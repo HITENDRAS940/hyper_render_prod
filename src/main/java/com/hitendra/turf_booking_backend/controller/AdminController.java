@@ -154,6 +154,44 @@ public class AdminController {
         return ResponseEntity.ok("Service deleted successfully");
     }
 
+    @PatchMapping("/services/{serviceId}/toggle")
+    @Operation(summary = "Toggle service availability status",
+            description = """
+                Toggle a service's available/unavailable status.
+                - If available: will be marked unavailable
+                - If unavailable: will be marked available
+                
+                **Use Cases:**
+                - Quickly toggle service availability without separate API calls
+                - Dynamic service availability management
+                - Temporary service closure/reopening
+                
+                **Response:**
+                Returns updated service with new availability status
+                
+                **Note:**
+                - Does not delete the service
+                - All service data remains intact
+                - Bookings are not affected, but new bookings cannot be made if unavailable
+                """)
+    public ResponseEntity<ServiceDto> toggleService(@PathVariable Long serviceId) {
+        // Check current service availability status
+        Boolean isCurrentlyAvailable = serviceService.isServiceAvailable(serviceId);
+
+        // Toggle based on current status
+        if (isCurrentlyAvailable) {
+            // Service is available, make it unavailable
+            serviceService.serviceNotAvailable(serviceId);
+        } else {
+            // Service is unavailable, make it available
+            serviceService.serviceAvailable(serviceId);
+        }
+
+        // Fetch and return updated service
+        ServiceDto service = serviceService.getServiceById(serviceId);
+        return ResponseEntity.ok(service);
+    }
+
     @PutMapping("/services/{serviceId}/location-from-url")
     @Operation(summary = "Update service location from URL", description = "Extract latitude and longitude from a Google Maps URL and save to the service")
     public ResponseEntity<ServiceDto> updateServiceLocationFromUrl(
@@ -227,17 +265,32 @@ public class AdminController {
         return ResponseEntity.ok("Resource deleted successfully");
     }
 
-    @PatchMapping("/resources/{resourceId}/enable")
-    @Operation(summary = "Enable resource", description = "Enable a disabled resource")
-    public ResponseEntity<ServiceResourceDto> enableResource(@PathVariable Long resourceId) {
-        ServiceResourceDto resource = serviceResourceService.enableResource(resourceId);
-        return ResponseEntity.ok(resource);
-    }
+    @PatchMapping("/resources/{resourceId}/toggle")
+    @Operation(summary = "Toggle resource status",
+            description = """
+                Toggle a resource's enabled/disabled status.
+                - If enabled: will be disabled
+                - If disabled: will be enabled
+                
+                **Use Cases:**
+                - Quick enable/disable without separate API calls
+                - Dynamic resource availability management
+                
+                **Response:**
+                Returns updated resource with new enabled status
+                """)
+    public ResponseEntity<ServiceResourceDto> toggleResource(@PathVariable Long resourceId) {
+        // Fetch current resource to check its status
+        ServiceResourceDto currentResource = serviceResourceService.getResourceById(resourceId);
 
-    @PatchMapping("/resources/{resourceId}/disable")
-    @Operation(summary = "Disable resource", description = "Disable a resource without deleting it")
-    public ResponseEntity<ServiceResourceDto> disableResource(@PathVariable Long resourceId) {
-        ServiceResourceDto resource = serviceResourceService.disableResource(resourceId);
+        // Toggle based on current status
+        ServiceResourceDto resource;
+        if (currentResource.isEnabled()) {
+            resource = serviceResourceService.disableResource(resourceId);
+        } else {
+            resource = serviceResourceService.enableResource(resourceId);
+        }
+
         return ResponseEntity.ok(resource);
     }
 
