@@ -1,0 +1,72 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# .dockerignore - Exclude unnecessary files from Docker build context
+# Reduces build time and image size
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Maven build artifacts (will be rebuilt in Docker)
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+*.swp
+*.swo
+*~
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+INVOICE_*.md
+MANAGER_ROLE_UPDATE.md
+CACHE_FIX.md
+
+# Test files
+src/test/
+*.log
+
+# Environment files (should use env vars)
+.env
+.env.*
+*.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database files (if any locally)
+*.db
+*.sqlite
+
+# Backup files
+*.bak
+*.backup
+
+# SQL scripts (except migrations)
+*.sql
+!src/main/resources/db/migration/*.sql
+
+# Render specific
+render.yaml
+
+# Other build tools
+node_modules/
+npm-debug.log
+yarn-error.log
+

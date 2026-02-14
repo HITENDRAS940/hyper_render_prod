@@ -1,17 +1,89 @@
-# Render Blueprint - Hyper Backend
-# https://render.com/docs/blueprint-spec
-# Most environment variables are configured in the Render dashboard
+# ═══════════════════════════════════════════════════════════════════════════
+# Render Blueprint - Hyper Backend with Invoice Generation System
+# ═══════════════════════════════════════════════════════════════════════════
+# Documentation: https://render.com/docs/blueprint-spec
+#
+# Features:
+# - Async invoice generation after booking confirmation
+# - Invoice template caching for performance
+# - PDF generation with OpenHTMLtoPDF
+# - Cloudinary integration for PDF storage
+# - Razorpay webhook handling
+#
+# Important: Most sensitive environment variables (DATABASE_URL, JWT_SECRET,
+# API keys) should be configured in Render Dashboard for security.
+# ═══════════════════════════════════════════════════════════════════════════
 
 services:
   - type: web
     name: hyper-backend
     runtime: docker
-    plan: free
+    plan: free # Change to 'starter' or higher for production
+    region: singapore # Choose closest region to your users
+
+    # Docker configuration
     dockerfilePath: ./Dockerfile
+    dockerContext: .
+
+    # Health check - critical for Render to know when app is ready
     healthCheckPath: /actuator/health
+
+    # Auto-deploy settings
+    autoDeploy: true
+    branch: main # Change to your default branch
+
+    # Environment variables
     envVars:
+      # ═══════════════════════════════════════════════════════════════════════
+      # Application Profile
+      # ═══════════════════════════════════════════════════════════════════════
       - key: SPRING_PROFILES_ACTIVE
-        value: staging
-      # All other environment variables (DATABASE_URL, DATABASE_USERNAME, DATABASE_PASSWORD,
-      # JWT_SECRET, GOOGLE_CLIENT_ID, CLOUDINARY_*, RAZORPAY_*, etc.)
-      # are configured in the Render dashboard for security
+        value: staging # Use 'prod' for production deployment
+
+      # ═══════════════════════════════════════════════════════════════════════
+      # IMPORTANT: Configure these sensitive variables in Render Dashboard
+      # (Settings → Environment → Add Environment Variable)
+      # ═══════════════════════════════════════════════════════════════════════
+      #
+      # Database (auto-provided by Render PostgreSQL service):
+      #   - DATABASE_URL
+      #   - DATABASE_USERNAME (optional - usually in DATABASE_URL)
+      #   - DATABASE_PASSWORD (optional - usually in DATABASE_URL)
+      #
+      # Authentication:
+      #   - JWT_SECRET (generate with: openssl rand -base64 64)
+      #   - GOOGLE_CLIENT_ID
+      #   - APPLE_BUNDLE_ID
+      #
+      # Email (Gmail API):
+      #   - GMAIL_CLIENT_ID
+      #   - GMAIL_CLIENT_SECRET
+      #   - GMAIL_REFRESH_TOKEN
+      #   - GMAIL_FROM_EMAIL
+      #
+      # Cloudinary (for invoice PDF storage):
+      #   - CLOUDINARY_CLOUD_NAME
+      #   - CLOUDINARY_API_KEY
+      #   - CLOUDINARY_API_SECRET
+      #
+      # Razorpay (payment gateway):
+      #   - RAZORPAY_KEY_ID
+      #   - RAZORPAY_KEY_SECRET
+      #   - RAZORPAY_ENVIRONMENT (test or live)
+      #   - RAZORPAY_WEBHOOK_SECRET
+      #
+      # Pricing Configuration:
+      #   - PRICING_TAX_RATE (e.g., 18.0)
+      #   - PRICING_CONVENIENCE_FEE_RATE (e.g., 2.5)
+      #   - PRICING_CONVENIENCE_FEE_FIXED (e.g., 10.0)
+      #   - PRICING_PLATFORM_FEE_RATE (e.g., 5.0)
+      #   - PRICING_ONLINE_PAYMENT_PERCENT (e.g., 20.0)
+      #
+      # Booking Configuration:
+      #   - BOOKING_LOCK_DURATION_MINUTES (e.g., 15)
+      #
+      # Refund Configuration:
+      #   - REFUND_ENABLED (true or false)
+      #   - REFUND_MIN_MINUTES (e.g., 30)
+      #   - REFUND_ALLOW_PAST (true or false)
+      # ═══════════════════════════════════════════════════════════════════════

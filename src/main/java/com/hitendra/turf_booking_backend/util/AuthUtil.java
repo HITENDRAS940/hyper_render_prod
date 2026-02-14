@@ -23,6 +23,10 @@ public class AuthUtil {
         return authentication.getName();
     }
 
+    public String getCurrentUserEmail() {
+        return getEmailFromAuth();
+    }
+
     public User getCurrentUser() {
         return userRepository.findUserByEmail(getEmailFromAuth()).orElse(null);
     }

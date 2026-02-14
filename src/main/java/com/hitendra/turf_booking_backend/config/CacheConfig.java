@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
  * 
  * Cached data:
  * - activities: Activity list (rarely changes)
+ * - activeInvoiceTemplate: Active invoice template (evicted on manager update)
  */
 @Configuration
 @EnableCaching
@@ -23,7 +24,7 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         // Simple in-memory cache for static/semi-static data
-        return new ConcurrentMapCacheManager("activities");
+        return new ConcurrentMapCacheManager("activities", "activeInvoiceTemplate");
     }
 
     /**

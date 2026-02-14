@@ -40,6 +40,12 @@ public class Service {
     @Column
     private String contactNumber;
 
+    @Column(name = "gstin")
+    private String gstin;
+
+    @Column(name = "state")
+    private String state;
+
     @Column
     private LocalTime startTime;
 

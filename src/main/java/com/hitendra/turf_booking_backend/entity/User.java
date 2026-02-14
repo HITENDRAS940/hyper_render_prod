@@ -25,6 +25,12 @@ public class User {
     @Column
     private String name;
 
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "gstin")
+    private String gstin;
+
     // OAuth Provider Information
     @Column(name = "oauth_provider")
     @Enumerated(EnumType.STRING)
