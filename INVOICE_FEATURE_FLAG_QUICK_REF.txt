@@ -1,0 +1,168 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   INVOICE FEATURE FLAG - QUICK REFERENCE                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+┌─ ENVIRONMENT VARIABLE ────────────────────────────────────────────────────────┐
+│ Variable Name: INVOICE_GENERATION_ENABLED                                     │
+│ Values:        true | false                                                   │
+│ Default:       false (disabled)                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ QUICK SETUP ─────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│ FOR FREE TIER (No Invoices):                                                  │
+│   1. Set: INVOICE_GENERATION_ENABLED=false                                    │
+│   2. Deploy                                                                    │
+│   3. Done! ✅                                                                  │
+│                                                                                │
+│ FOR PAID TIER (With Invoices):                                                │
+│   1. Set: INVOICE_GENERATION_ENABLED=true                                     │
+│   2. Configure Cloudinary (cloud-name, api-key, api-secret)                   │
+│   3. Deploy                                                                    │
+│   4. Verify invoice generation in logs ✅                                      │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT GETS DISABLED (when false) ────────────────────────────────────────────┐
+│ ❌ Automatic invoice generation after booking                                 │
+│ ❌ Invoice API endpoints (/api/invoices/*)                                    │
+│ ❌ Invoice template management (/api/manager/invoice-template)                │
+│ ❌ Thymeleaf template engine initialization                                   │
+│ ❌ OGNL library loading                                                        │
+│ ❌ PDF generation libraries                                                    │
+│                                                                                │
+│ Memory Saved: ~30-50MB                                                        │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ WHAT KEEPS WORKING (Always) ────────────────────────────────────────────────┐
+│ ✅ Booking creation and confirmation                                          │
+│ ✅ Payment processing (Razorpay)                                              │
+│ ✅ Email notifications                                                         │
+│ ✅ SMS notifications                                                           │
+│ ✅ Venue/Resource management                                                   │
+│ ✅ Image uploads (Cloudinary for images)                                      │
+│ ✅ User authentication & authorization                                         │
+│ ✅ All other application features                                             │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ STARTUP LOGS ────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│ When DISABLED (false):                                                        │
+│   ℹ️  No invoice-related initialization logs                                  │
+│   ℹ️  Application starts normally without invoice features                    │
+│                                                                                │
+│ When ENABLED (true):                                                          │
+│   ✅ InvoiceService initialized with Cloudinary support                       │
+│   ✅ Default invoice template initialized successfully (Version 1)            │
+│   ✅ Async executor configured for invoice generation                         │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ VERIFICATION COMMANDS ───────────────────────────────────────────────────────┐
+│                                                                                │
+│ Check if feature is enabled:                                                  │
+│   $ grep "invoice.generation.enabled" application.properties                  │
+│                                                                                │
+│ Check startup logs:                                                           │
+│   $ grep -i "invoice" logs/application.log                                    │
+│                                                                                │
+│ Test invoice endpoint (when enabled):                                         │
+│   $ curl -H "Authorization: Bearer <token>" \                                 │
+│          https://your-app.com/api/invoices/{bookingId}                        │
+│                                                                                │
+│ Expected: 200 OK (if enabled), 404 Not Found (if disabled)                    │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ SWITCHING MODES ─────────────────────────────────────────────────────────────┐
+│                                                                                │
+│ Free → Paid (Enable Invoices):                                                │
+│   1. Set INVOICE_GENERATION_ENABLED=true                                      │
+│   2. Configure Cloudinary variables                                           │
+│   3. Restart application                                                      │
+│   → New bookings will auto-generate invoices                                  │
+│                                                                                │
+│ Paid → Free (Disable Invoices):                                               │
+│   1. Set INVOICE_GENERATION_ENABLED=false                                     │
+│   2. Restart application                                                      │
+│   → Application runs without invoice overhead                                 │
+│   → Existing invoice data remains intact                                      │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ COMMON USE CASES ────────────────────────────────────────────────────────────┐
+│                                                                                │
+│ 1. Starting on free tier:                                                     │
+│    → Set INVOICE_GENERATION_ENABLED=false                                     │
+│    → Focus on core booking features first                                     │
+│                                                                                │
+│ 2. Testing locally with full features:                                        │
+│    → Set INVOICE_GENERATION_ENABLED=true                                      │
+│    → Configure Cloudinary for local testing                                   │
+│                                                                                │
+│ 3. Production deployment (paid tier):                                         │
+│    → Set INVOICE_GENERATION_ENABLED=true                                      │
+│    → Configure production Cloudinary account                                  │
+│                                                                                │
+│ 4. Temporary cost reduction:                                                  │
+│    → Set INVOICE_GENERATION_ENABLED=false                                     │
+│    → Reduce memory usage during high-traffic periods                          │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ IMPORTANT NOTES ─────────────────────────────────────────────────────────────┐
+│ ⚠️  Default is DISABLED - Must explicitly enable                              │
+│ ⚠️  Requires application restart to change                                    │
+│ ⚠️  Old bookings won't auto-regenerate when enabling                          │
+│ ⚠️  Cloudinary MUST be configured when enabling                               │
+│ ✅ Code always present - just conditionally activated                         │
+│ ✅ Database tables always exist - just empty when disabled                    │
+│ ✅ Safe to toggle between modes anytime                                       │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ TROUBLESHOOTING ─────────────────────────────────────────────────────────────┐
+│                                                                                │
+│ Problem: Invoices not generating                                              │
+│ Solution:                                                                      │
+│   1. Verify INVOICE_GENERATION_ENABLED=true                                   │
+│   2. Check Cloudinary configuration                                           │
+│   3. Restart application                                                      │
+│   4. Check logs for initialization messages                                   │
+│                                                                                │
+│ Problem: Memory issues with invoices enabled                                  │
+│ Solution:                                                                      │
+│   1. Disable: INVOICE_GENERATION_ENABLED=false                                │
+│   2. Restart application                                                      │
+│   3. Consider upgrading server resources                                      │
+│                                                                                │
+│ Problem: Old bookings need invoices                                           │
+│ Solution:                                                                      │
+│   POST /api/invoices/{bookingId}/regenerate                                   │
+│   (Requires MANAGER role)                                                     │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ FILES MODIFIED ──────────────────────────────────────────────────────────────┐
+│ ✓ application.properties - Added feature flag property                        │
+│ ✓ InvoiceService.java - Added @ConditionalOnProperty                          │
+│ ✓ InvoiceGenerationEventListener.java - Added @ConditionalOnProperty          │
+│ ✓ InvoiceTemplateService.java - Added @ConditionalOnProperty                  │
+│ ✓ InvoiceController.java - Added @ConditionalOnProperty                       │
+│ ✓ InvoiceTemplateController.java - Added @ConditionalOnProperty               │
+│ ✓ InvoiceTemplateInitializer.java - Added @ConditionalOnProperty              │
+│ ✓ pom.xml - Added OGNL dependency (already done)                              │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─ DEPLOYMENT CHECKLIST ────────────────────────────────────────────────────────┐
+│ ☐ Build: mvn clean package -DskipTests                                        │
+│ ☐ Set environment variable: INVOICE_GENERATION_ENABLED=false or true          │
+│ ☐ If true: Configure Cloudinary variables                                     │
+│ ☐ Deploy JAR to server                                                        │
+│ ☐ Restart application                                                         │
+│ ☐ Check startup logs for initialization                                       │
+│ ☐ Test booking creation                                                       │
+│ ☐ If enabled: Verify invoice generation in logs                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+For detailed guide, see: INVOICE_FEATURE_FLAG_GUIDE.md
+

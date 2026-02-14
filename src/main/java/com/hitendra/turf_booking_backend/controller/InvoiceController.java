@@ -12,12 +12,18 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * Controller for invoice management.
+ *
+ * FEATURE FLAG:
+ * - This controller is ONLY created if invoice.generation.enabled=true
+ * - If disabled, invoice endpoints will return 404
+ * - Keeps application lightweight for free-tier deployments
  *
  * Provides API to fetch invoice URLs for confirmed bookings.
  */
@@ -26,6 +32,12 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Invoice Management", description = "APIs for fetching booking invoices")
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceController {
 
     private final InvoiceService invoiceService;

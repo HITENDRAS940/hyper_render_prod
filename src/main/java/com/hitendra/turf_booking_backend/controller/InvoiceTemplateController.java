@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,11 @@ import java.util.Map;
 
 /**
  * Manager API for managing invoice templates.
+ *
+ * FEATURE FLAG:
+ * - This controller is ONLY created if invoice.generation.enabled=true
+ * - If disabled, template management endpoints will return 404
+ * - Keeps application lightweight for free-tier deployments
  *
  * FEATURES:
  * - Create/update invoice template without redeploying backend
@@ -35,6 +41,12 @@ import java.util.Map;
 @Slf4j
 @Tag(name = "Manager - Invoice Template", description = "Manage invoice templates without backend redeploy")
 @SecurityRequirement(name = "Bearer Authentication")
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceTemplateController {
 
     private final InvoiceTemplateService templateService;

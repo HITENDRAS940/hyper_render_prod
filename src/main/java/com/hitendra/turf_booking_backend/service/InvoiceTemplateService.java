@@ -5,6 +5,7 @@ import com.hitendra.turf_booking_backend.exception.InvoiceException;
 import com.hitendra.turf_booking_backend.repository.InvoiceTemplateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,11 @@ import java.time.LocalDateTime;
 
 /**
  * Service for managing invoice templates with caching.
+ *
+ * FEATURE FLAG:
+ * - This service is ONLY created if invoice.generation.enabled=true
+ * - If disabled, template management endpoints will not work
+ * - Keeps application lightweight for free-tier deployments
  *
  * CACHING STRATEGY:
  * - Active template is cached in memory
@@ -29,6 +35,12 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceTemplateService {
 
     private final InvoiceTemplateRepository templateRepository;

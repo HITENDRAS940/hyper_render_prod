@@ -12,6 +12,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
@@ -28,6 +29,11 @@ import java.util.Map;
 /**
  * Service for generating and managing invoices.
  *
+ * FEATURE FLAG:
+ * - This service is ONLY created if invoice.generation.enabled=true
+ * - If disabled, invoice endpoints will not work (returns 404/503)
+ * - Keeps application lightweight for free-tier deployments
+ *
  * RESPONSIBILITIES:
  * 1. Fetch active template from cache (via InvoiceTemplateService)
  * 2. Generate HTML from template string using Thymeleaf
@@ -43,6 +49,12 @@ import java.util.Map;
  */
 @Service
 @Slf4j
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;

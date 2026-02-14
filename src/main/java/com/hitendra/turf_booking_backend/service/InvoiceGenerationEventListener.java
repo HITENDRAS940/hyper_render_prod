@@ -5,12 +5,18 @@ import com.hitendra.turf_booking_backend.event.BookingConfirmedEvent;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 /**
  * Asynchronous event listener for booking confirmation events.
+ *
+ * FEATURE FLAG:
+ * - This component is ONLY created if invoice.generation.enabled=true
+ * - If disabled, no invoice generation happens on booking confirmation
+ * - Keeps application lightweight for free-tier deployments
  *
  * ARCHITECTURE:
  * - Webhook confirms booking -> publishes BookingConfirmedEvent -> returns 200 OK immediately
@@ -30,6 +36,12 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceGenerationEventListener {
 
     private final InvoiceService invoiceService;

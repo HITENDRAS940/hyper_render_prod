@@ -4,6 +4,7 @@ import com.hitendra.turf_booking_backend.service.InvoiceTemplateService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
@@ -16,6 +17,11 @@ import java.nio.charset.StandardCharsets;
  * Initialize default invoice template from file on first startup.
  * Runs after DataInitializer to ensure database tables exist.
  *
+ * FEATURE FLAG:
+ * - This initializer is ONLY created if invoice.generation.enabled=true
+ * - If disabled, no template initialization happens
+ * - Keeps application lightweight for free-tier deployments
+ *
  * BEHAVIOR:
  * - Checks if any active template exists
  * - If not, loads default template from resources/templates/invoice-template.html
@@ -26,6 +32,12 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 @Slf4j
 @Order(2) // Run after DataInitializer (which is Order(1) by default)
+@ConditionalOnProperty(
+    prefix = "invoice.generation",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 public class InvoiceTemplateInitializer implements CommandLineRunner {
 
     private final InvoiceTemplateService templateService;
