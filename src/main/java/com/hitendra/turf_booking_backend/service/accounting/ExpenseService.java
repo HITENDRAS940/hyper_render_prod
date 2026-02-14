@@ -110,6 +110,7 @@ public class ExpenseService {
 
     /**
      * Get all expenses for a service (validates ownership).
+     * Uses eager fetching to prevent LazyInitializationException.
      */
     public List<Expense> getExpensesByService(Long serviceId) {
         // Validate service ownership
@@ -121,11 +122,13 @@ public class ExpenseService {
             throw new BookingException("Access denied: This service belongs to another admin");
         }
 
-        return expenseRepository.findByServiceIdOrderByExpenseDateDesc(serviceId);
+        // Use eager fetch query to load service and category relationships
+        return expenseRepository.findByServiceIdWithRelationships(serviceId);
     }
 
     /**
      * Get expenses for a service within a date range (validates ownership).
+     * Uses eager fetching to prevent LazyInitializationException.
      */
     public List<Expense> getExpensesByServiceAndDateRange(
         Long serviceId, LocalDate startDate, LocalDate endDate) {
@@ -139,7 +142,8 @@ public class ExpenseService {
             throw new BookingException("Access denied: This service belongs to another admin");
         }
 
-        return expenseRepository.findByServiceIdAndExpenseDateBetweenOrderByExpenseDateDesc(
+        // Use eager fetch query to load service and category relationships
+        return expenseRepository.findByServiceIdAndDateRangeWithRelationships(
             serviceId, startDate, endDate);
     }
 

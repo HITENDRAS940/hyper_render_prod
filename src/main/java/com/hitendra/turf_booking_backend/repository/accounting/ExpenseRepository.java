@@ -12,8 +12,44 @@ import java.util.List;
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
+    // ==================== EAGER FETCH QUERIES (Prevent LazyInitializationException) ====================
+
+    /**
+     * Get expenses by service with eager loading of service and category.
+     * Prevents LazyInitializationException when accessing service.name or category.name.
+     */
+    @Query("""
+        SELECT e FROM Expense e
+        LEFT JOIN FETCH e.service s
+        LEFT JOIN FETCH e.category c
+        WHERE e.service.id = :serviceId
+        ORDER BY e.expenseDate DESC
+        """)
+    List<Expense> findByServiceIdWithRelationships(@Param("serviceId") Long serviceId);
+
+    /**
+     * Get expenses by service and date range with eager loading.
+     */
+    @Query("""
+        SELECT e FROM Expense e
+        LEFT JOIN FETCH e.service s
+        LEFT JOIN FETCH e.category c
+        WHERE e.service.id = :serviceId
+        AND e.expenseDate BETWEEN :startDate AND :endDate
+        ORDER BY e.expenseDate DESC
+        """)
+    List<Expense> findByServiceIdAndDateRangeWithRelationships(
+        @Param("serviceId") Long serviceId,
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate
+    );
+
+    // ==================== LEGACY METHODS (Deprecated - use eager fetch versions) ====================
+
+    @Deprecated
     List<Expense> findByServiceIdOrderByExpenseDateDesc(Long serviceId);
 
+    @Deprecated
     List<Expense> findByServiceIdAndExpenseDateBetweenOrderByExpenseDateDesc(
         Long serviceId, LocalDate startDate, LocalDate endDate);
 

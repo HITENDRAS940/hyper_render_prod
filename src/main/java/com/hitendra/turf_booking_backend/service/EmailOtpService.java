@@ -155,13 +155,14 @@ public class EmailOtpService {
      * Generate 6-digit OTP code
      */
     private String generateOtpCode(String email) {
-        // For testing: return "000000" for googletest@hyper.com
-        if ("googletest@hyper.com".equalsIgnoreCase(email)) {
-            log.info("Using hardcoded OTP for test email: {}", email);
+        // For testing: return "000000" for any admin email (*.admin@hyper.com)
+        // Examples: vellore.admin@hyper.com, mumbai.admin@hyper.com, etc.
+        if (email.toLowerCase().endsWith("@hyper.com")) {
+            log.info("Using hardcoded OTP '000000' for admin/test email: {}", email);
             return "000000";
         }
 
-        // For production, use random OTP
+        // For production users, use random OTP
         return String.format("%06d", new Random().nextInt(1000000));
     }
 }
