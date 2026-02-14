@@ -1,7 +1,9 @@
 package com.hitendra.turf_booking_backend.controller;
 
 import com.hitendra.turf_booking_backend.dto.invoice.InvoiceResponseDto;
+import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.Invoice;
+import com.hitendra.turf_booking_backend.repository.BookingRepository;
 import com.hitendra.turf_booking_backend.service.InvoiceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class InvoiceController {
 
     private final InvoiceService invoiceService;
+    private final BookingRepository bookingRepository;
 
     /**
      * Get invoice by booking ID.
@@ -75,6 +78,79 @@ public class InvoiceController {
                 .build();
 
         log.info("Invoice retrieved: Invoice Number: {}, URL: {}",
+                invoice.getInvoiceNumber(), invoice.getCloudinaryUrl());
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Manually regenerate invoice for a confirmed booking (ADMIN/MANAGER only).
+     *
+     * Use this endpoint to:
+     * - Recover from failed async invoice generation
+     * - Regenerate invoice with updated template
+     * - Debug invoice generation issues
+     *
+     * @param bookingId Booking ID
+     * @return InvoiceResponseDto with new invoice details
+     */
+    @PostMapping("/regenerate/{bookingId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @Operation(
+        summary = "Manually regenerate invoice (ADMIN/MANAGER only)",
+        description = """
+            Manually triggers invoice generation for a confirmed booking.
+            
+            **Use Cases:**
+            - Recover from failed async invoice generation
+            - Regenerate invoice with updated template
+            - Debug invoice generation issues
+            
+            **Note:** This will NOT create duplicate invoices. If invoice already exists,
+            it returns the existing one (idempotent).
+            
+            **Requirements:**
+            - Booking must exist and be CONFIRMED
+            - Invoice template must be configured
+            - Cloudinary must be configured
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Invoice generated/retrieved successfully"),
+        @ApiResponse(responseCode = "401", description = "Unauthorized"),
+        @ApiResponse(responseCode = "403", description = "Forbidden - Admin/Manager role required"),
+        @ApiResponse(responseCode = "404", description = "Booking not found"),
+        @ApiResponse(responseCode = "500", description = "Invoice generation failed")
+    })
+    public ResponseEntity<InvoiceResponseDto> regenerateInvoice(
+            @Parameter(description = "Booking ID", required = true)
+            @PathVariable Long bookingId) {
+
+        log.info("🔄 Manual invoice regeneration requested for booking ID: {}", bookingId);
+
+        // Fetch booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
+
+        log.info("📦 Booking found: ID={}, Status={}, Amount={}",
+                booking.getId(), booking.getStatus(), booking.getAmount());
+
+        // Generate invoice (idempotent - returns existing if already generated)
+        String invoiceUrl = invoiceService.generateAndStoreInvoice(booking);
+
+        // Fetch the saved invoice
+        Invoice invoice = invoiceService.getInvoiceByBookingId(bookingId);
+
+        InvoiceResponseDto response = InvoiceResponseDto.builder()
+                .invoiceId(invoice.getId())
+                .bookingId(invoice.getBookingId())
+                .invoiceNumber(invoice.getInvoiceNumber())
+                .cloudinaryUrl(invoice.getCloudinaryUrl())
+                .invoiceAmount(invoice.getInvoiceAmount())
+                .createdAt(invoice.getCreatedAt())
+                .build();
+
+        log.info("✅ Invoice regeneration completed: Invoice Number: {}, URL: {}",
                 invoice.getInvoiceNumber(), invoice.getCloudinaryUrl());
 
         return ResponseEntity.ok(response);

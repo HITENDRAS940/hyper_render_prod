@@ -44,7 +44,9 @@ public class InvoiceGenerationEventListener {
     @Async
     @EventListener
     public void handleBookingConfirmed(BookingConfirmedEvent event) {
-        log.info("🎯 Received BookingConfirmedEvent for booking ID: {} (async processing)", event.getBookingId());
+        String threadName = Thread.currentThread().getName();
+        log.info("🎯 Received BookingConfirmedEvent for booking ID: {} (async processing on thread: {})",
+                event.getBookingId(), threadName);
 
         try {
             // Calculate event processing delay for monitoring
@@ -59,6 +61,7 @@ public class InvoiceGenerationEventListener {
                     booking.getId(), booking.getStatus(), booking.getAmount());
 
             // Generate and store invoice (idempotent operation)
+            log.info("🔄 Starting invoice generation for booking ID: {}", event.getBookingId());
             String invoiceUrl = invoiceService.generateAndStoreInvoice(booking);
 
             log.info("✅ Invoice generation completed for booking ID: {}. URL: {}",
@@ -69,6 +72,9 @@ public class InvoiceGenerationEventListener {
             log.error("❌ Failed to generate invoice for booking ID: {} (Event: RazorpayPaymentId={}). " +
                             "Booking is still confirmed. Manager can regenerate invoice manually.",
                     event.getBookingId(), event.getRazorpayPaymentId(), e);
+
+            // Print stack trace for debugging
+            log.error("❌ Full stack trace:", e);
         }
     }
 }

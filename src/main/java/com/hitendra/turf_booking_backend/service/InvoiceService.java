@@ -11,6 +11,7 @@ import com.hitendra.turf_booking_backend.repository.InvoiceRepository;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.TemplateEngine;
@@ -41,7 +42,6 @@ import java.util.Map;
  * - Invoice generation is asynchronous (triggered by BookingConfirmedEvent)
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class InvoiceService {
 
@@ -49,12 +49,44 @@ public class InvoiceService {
     private final InvoiceTemplateService templateService;
     private final Cloudinary cloudinary;
 
+    /**
+     * Constructor with Cloudinary as optional dependency.
+     * If Cloudinary is not configured, invoice generation will fail with clear error message.
+     */
+    @Autowired
+    public InvoiceService(
+            InvoiceRepository invoiceRepository,
+            InvoiceTemplateService templateService,
+            @Autowired(required = false) Cloudinary cloudinary) {
+        this.invoiceRepository = invoiceRepository;
+        this.templateService = templateService;
+        this.cloudinary = cloudinary;
+
+        if (cloudinary == null) {
+            log.warn("⚠️  Cloudinary is not configured. Invoice generation will fail until Cloudinary is properly configured.");
+        } else {
+            log.info("✅ InvoiceService initialized with Cloudinary support");
+        }
+    }
+
     // GST rate constant (18%)
     private static final double GST_RATE = 18.0;
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd MMM yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
+    /**
+     * Verify Cloudinary is configured.
+     * Throws exception if Cloudinary bean is null.
+     */
+    private void verifyCloudinaryConfigured() {
+        if (cloudinary == null) {
+            throw new InvoiceException(
+                "Cloudinary is not configured. Please set environment variables: " +
+                "CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET"
+            );
+        }
+    }
     /**
      * Create a Thymeleaf TemplateEngine for processing string-based templates.
      * This is needed because template content comes from database, not files.
@@ -92,6 +124,11 @@ public class InvoiceService {
     @Transactional
     public String generateAndStoreInvoice(Booking booking) {
         log.info("🧾 Generating invoice for booking ID: {}", booking.getId());
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // STEP 0: Verify Cloudinary is configured
+        // ═══════════════════════════════════════════════════════════════════════
+        verifyCloudinaryConfigured();
 
         // ═══════════════════════════════════════════════════════════════════════
         // IDEMPOTENCY: Check if invoice already exists
