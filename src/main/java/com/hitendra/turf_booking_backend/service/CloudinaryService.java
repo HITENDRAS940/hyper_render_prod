@@ -23,15 +23,24 @@ public class CloudinaryService {
 
     private final Cloudinary cloudinary;
     private final ExecutorService executorService;
+    private final boolean cloudinaryAvailable;
 
     /**
      * Constructor with dependency injection.
      * ExecutorService is injected to allow shared thread pool management.
+     * Cloudinary is optional - if not configured, all upload operations will fail gracefully.
      */
     @Autowired
-    public CloudinaryService(Cloudinary cloudinary, ExecutorService imageUploadExecutor) {
+    public CloudinaryService(
+            @Autowired(required = false) Cloudinary cloudinary,
+            ExecutorService imageUploadExecutor) {
         this.cloudinary = cloudinary;
         this.executorService = imageUploadExecutor;
+        this.cloudinaryAvailable = (cloudinary != null);
+
+        if (!cloudinaryAvailable) {
+            log.warn("⚠️  Cloudinary is not configured. Image upload features will be disabled.");
+        }
     }
 
     /**
@@ -66,6 +75,11 @@ public class CloudinaryService {
      * @return The secure URL of the uploaded image
      */
     public String uploadImage(MultipartFile file) {
+        if (!cloudinaryAvailable) {
+            log.error("Cloudinary is not configured. Cannot upload image.");
+            throw new RuntimeException("Image upload service is not configured");
+        }
+
         try {
             if (file == null || file.isEmpty()) {
                 throw new RuntimeException("File is empty or null");
@@ -100,6 +114,11 @@ public class CloudinaryService {
      * @return List of secure URLs of uploaded images
      */
     public List<String> uploadImages(List<MultipartFile> files) {
+        if (!cloudinaryAvailable) {
+            log.error("Cloudinary is not configured. Cannot upload images.");
+            throw new RuntimeException("Image upload service is not configured");
+        }
+
         if (files == null || files.isEmpty()) {
             return new ArrayList<>();
         }

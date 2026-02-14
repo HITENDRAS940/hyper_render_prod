@@ -7,9 +7,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Initialize default invoice template from file on first startup.
@@ -41,9 +42,13 @@ public class InvoiceTemplateInitializer implements CommandLineRunner {
 
         try {
             // Load default template from resources/templates/invoice-template.html
+            // Use InputStream to read from JAR (works in both development and production)
             ClassPathResource resource = new ClassPathResource("templates/invoice-template.html");
-            Path templatePath = resource.getFile().toPath();
-            String templateContent = Files.readString(templatePath);
+
+            String templateContent;
+            try (InputStream inputStream = resource.getInputStream()) {
+                templateContent = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+            }
 
             // Create initial template
             templateService.createOrUpdateTemplate(

@@ -10,7 +10,6 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -50,14 +49,18 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/services/**").permitAll()
-                    .requestMatchers("/resources/**").permitAll()
+                .requestMatchers("/resources/**").permitAll()
                 .requestMatchers("/service-slots/**").permitAll()
                 .requestMatchers("/payments/confirm", "/payments/webhook/**").permitAll()
                 .requestMatchers("/api/payment/**").permitAll()
-                    .requestMatchers("/api/**").permitAll()
+                .requestMatchers("/api/**").permitAll()
                 .requestMatchers("/api/razorpay/webhook").permitAll()
+                // Swagger/OpenAPI endpoints
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/v2/api-docs", "/swagger-resources/**", "/configuration/security", "/swagger-ui.html", "/webjars/**").permitAll()
+                // Health check
                 .requestMatchers("/actuator/health").permitAll()
+                // Role-based access
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN", "MANAGER")
@@ -69,16 +72,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    @Bean
-    public WebSecurityCustomizer webSecurityCustomizer() {
-        return (web -> web.ignoring().requestMatchers(
-                "/v2/api-docs",
-                "/swagger-resources/**",
-                "configuration/security",
-                "swagger-ui.html",
-                "/webjars/**"
-        ));
-    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
