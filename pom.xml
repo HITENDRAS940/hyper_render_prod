@@ -152,6 +152,13 @@
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
 
+        <!-- OGNL - Required by Thymeleaf for expression evaluation -->
+        <dependency>
+            <groupId>ognl</groupId>
+            <artifactId>ognl</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+
         <!-- OpenHTMLtoPDF for HTML to PDF conversion -->
         <dependency>
             <groupId>com.openhtmltopdf</groupId>
