@@ -1,45 +1,43 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Multi-stage Dockerfile for Hyper Backend - Optimized for Render Deployment
-# Includes optimizations for invoice generation (async processing, PDF generation)
+# Multi-stage Dockerfile for Hyper Backend - Memory Optimized for Render Free Tier (512MB)
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════
-# BUILD STAGE - Create production JAR
+# BUILD STAGE - Create production JAR with optimizations
 # ═══════════════════════════════════════════════════════════════════════════
 FROM eclipse-temurin:17-jdk-alpine AS build
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache dos2unix
-
-# Copy Maven wrapper and pom.xml
+# Copy Maven wrapper and pom.xml (minimal setup)
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
 
-# Fix line endings and make mvnw executable
-RUN dos2unix mvnw && chmod +x mvnw
+# Make mvnw executable (no dos2unix needed)
+RUN chmod +x mvnw
 
-# Download dependencies (cached layer - only re-runs if pom.xml changes)
+# Download dependencies (cached layer)
 RUN ./mvnw dependency:go-offline -B
 
 # Copy source code
 COPY src src
 
-# Build the application (skip tests for faster builds)
-RUN ./mvnw package -DskipTests
+# Build with memory optimization and skip tests
+RUN ./mvnw clean package -DskipTests \
+    -Dmaven.compiler.debug=false \
+    -Dmaven.compiler.debuglevel=none
 
 # ═══════════════════════════════════════════════════════════════════════════
-# RUNTIME STAGE - Optimized JRE with production configurations
+# RUNTIME STAGE - Memory Optimized JRE for 512MB Limit
 # ═══════════════════════════════════════════════════════════════════════════
 FROM eclipse-temurin:17-jre-alpine
 
-# Install runtime dependencies for PDF generation
-# - fontconfig: Font handling for PDF generation
-# - ttf-dejavu: Unicode fonts for invoice PDFs
+# Install only essential runtime dependencies for PDF generation
+# Keep font package minimal to save memory
 RUN apk add --no-cache \
     fontconfig \
-    ttf-dejavu
+    ttf-dejavu \
+    && rm -rf /var/cache/apk/*
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S appuser && adduser -u 1001 -S appuser -G appuser
@@ -58,56 +56,51 @@ USER appuser
 # Set default Spring profile to staging
 ENV SPRING_PROFILES_ACTIVE=staging
 
-# Expose port (Render will override with $PORT environment variable)
+# Expose port
 EXPOSE 8080
 
 # ═══════════════════════════════════════════════════════════════════════════
-# JVM Optimization Flags for Production
+# JVM Optimization Flags for 512MB RAM Limit (Render Free Tier)
 # ═══════════════════════════════════════════════════════════════════════════
-# Memory Settings (Render Free Tier: 512MB RAM):
-# - Xms256m: Initial heap size (50% of available memory)
-# - Xmx400m: Maximum heap size (80% of available memory, leave room for native memory)
-# - XX:MaxMetaspaceSize=128m: Metaspace limit (class metadata)
-# - XX:ReservedCodeCacheSize=64m: Code cache for JIT compiler
-#
-# Garbage Collection:
-# - XX:+UseG1GC: G1 collector (good for low-pause times)
-# - XX:MaxGCPauseMillis=200: Target max pause time for GC
-# - XX:G1HeapRegionSize=1M: Region size for G1
-#
-# Performance:
-# - XX:+UseStringDeduplication: Reduce memory for duplicate strings
-# - XX:+OptimizeStringConcat: Optimize string concatenation
-#
-# Async Invoice Generation:
-# - XX:+UseContainerSupport: Respect container memory limits
-# - XX:ActiveProcessorCount=2: Limit async thread pool size
+# Memory Allocation Strategy:
+# - Total Available: 512MB
+# - JVM Heap: 200MB max (Xmx)
+# - Metaspace: 96MB max
+# - Code Cache: 32MB
+# - Thread Stacks: ~50MB (estimated)
+# - Native Memory + Overhead: ~134MB
 # ═══════════════════════════════════════════════════════════════════════════
 
 ENTRYPOINT ["sh", "-c", "\
-    # Convert Render's DATABASE_URL format (postgres://) to JDBC format (jdbc:postgresql://) \
+    # Convert Render's DATABASE_URL format \
     if [ -n \"$DATABASE_URL\" ] && echo \"$DATABASE_URL\" | grep -q '^postgres://'; then \
         export DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgres:/jdbc:postgresql:/'); \
     fi && \
-    # Run application with optimized JVM settings \
+    # Run with aggressive memory optimization \
     exec java \
-        -Xms256m \
-        -Xmx400m \
-        -XX:MaxMetaspaceSize=128m \
-        -XX:ReservedCodeCacheSize=64m \
+        -Xms128m \
+        -Xmx200m \
+        -XX:MaxMetaspaceSize=96m \
+        -XX:MetaspaceSize=64m \
+        -XX:ReservedCodeCacheSize=32m \
+        -XX:MaxDirectMemorySize=32m \
         -XX:+UseG1GC \
-        -XX:MaxGCPauseMillis=200 \
-        -XX:G1HeapRegionSize=1M \
+        -XX:MaxGCPauseMillis=100 \
         -XX:+UseStringDeduplication \
-        -XX:+OptimizeStringConcat \
         -XX:+UseContainerSupport \
-        -XX:ActiveProcessorCount=2 \
+        -XX:ActiveProcessorCount=1 \
+        -XX:+TieredCompilation \
+        -XX:TieredStopAtLevel=1 \
+        -XX:+UseCompressedOops \
+        -XX:+UseCompressedClassPointers \
+        -XX:+ExitOnOutOfMemoryError \
         -Djava.security.egd=file:/dev/./urandom \
         -Dfile.encoding=UTF-8 \
+        -Djava.awt.headless=true \
         -jar app.jar"]
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Health Check Configuration
 # ═══════════════════════════════════════════════════════════════════════════
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1

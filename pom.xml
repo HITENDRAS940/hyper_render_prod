@@ -37,6 +37,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <exclusions>
+                <!-- Exclude unused components to reduce memory -->
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-tomcat</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Use Undertow instead of Tomcat - lighter and faster -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-undertow</artifactId>
         </dependency>
 
         <!-- Security, validation and JWT -->
@@ -64,6 +77,13 @@
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-gmail</artifactId>
             <version>v1-rev20220404-2.0.0</version>
+            <exclusions>
+                <!-- Exclude duplicate HTTP clients -->
+                <exclusion>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava-jdk5</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.google.auth</groupId>
@@ -74,22 +94,13 @@
             <groupId>com.google.oauth-client</groupId>
             <artifactId>google-oauth-client-jetty</artifactId>
             <version>1.34.1</version>
-        </dependency>
-        <!-- Jakarta Mail API (compatible with Spring Boot 3) -->
-        <dependency>
-            <groupId>com.sun.mail</groupId>
-            <artifactId>jakarta.mail</artifactId>
-            <version>2.0.1</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.activation</groupId>
-            <artifactId>jakarta.activation-api</artifactId>
-            <version>2.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>jakarta.annotation</groupId>
-            <artifactId>jakarta.annotation-api</artifactId>
-            <version>2.1.1</version>
+            <exclusions>
+                <!-- Exclude Jetty as we're not using it -->
+                <exclusion>
+                    <groupId>org.mortbay.jetty</groupId>
+                    <artifactId>jetty</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -110,11 +121,18 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- OpenAPI / Swagger for Spring Boot 3 -->
+        <!-- OpenAPI / Swagger for Spring Boot 3 (only in dev/staging) -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>2.7.0</version>
+            <exclusions>
+                <!-- Exclude Swagger UI static resources in production -->
+                <exclusion>
+                    <groupId>org.webjars</groupId>
+                    <artifactId>swagger-ui</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Source: https://mvnrepository.com/artifact/com.razorpay/razorpay-java -->
@@ -219,6 +237,9 @@
                             <artifactId>lombok</artifactId>
                         </path>
                     </annotationProcessorPaths>
+                    <!-- Disable debug info to reduce class file size -->
+                    <debug>false</debug>
+                    <debuglevel>none</debuglevel>
                 </configuration>
             </plugin>
             <plugin>
@@ -231,6 +252,11 @@
                             <artifactId>lombok</artifactId>
                         </exclude>
                     </excludes>
+                    <!-- Optimize JAR for production -->
+                    <layers>
+                        <enabled>true</enabled>
+                    </layers>
+                    <excludeDevtools>true</excludeDevtools>
                 </configuration>
             </plugin>
         </plugins>
