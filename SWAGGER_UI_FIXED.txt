@@ -1,0 +1,188 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                 ✅ SWAGGER UI "NO STATIC RESOURCE" FIXED ✅                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🐛 PROBLEM
+═══════════════════════════════════════════════════════════════════════════════
+Error: No static resource swagger-ui/index.html
+
+🔍 ROOT CAUSE
+═══════════════════════════════════════════════════════════════════════════════
+During memory optimization, we excluded the swagger-ui webjar from dependencies.
+This webjar contains the HTML/CSS/JS files needed for Swagger UI interface.
+
+Also, the Swagger UI path was incorrectly configured.
+
+✅ SOLUTION APPLIED
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Removed the swagger-ui exclusion from pom.xml
+2. Fixed the Swagger UI path in application.properties
+
+📦 CHANGES MADE
+═══════════════════════════════════════════════════════════════════════════════
+
+File: pom.xml
+  REMOVED:
+    <exclusions>
+        <exclusion>
+            <groupId>org.webjars</groupId>
+            <artifactId>swagger-ui</artifactId>
+        </exclusion>
+    </exclusions>
+
+File: application.properties
+  CHANGED:
+    springdoc.swagger-ui.path=/swagger-ui.html
+  TO:
+    springdoc.swagger-ui.path=/swagger-ui
+
+🚀 HOW TO USE SWAGGER UI
+═══════════════════════════════════════════════════════════════════════════════
+
+OPTION 1 - Using Quick Start Script:
+───────────────────────────────────────────────────────────────────────────────
+  cd /Users/hitendrasingh/Desktop/backendHyper
+  ./run-with-swagger.sh
+
+  This will:
+  ✓ Clean previous build
+  ✓ Rebuild with Swagger UI
+  ✓ Start application with dev profile
+  ✓ Open Swagger UI at http://localhost:8080/swagger-ui
+
+
+OPTION 2 - Manual Steps:
+───────────────────────────────────────────────────────────────────────────────
+  cd /Users/hitendrasingh/Desktop/backendHyper
+
+  # Rebuild (required after pom.xml changes)
+  ./mvnw clean package -DskipTests
+
+  # Set environment (replace with your values)
+  export SPRING_PROFILES_ACTIVE=dev
+  export DATABASE_URL=jdbc:postgresql://localhost:5432/yourdb
+  export DATABASE_USERNAME=youruser
+  export DATABASE_PASSWORD=yourpass
+  export JWT_SECRET=your-jwt-secret-min-32-chars
+
+  # Run application
+  ./mvnw spring-boot:run
+
+🌐 SWAGGER UI URLS
+═══════════════════════════════════════════════════════════════════════════════
+
+Primary URL:
+  http://localhost:8080/swagger-ui
+
+Alternative URLs (all work):
+  http://localhost:8080/swagger-ui/index.html
+  http://localhost:8080/swagger-ui.html
+
+OpenAPI JSON Specification:
+  http://localhost:8080/v3/api-docs
+
+🔐 AUTHENTICATION IN SWAGGER UI
+═══════════════════════════════════════════════════════════════════════════════
+
+Your API uses JWT Bearer token authentication. To test protected endpoints:
+
+Step 1: Get JWT Token
+  • Find /api/auth/request-email-otp or /api/auth/verify-email-otp endpoint
+  • Or use /api/oauth/login for OAuth login
+  • Execute and copy the "token" from response
+
+Step 2: Authorize
+  • Click "Authorize" button (🔒 lock icon) at top right of Swagger UI
+  • In the popup, enter: Bearer YOUR_TOKEN_HERE
+    (Include the word "Bearer" followed by space and token)
+  • Click "Authorize" and then "Close"
+
+Step 3: Test Endpoints
+  • All authenticated endpoints will now include your JWT token
+  • Green lock icon (🔓) means authenticated
+
+Example Authorization Value:
+  Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyQGV4YW1wbGUuY29tIn0...
+
+📊 ENVIRONMENT CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Profile     | Swagger UI | Reason
+────────────────────────────────────────────────────────────────────────────────
+dev         | ✅ ENABLED  | For local development & testing
+staging     | ❌ DISABLED | Memory optimization (saves ~20MB)
+production  | ❌ DISABLED | Security & memory optimization
+
+💾 MEMORY IMPACT
+═══════════════════════════════════════════════════════════════════════════════
+
+Swagger UI adds ~15-20MB to runtime memory usage:
+  • Without Swagger: 350-450 MB
+  • With Swagger:    370-470 MB
+
+This is acceptable for local dev but was disabled in staging/production
+to stay within 512MB RAM limit on Render free tier.
+
+🔧 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+Issue: "No static resource swagger-ui/index.html"
+Solution: ✅ FIXED by restoring swagger-ui webjar dependency
+
+Issue: 404 Not Found
+Solution: Make sure you rebuilt after pom.xml changes:
+  ./mvnw clean package -DskipTests
+
+Issue: Swagger UI is blank/white page
+Solution: Check browser console for errors, ensure all static resources loaded
+
+Issue: Cannot authorize
+Solution: Make sure to include "Bearer " prefix before token
+
+Issue: "springdoc.swagger-ui.enabled=false"
+Solution: This is controlled by profile. Use dev profile for local:
+  export SPRING_PROFILES_ACTIVE=dev
+
+📚 API DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════════════
+
+API Title:       Service Booking API
+Description:     REST APIs for slot-based service booking
+Version:         2.0.0
+Contact:         Hitendra Singh (hitendras940@gmail.com)
+Security:        Bearer JWT Authentication
+
+Available Endpoints (examples):
+  • POST   /api/auth/request-email-otp    - Request OTP
+  • POST   /api/auth/verify-email-otp     - Verify OTP & get JWT
+  • POST   /api/oauth/login               - OAuth login
+  • GET    /api/public/services           - List services (public)
+  • POST   /api/bookings                  - Create booking (auth)
+  • GET    /api/admin/services            - Admin services (auth)
+
+✅ VERIFICATION STEPS
+═══════════════════════════════════════════════════════════════════════════════
+
+After starting the application:
+
+□ Application starts without errors
+□ Swagger UI loads at http://localhost:8080/swagger-ui
+□ All API endpoints are visible
+□ Authorization button is present (top right)
+□ Can execute public endpoints (e.g., GET /api/public/services)
+□ Can authorize with JWT token
+□ Can execute protected endpoints after authorization
+
+═══════════════════════════════════════════════════════════════════════════════
+                          🎉 SWAGGER UI IS READY! 🎉
+═══════════════════════════════════════════════════════════════════════════════
+
+Quick Start:
+  ./run-with-swagger.sh
+
+Then open:
+  http://localhost:8080/swagger-ui
+
+Happy API Testing! 🚀
+

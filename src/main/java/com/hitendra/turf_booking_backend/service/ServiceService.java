@@ -10,8 +10,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.hitendra.turf_booking_backend.entity.Service;
@@ -34,7 +32,6 @@ public class ServiceService {
     private final CloudinaryService cloudinaryService;
     private final BookingRepository bookingRepository;
     private final AdminProfileRepository adminProfileRepository;
-    private final UserRepository userRepository;
     private final AuthUtil authUtil;
     private final LocationService locationService;
     private final ServiceResourceRepository serviceResourceRepository;
@@ -236,11 +233,10 @@ public class ServiceService {
      * Throws exception if user is not an admin or manager
      */
     private AdminProfile getCurrentAdminProfile() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String phone = authentication.getName();
-
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = authUtil.getCurrentUser();
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
 
         if (user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER) {
             throw new RuntimeException("Only admins can create services");
@@ -259,11 +255,10 @@ public class ServiceService {
      * Only the admin who created the service or a manager can modify it
      */
     private void checkServiceModificationPermission(com.hitendra.turf_booking_backend.entity.Service service) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String phone = authentication.getName();
-
-        User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = authUtil.getCurrentUser();
+        if (user == null) {
+            throw new RuntimeException("User not found");
+        }
 
         // Managers can modify any service
         if (user.getRole() == Role.MANAGER) {
