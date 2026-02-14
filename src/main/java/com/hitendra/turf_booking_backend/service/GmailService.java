@@ -78,7 +78,10 @@ public class GmailService {
     }
 
     /**
-     * Initialize Gmail API using environment variables
+     * Initialize Gmail API using environment variables.
+     * GoogleCredential is deprecated but still required for the refresh token flow
+     * used with Gmail API. The newer GoogleAuthLibrary credential classes do not
+     * support direct refresh token injection in the same way.
      */
     @SuppressWarnings("deprecation")
     private void initWithEnvCredentials(HttpTransport httpTransport) throws Exception {
