@@ -69,6 +69,7 @@ EXPOSE 8080
 # - Code Cache: 32MB
 # - Thread Stacks: ~50MB (estimated)
 # - Native Memory + Overhead: ~134MB
+# - SerialGC used for minimal memory overhead (no concurrent GC threads)
 # ═══════════════════════════════════════════════════════════════════════════
 
 ENTRYPOINT ["sh", "-c", "\
@@ -84,9 +85,7 @@ ENTRYPOINT ["sh", "-c", "\
         -XX:MetaspaceSize=64m \
         -XX:ReservedCodeCacheSize=32m \
         -XX:MaxDirectMemorySize=32m \
-        -XX:+UseG1GC \
-        -XX:MaxGCPauseMillis=100 \
-        -XX:+UseStringDeduplication \
+        -XX:+UseSerialGC \
         -XX:+UseContainerSupport \
         -XX:ActiveProcessorCount=1 \
         -XX:+TieredCompilation \
