@@ -128,15 +128,16 @@ public class InvoiceController {
 
         log.info("🔄 Manual invoice regeneration requested for booking ID: {}", bookingId);
 
-        // Fetch booking
-        Booking booking = bookingRepository.findById(bookingId)
+        // Fetch booking with all relationships eagerly loaded
+        // This prevents LazyInitializationException during invoice generation
+        Booking booking = bookingRepository.findByIdWithAllRelationships(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found: " + bookingId));
 
-        log.info("📦 Booking found: ID={}, Status={}, Amount={}",
+        log.info("📦 Booking found with all relationships: ID={}, Status={}, Amount={}",
                 booking.getId(), booking.getStatus(), booking.getAmount());
 
         // Generate invoice (idempotent - returns existing if already generated)
-        String invoiceUrl = invoiceService.generateAndStoreInvoice(booking);
+        invoiceService.generateAndStoreInvoice(booking);
 
         // Fetch the saved invoice
         Invoice invoice = invoiceService.getInvoiceByBookingId(bookingId);

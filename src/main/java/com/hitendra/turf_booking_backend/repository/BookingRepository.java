@@ -20,8 +20,28 @@ import org.springframework.data.repository.query.Param;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface BookingRepository extends JpaRepository<Booking, Long> {
+
+    /**
+     * Find booking by ID with all relationships eagerly loaded for invoice generation.
+     * This prevents LazyInitializationException when processing booking in async thread.
+     *
+     * Eagerly fetches:
+     * - service (required for invoice)
+     * - user (required for invoice)
+     * - resource (required for invoice)
+     */
+    @Query("""
+        SELECT b FROM Booking b
+        LEFT JOIN FETCH b.service s
+        LEFT JOIN FETCH b.user u
+        LEFT JOIN FETCH b.resource r
+        WHERE b.id = :id
+        """)
+    Optional<Booking> findByIdWithAllRelationships(@Param("id") Long id);
+
     List<Booking> findByServiceId(Long serviceId);
     Page<Booking> findByServiceId(Long serviceId, Pageable pageable);
 

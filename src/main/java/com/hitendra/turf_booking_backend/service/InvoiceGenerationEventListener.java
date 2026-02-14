@@ -53,11 +53,12 @@ public class InvoiceGenerationEventListener {
             long delay = System.currentTimeMillis() - event.getTimestamp();
             log.info("⏱ Event processing delay: {}ms", delay);
 
-            // Fetch booking from database
-            Booking booking = bookingRepository.findById(event.getBookingId())
+            // Fetch booking from database WITH all relationships eagerly loaded
+            // This is CRITICAL to prevent LazyInitializationException in async thread
+            Booking booking = bookingRepository.findByIdWithAllRelationships(event.getBookingId())
                     .orElseThrow(() -> new RuntimeException("Booking not found: " + event.getBookingId()));
 
-            log.info("📦 Booking fetched: ID={}, Status={}, Amount={}",
+            log.info("📦 Booking fetched with all relationships: ID={}, Status={}, Amount={}",
                     booking.getId(), booking.getStatus(), booking.getAmount());
 
             // Generate and store invoice (idempotent operation)
