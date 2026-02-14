@@ -15,6 +15,7 @@ import java.time.Instant;
 public class ExpenseCategoryDto {
 
     private Long id;
+    private Long adminProfileId;
     private String name;
     private ExpenseType type;
     private Instant createdAt;

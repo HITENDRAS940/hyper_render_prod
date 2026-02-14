@@ -39,9 +39,13 @@ public class ExpenseService {
      * Create a new expense and record in ledger.
      *
      * TRANSACTION FLOW:
-     * 1. Validate service and category
-     * 2. Create expense record
-     * 3. Record debit in cash ledger
+     * 1. Validate service belongs to current admin
+     * 2. Validate category exists (can be from any admin - sharing allowed)
+     * 3. Create expense record for the service
+     * 4. Record debit in cash ledger
+     *
+     * NOTE: Expenses are service-specific, so they're automatically admin-specific
+     * through the service relationship. Categories can be used across admins.
      *
      * @param request Expense details
      * @return Created expense
@@ -51,18 +55,26 @@ public class ExpenseService {
         log.info("Creating expense for service {}: {} - {}",
             request.getServiceId(), request.getAmount(), request.getDescription());
 
+        // Get current admin
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+
         // Validate service
         Service service = serviceRepository.findById(request.getServiceId())
             .orElseThrow(() -> new BookingException("Service not found: " + request.getServiceId()));
 
-        // Validate category
+        // Verify service belongs to current admin
+        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
+            throw new BookingException("Access denied: This service belongs to another admin");
+        }
+
+        // Validate category exists (category can be from any admin)
         ExpenseCategory category = categoryRepository.findById(request.getCategoryId())
             .orElseThrow(() -> new BookingException("Expense category not found: " + request.getCategoryId()));
 
         // Get current user
         String currentUser = authUtil.getCurrentUser().getPhone();
 
-        // Create expense
+        // Create expense - it's automatically admin-specific because service belongs to admin
         Expense expense = Expense.builder()
             .service(service)
             .category(category)
@@ -76,7 +88,8 @@ public class ExpenseService {
 
         Expense savedExpense = expenseRepository.save(expense);
 
-        log.info("Expense created with ID: {}", savedExpense.getId());
+        log.info("Expense created with ID: {} for service {} (admin {})",
+                 savedExpense.getId(), service.getId(), currentAdminId);
 
         // Record in ledger (DEBIT)
         ledgerService.recordDebit(
@@ -96,25 +109,53 @@ public class ExpenseService {
     }
 
     /**
-     * Get all expenses for a service.
+     * Get all expenses for a service (validates ownership).
      */
     public List<Expense> getExpensesByService(Long serviceId) {
+        // Validate service ownership
+        Service service = serviceRepository.findById(serviceId)
+            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
+
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
+            throw new BookingException("Access denied: This service belongs to another admin");
+        }
+
         return expenseRepository.findByServiceIdOrderByExpenseDateDesc(serviceId);
     }
 
     /**
-     * Get expenses for a service within a date range.
+     * Get expenses for a service within a date range (validates ownership).
      */
     public List<Expense> getExpensesByServiceAndDateRange(
         Long serviceId, LocalDate startDate, LocalDate endDate) {
+
+        // Validate service ownership
+        Service service = serviceRepository.findById(serviceId)
+            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
+
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
+            throw new BookingException("Access denied: This service belongs to another admin");
+        }
+
         return expenseRepository.findByServiceIdAndExpenseDateBetweenOrderByExpenseDateDesc(
             serviceId, startDate, endDate);
     }
 
     /**
-     * Get total expenses for a service in a date range.
+     * Get total expenses for a service in a date range (validates ownership).
      */
     public Double getTotalExpenses(Long serviceId, LocalDate startDate, LocalDate endDate) {
+        // Validate service ownership
+        Service service = serviceRepository.findById(serviceId)
+            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
+
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
+            throw new BookingException("Access denied: This service belongs to another admin");
+        }
+
         return expenseRepository.getTotalExpensesByServiceAndDateRange(serviceId, startDate, endDate);
     }
 

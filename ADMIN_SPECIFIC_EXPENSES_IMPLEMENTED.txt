@@ -1,0 +1,474 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║      ADMIN-SPECIFIC EXPENSE CATEGORIES & EXPENSES - IMPLEMENTED ✅            ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+✅ IMPLEMENTATION COMPLETE
+
+Expense categories and expenses are now fully admin-specific. Each admin has their
+own set of categories and can only view/manage their own expenses.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 WHAT WAS CHANGED
+
+DATABASE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ V12__make_expense_categories_admin_specific.sql (NEW MIGRATION)
+   - Added admin_profile_id column to expense_categories table
+   - Added foreign key constraint to admin_profiles
+   - Removed global unique constraint on name
+   - Added composite unique constraint: (admin_profile_id, name)
+   - Each admin can have their own "Electricity", "Maintenance", etc.
+
+ENTITIES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ExpenseCategory.java
+   - Added adminProfile relationship (ManyToOne)
+   - Updated table constraints for admin-specific uniqueness
+   - Added documentation about admin-specific behavior
+
+DTOs:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ExpenseCategoryDto.java
+   - Added adminProfileId field
+   - Now shows which admin owns the category
+
+REPOSITORIES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ExpenseCategoryRepository.java
+   - Added admin-specific query methods:
+     * findByAdminProfileId()
+     * findByAdminProfileIdAndType()
+     * findByAdminProfileIdAndName()
+     * existsByAdminProfileIdAndName()
+   - Deprecated old global query methods
+
+SERVICES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ExpenseCategoryService.java
+   - All methods now use current admin from AuthUtil
+   - Category creation includes admin ownership
+   - Category retrieval filtered by admin
+   - Category validation ensures ownership
+
+✅ ExpenseService.java
+   - Validates service belongs to current admin
+   - Validates category belongs to current admin
+   - All queries ensure admin ownership
+   - Added access control to all methods
+
+CONTROLLERS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ ExpenseCategoryController.java
+   - Updated descriptions to emphasize "my" categories
+   - Returns adminProfileId in response
+
+✅ ExpenseController.java
+   - Updated descriptions to emphasize "your" services
+   - All operations now admin-specific
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 HOW IT WORKS NOW
+
+EXPENSE CATEGORIES (Admin-Specific):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Scenario: Two admins create categories
+
+Admin A (ID: 1):
+  POST /api/admin/accounting/expense-categories
+  Body: { "name": "Electricity", "type": "FIXED" }
+  Result: Category created with admin_profile_id = 1 ✅
+
+Admin B (ID: 2):
+  POST /api/admin/accounting/expense-categories
+  Body: { "name": "Electricity", "type": "FIXED" }
+  Result: Category created with admin_profile_id = 2 ✅
+
+Both admins can have "Electricity" category! ✅
+
+When Admin A calls:
+  GET /api/admin/accounting/expense-categories
+  Returns: Only categories where admin_profile_id = 1
+
+When Admin B calls:
+  GET /api/admin/accounting/expense-categories
+  Returns: Only categories where admin_profile_id = 2
+
+✅ Complete isolation between admins!
+
+
+EXPENSES (Admin-Specific via Service):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Admin A creates expense:
+  POST /api/admin/accounting/expenses
+  Body: {
+    "serviceId": 1,        // Must belong to Admin A
+    "categoryId": 5,       // Must belong to Admin A
+    "amount": 5000,
+    "description": "Monthly electricity bill"
+  }
+
+Validation:
+  1. Check if service (ID: 1) belongs to Admin A ✅
+  2. Check if category (ID: 5) belongs to Admin A ✅
+  3. If both pass → Create expense ✅
+  4. If either fails → 403 Access Denied ❌
+
+Admin B tries to use Admin A's category:
+  POST /api/admin/accounting/expenses
+  Body: {
+    "serviceId": 10,       // Belongs to Admin B
+    "categoryId": 5,       // Belongs to Admin A ❌
+    "amount": 3000
+  }
+
+Result: Error - "Access denied: This expense category belongs to another admin"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔒 SECURITY & ISOLATION
+
+✅ Category Isolation:
+   - Each admin can only see their own categories
+   - Category names can be duplicated across admins
+   - No admin can access another admin's categories
+
+✅ Expense Isolation:
+   - Expenses are linked to services
+   - Services belong to admins
+   - Admin can only create expenses for their own services
+   - Admin can only use their own categories
+
+✅ Validation Layers:
+   Layer 1: Service ownership validation
+   Layer 2: Category ownership validation
+   Layer 3: Repository queries filtered by admin
+   Layer 4: Controller authorization (@PreAuthorize)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 DATABASE CHANGES
+
+BEFORE (Global Categories):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ expense_categories                                                          │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ id | name         | type     | created_at                                   │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ 1  | Electricity  | FIXED    | 2026-01-01 10:00:00                          │
+│ 2  | Maintenance  | VARIABLE | 2026-01-01 10:05:00                          │
+│                                                                              │
+│ Constraint: UNIQUE(name) ← Global uniqueness                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+AFTER (Admin-Specific Categories):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ expense_categories                                                          │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ id | admin_profile_id | name         | type     | created_at               │
+│ ─────────────────────────────────────────────────────────────────────────── │
+│ 1  | 1                | Electricity  | FIXED    | 2026-01-01 10:00:00      │
+│ 2  | 1                | Maintenance  | VARIABLE | 2026-01-01 10:05:00      │
+│ 3  | 2                | Electricity  | FIXED    | 2026-01-01 11:00:00      │
+│ 4  | 2                | Staff Salary | FIXED    | 2026-01-01 11:05:00      │
+│                                                                              │
+│ Constraint: UNIQUE(admin_profile_id, name) ← Per-admin uniqueness           │
+│ FK: admin_profile_id → admin_profiles(id)                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Notice:
+- Admin 1 and Admin 2 both have "Electricity" category ✅
+- Each admin's category names are unique within their scope ✅
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 API BEHAVIOR CHANGES
+
+EXPENSE CATEGORY CREATION:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE:
+  POST /api/admin/accounting/expense-categories
+  Body: { "name": "Electricity", "type": "FIXED" }
+
+  Validation: Check if ANY admin has "Electricity" category
+  Error: "Category already exists" (if any admin has it)
+
+AFTER:
+  POST /api/admin/accounting/expense-categories
+  Body: { "name": "Electricity", "type": "FIXED" }
+
+  Validation: Check if CURRENT admin has "Electricity" category
+  Error: "You already have an expense category named: Electricity"
+
+  ✅ Other admins can have same category name!
+
+
+GET CATEGORIES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE:
+  GET /api/admin/accounting/expense-categories
+  Returns: ALL categories from ALL admins
+
+AFTER:
+  GET /api/admin/accounting/expense-categories
+  Returns: Only categories belonging to CURRENT admin
+
+  ✅ Complete privacy between admins!
+
+
+CREATE EXPENSE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEFORE:
+  POST /api/admin/accounting/expenses
+  Body: {
+    "serviceId": 1,
+    "categoryId": 5,     // Could use ANY category from ANY admin
+    "amount": 5000
+  }
+
+  Validation: Only check if service and category exist
+
+AFTER:
+  POST /api/admin/accounting/expenses
+  Body: {
+    "serviceId": 1,
+    "categoryId": 5,
+    "amount": 5000
+  }
+
+  Validation:
+    1. Check if service exists ✅
+    2. Check if service belongs to current admin ✅
+    3. Check if category exists ✅
+    4. Check if category belongs to current admin ✅
+
+  Error: "Access denied: This service/category belongs to another admin"
+
+  ✅ Admin can only use their own services and categories!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 API ENDPOINTS SUMMARY
+
+EXPENSE CATEGORY ENDPOINTS (Admin-Specific):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST   /api/admin/accounting/expense-categories
+       → Create category for current admin
+
+GET    /api/admin/accounting/expense-categories
+       → Get all categories for current admin
+
+GET    /api/admin/accounting/expense-categories/type/{type}
+       → Get categories by type for current admin
+
+GET    /api/admin/accounting/expense-categories/{id}
+       → Get category by ID (validates ownership)
+
+
+EXPENSE ENDPOINTS (Admin-Specific via Service):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+POST   /api/admin/accounting/expenses
+       → Create expense (validates service + category ownership)
+
+GET    /api/admin/accounting/expenses/service/{serviceId}
+       → Get expenses for your service
+
+GET    /api/admin/accounting/expenses/service/{serviceId}/range
+       → Get expenses by date range for your service
+
+GET    /api/admin/accounting/expenses/service/{serviceId}/total
+       → Get total expenses for your service
+
+GET    /api/admin/accounting/expenses/service/{serviceId}/breakdown
+       → Get expense breakdown by category for your service
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧪 EXAMPLE WORKFLOWS
+
+Workflow 1: Admin A creates and uses their own categories
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Admin A creates "Electricity" category
+  POST /api/admin/accounting/expense-categories
+  Authorization: Bearer <admin_a_token>
+  Body: { "name": "Electricity", "type": "FIXED" }
+
+  Response: { "id": 1, "adminProfileId": 1, "name": "Electricity", ... }
+
+Step 2: Admin A creates expense using their category
+  POST /api/admin/accounting/expenses
+  Authorization: Bearer <admin_a_token>
+  Body: {
+    "serviceId": 1,      // Admin A's service
+    "categoryId": 1,     // Admin A's category
+    "amount": 5000,
+    "description": "Monthly electricity bill"
+  }
+
+  Result: Expense created successfully ✅
+
+
+Workflow 2: Admin B has separate categories
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Admin B creates "Electricity" category (same name, different admin)
+  POST /api/admin/accounting/expense-categories
+  Authorization: Bearer <admin_b_token>
+  Body: { "name": "Electricity", "type": "FIXED" }
+
+  Response: { "id": 2, "adminProfileId": 2, "name": "Electricity", ... }
+  ✅ No conflict! Different admin = separate category
+
+Step 2: Admin B tries to use Admin A's category ❌
+  POST /api/admin/accounting/expenses
+  Authorization: Bearer <admin_b_token>
+  Body: {
+    "serviceId": 10,     // Admin B's service
+    "categoryId": 1,     // Admin A's category ❌
+    "amount": 3000
+  }
+
+  Result: Error - "Access denied: This expense category belongs to another admin"
+
+
+Workflow 3: Admin retrieves only their data
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Admin A:
+  GET /api/admin/accounting/expense-categories
+  Returns:
+  [
+    { "id": 1, "adminProfileId": 1, "name": "Electricity", ... },
+    { "id": 3, "adminProfileId": 1, "name": "Maintenance", ... }
+  ]
+
+Admin B:
+  GET /api/admin/accounting/expense-categories
+  Returns:
+  [
+    { "id": 2, "adminProfileId": 2, "name": "Electricity", ... },
+    { "id": 4, "adminProfileId": 2, "name": "Staff Salary", ... }
+  ]
+
+✅ Each admin sees only their own categories!
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🛡️ SECURITY FEATURES
+
+1. ✅ Admin Isolation
+   - Each admin has their own expense categories
+   - No cross-admin data access
+   - Complete privacy
+
+2. ✅ Ownership Validation
+   - Service ownership checked on every expense operation
+   - Category ownership checked on creation
+   - Category ownership checked on retrieval
+
+3. ✅ Automatic Filtering
+   - Repository queries automatically filter by admin
+   - No manual filtering needed in controllers
+   - Impossible to accidentally leak data
+
+4. ✅ Clear Error Messages
+   - "Access denied: This service belongs to another admin"
+   - "Access denied: This expense category belongs to another admin"
+   - "You already have an expense category named: X"
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 DEPLOYMENT NOTES
+
+MIGRATION REQUIRED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Flyway will automatically run V12 migration on startup
+2. Existing expense_categories will be assigned to first admin
+3. No data loss
+4. Application continues to work
+
+Migration SQL Preview:
+  - ALTER TABLE expense_categories ADD COLUMN admin_profile_id BIGINT;
+  - ALTER TABLE expense_categories ADD FOREIGN KEY (admin_profile_id) ...;
+  - ALTER TABLE expense_categories DROP CONSTRAINT expense_categories_name_key;
+  - ALTER TABLE expense_categories ADD CONSTRAINT uk_expense_category_admin_name ...;
+
+⚠️  IMPORTANT:
+  If you have existing expense categories in production:
+  - They will be assigned to the first admin
+  - Other admins should create their own categories
+  - No data is lost, just reassigned to an owner
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✨ BENEFITS
+
+1. 💼 Multi-Tenancy Support
+   - Multiple admins can use the system independently
+   - No data conflicts
+   - Each admin manages their own expense categories
+
+2. 🔒 Enhanced Security
+   - Admin data isolation
+   - Ownership validation at every step
+   - Prevents unauthorized access
+
+3. 🎯 Better UX
+   - Admins see only relevant categories
+   - No clutter from other admins' data
+   - Simpler category management
+
+4. 📊 Accurate Reporting
+   - Expense reports are truly admin-specific
+   - No cross-contamination of expense data
+   - Clear ownership trail
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 SUMMARY
+
+✅ Expense categories are now admin-specific
+✅ Expenses can only be created with admin's own categories
+✅ Complete data isolation between admins
+✅ Ownership validation on all operations
+✅ Database migration created and ready
+✅ Application compiled and built successfully
+
+JAR Ready: target/Hyper_backend-0.0.1-SNAPSHOT.jar
+
+Deploy the new JAR and run - Flyway will handle the migration automatically! 🚀
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 FILES MODIFIED
+
+1. V12__make_expense_categories_admin_specific.sql (NEW)
+2. ExpenseCategory.java (UPDATED - added adminProfile)
+3. ExpenseCategoryDto.java (UPDATED - added adminProfileId)
+4. ExpenseCategoryRepository.java (UPDATED - admin-specific queries)
+5. ExpenseCategoryService.java (UPDATED - admin filtering)
+6. ExpenseService.java (UPDATED - ownership validation)
+7. ExpenseCategoryController.java (UPDATED - descriptions)
+8. ExpenseController.java (UPDATED - descriptions)
+
+Ready to deploy! ✅
+

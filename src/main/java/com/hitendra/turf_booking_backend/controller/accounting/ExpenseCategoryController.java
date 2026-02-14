@@ -26,28 +26,32 @@ public class ExpenseCategoryController {
     private final ExpenseCategoryService categoryService;
 
     @PostMapping
-    @Operation(summary = "Create expense category", description = "Create a new expense category")
+    @Operation(summary = "Create expense category",
+               description = "Create a new expense category for current admin. Category names must be unique per admin.")
     public ResponseEntity<ExpenseCategoryDto> createCategory(@Valid @RequestBody CreateExpenseCategoryRequest request) {
         ExpenseCategory category = categoryService.createCategory(request);
         return ResponseEntity.ok(mapToDto(category));
     }
 
     @GetMapping
-    @Operation(summary = "Get all expense categories", description = "Get all expense categories")
+    @Operation(summary = "Get my expense categories",
+               description = "Get all expense categories for the current admin")
     public ResponseEntity<List<ExpenseCategoryDto>> getAllCategories() {
         List<ExpenseCategory> categories = categoryService.getAllCategories();
         return ResponseEntity.ok(categories.stream().map(this::mapToDto).collect(Collectors.toList()));
     }
 
     @GetMapping("/type/{type}")
-    @Operation(summary = "Get categories by type", description = "Get expense categories by type (FIXED or VARIABLE)")
+    @Operation(summary = "Get my categories by type",
+               description = "Get expense categories by type (FIXED or VARIABLE) for the current admin")
     public ResponseEntity<List<ExpenseCategoryDto>> getCategoriesByType(@PathVariable ExpenseType type) {
         List<ExpenseCategory> categories = categoryService.getCategoriesByType(type);
         return ResponseEntity.ok(categories.stream().map(this::mapToDto).collect(Collectors.toList()));
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Get category by ID", description = "Get expense category details by ID")
+    @Operation(summary = "Get category by ID",
+               description = "Get expense category details by ID. Only accessible if it belongs to current admin.")
     public ResponseEntity<ExpenseCategoryDto> getCategoryById(@PathVariable Long id) {
         ExpenseCategory category = categoryService.getCategoryById(id);
         return ResponseEntity.ok(mapToDto(category));
@@ -56,6 +60,7 @@ public class ExpenseCategoryController {
     private ExpenseCategoryDto mapToDto(ExpenseCategory category) {
         return ExpenseCategoryDto.builder()
             .id(category.getId())
+            .adminProfileId(category.getAdminProfile().getId())
             .name(category.getName())
             .type(category.getType())
             .createdAt(category.getCreatedAt())

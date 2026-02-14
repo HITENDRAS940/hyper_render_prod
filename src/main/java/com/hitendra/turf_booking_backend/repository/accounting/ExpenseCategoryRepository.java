@@ -13,31 +13,58 @@ import java.util.Optional;
 @Repository
 public interface ExpenseCategoryRepository extends JpaRepository<ExpenseCategory, Long> {
 
+    // ==================== ADMIN-SPECIFIC QUERIES ====================
+
+    /**
+     * Get all categories for a specific admin.
+     */
+    List<ExpenseCategory> findByAdminProfileId(Long adminProfileId);
+
+    /**
+     * Get categories by admin and type.
+     */
+    List<ExpenseCategory> findByAdminProfileIdAndType(Long adminProfileId, ExpenseType type);
+
+    /**
+     * Find category by admin and name.
+     */
+    Optional<ExpenseCategory> findByAdminProfileIdAndName(Long adminProfileId, String name);
+
+    /**
+     * Check if category exists for admin with given name.
+     */
+    boolean existsByAdminProfileIdAndName(Long adminProfileId, String name);
+
+    // ==================== LEGACY METHODS (Deprecated - use admin-specific versions) ====================
+
+    @Deprecated
     Optional<ExpenseCategory> findByName(String name);
 
+    @Deprecated
     List<ExpenseCategory> findByType(ExpenseType type);
 
+    @Deprecated
     boolean existsByName(String name);
 
     // ==================== OPTIMIZED QUERIES ====================
 
     /**
-     * Get category ID by name (minimal data fetch).
+     * Get category ID by admin and name (minimal data fetch).
      */
-    @Query("SELECT ec.id FROM ExpenseCategory ec WHERE ec.name = :name")
-    Optional<Long> findCategoryIdByName(@Param("name") String name);
+    @Query("SELECT ec.id FROM ExpenseCategory ec WHERE ec.adminProfile.id = :adminProfileId AND ec.name = :name")
+    Optional<Long> findCategoryIdByAdminAndName(@Param("adminProfileId") Long adminProfileId, @Param("name") String name);
 
     /**
-     * Get only category names (for dropdown/autocomplete).
+     * Get only category names for an admin (for dropdown/autocomplete).
      */
-    @Query("SELECT ec.name FROM ExpenseCategory ec ORDER BY ec.name")
-    List<String> findAllCategoryNames();
+    @Query("SELECT ec.name FROM ExpenseCategory ec WHERE ec.adminProfile.id = :adminProfileId ORDER BY ec.name")
+    List<String> findCategoryNamesByAdmin(@Param("adminProfileId") Long adminProfileId);
 
     /**
-     * Get category names by type (for filtered dropdown).
+     * Get category names by admin and type (for filtered dropdown).
      */
-    @Query("SELECT ec.name FROM ExpenseCategory ec WHERE ec.type = :type ORDER BY ec.name")
-    List<String> findCategoryNamesByType(@Param("type") ExpenseType type);
+    @Query("SELECT ec.name FROM ExpenseCategory ec WHERE ec.adminProfile.id = :adminProfileId AND ec.type = :type ORDER BY ec.name")
+    List<String> findCategoryNamesByAdminAndType(@Param("adminProfileId") Long adminProfileId, @Param("type") ExpenseType type);
 
     // ==================== END OPTIMIZED QUERIES ====================
 }
