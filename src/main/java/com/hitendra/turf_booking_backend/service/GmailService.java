@@ -11,7 +11,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.mail.Session;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -48,12 +47,18 @@ public class GmailService {
     private String fromEmail;
 
     private Gmail gmail;
+    private volatile boolean initialized = false;
 
-    @PostConstruct
-    public void init() throws Exception {
-        log.info("Initializing Gmail Service...");
+    /**
+     * Lazy initialization - only initialize Gmail client when first email is sent
+     * This reduces startup memory pressure and Metaspace usage
+     */
+    private synchronized void ensureInitialized() throws Exception {
+        if (initialized) {
+            return;
+        }
 
-        HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
+        log.info("Lazy initializing Gmail Service...");
 
         if (!hasEnvCredentials()) {
             throw new RuntimeException(
@@ -63,9 +68,11 @@ public class GmailService {
         }
 
         log.info("Using environment variables for Gmail API");
+        HttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
         initWithEnvCredentials(httpTransport);
 
-        log.info("Gmail Service initialized successfully");
+        initialized = true;
+        log.info("✅ Gmail Service initialized successfully");
     }
 
     /**
@@ -106,6 +113,8 @@ public class GmailService {
     }
 
     public void sendEmail(String to, String subject, String body) throws Exception {
+        ensureInitialized(); // Lazy initialization on first email send
+
         log.info("Sending email to: {} with subject: {}", to, subject);
 
         Properties props = new Properties();

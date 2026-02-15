@@ -62,14 +62,14 @@ EXPOSE 8080
 # ═══════════════════════════════════════════════════════════════════════════
 # JVM Optimization Flags for 512MB RAM Limit (Render Free Tier)
 # ═══════════════════════════════════════════════════════════════════════════
-# Memory Allocation Strategy (OPTIMIZED):
+# Memory Allocation Strategy (CRITICAL FIX for Metaspace OOM):
 # - Total Available: 512MB
-# - JVM Heap: 280MB max (Xmx) - INCREASED for stability
-# - Metaspace: 80MB max - REDUCED (no invoice generation = fewer classes)
-# - Code Cache: 24MB - REDUCED
+# - JVM Heap: 240MB max (Xmx) - REDUCED to give more to Metaspace
+# - Metaspace: 128MB max - INCREASED (Google API libs need ~100-110MB)
+# - Code Cache: 20MB - REDUCED
 # - Thread Stacks: ~40MB (optimized thread count)
-# - Native Memory + Overhead: ~88MB
-# - G1GC used for better throughput and concurrent processing
+# - Native Memory + Overhead: ~84MB
+# - Serial GC used for minimal memory footprint
 # ═══════════════════════════════════════════════════════════════════════════
 
 ENTRYPOINT ["sh", "-c", "\
@@ -77,28 +77,25 @@ ENTRYPOINT ["sh", "-c", "\
     if [ -n \"$DATABASE_URL\" ] && echo \"$DATABASE_URL\" | grep -q '^postgres://'; then \
         export DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgres:/jdbc:postgresql:/'); \
     fi && \
-    # Run with optimized memory settings for concurrent tasks \
+    # Run with optimized memory settings - FIXED Metaspace allocation \
     exec java \
-        -Xms160m \
-        -Xmx280m \
-        -XX:MaxMetaspaceSize=80m \
-        -XX:MetaspaceSize=64m \
-        -XX:ReservedCodeCacheSize=24m \
-        -XX:MaxDirectMemorySize=24m \
-        -XX:+UseG1GC \
-        -XX:MaxGCPauseMillis=200 \
-        -XX:G1HeapRegionSize=1m \
-        -XX:InitiatingHeapOccupancyPercent=70 \
+        -Xms140m \
+        -Xmx240m \
+        -XX:MaxMetaspaceSize=128m \
+        -XX:MetaspaceSize=96m \
+        -XX:ReservedCodeCacheSize=20m \
+        -XX:MaxDirectMemorySize=20m \
+        -XX:+UseSerialGC \
         -XX:+UseContainerSupport \
         -XX:ActiveProcessorCount=2 \
         -XX:+TieredCompilation \
-        -XX:TieredStopAtLevel=2 \
+        -XX:TieredStopAtLevel=1 \
         -XX:+UseCompressedOops \
         -XX:+UseCompressedClassPointers \
+        -XX:-UsePerfData \
         -XX:+ExitOnOutOfMemoryError \
         -XX:+HeapDumpOnOutOfMemoryError \
         -XX:HeapDumpPath=/tmp/heapdump.hprof \
-        -XX:+UseStringDeduplication \
         -XX:StringTableSize=10000 \
         -Djava.security.egd=file:/dev/./urandom \
         -Dfile.encoding=UTF-8 \
