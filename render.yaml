@@ -1,14 +1,12 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# Render Blueprint - Hyper Backend with Invoice Generation System
+# Render Blueprint - Hyper Backend
 # ═══════════════════════════════════════════════════════════════════════════
 # Documentation: https://render.com/docs/blueprint-spec
 #
 # Features:
-# - Async invoice generation after booking confirmation
-# - Invoice template caching for performance
-# - PDF generation with OpenHTMLtoPDF
-# - Cloudinary integration for PDF storage
+# - Booking and payment management
 # - Razorpay webhook handling
+# - Cloudinary integration for image storage
 #
 # Important: Most sensitive environment variables (DATABASE_URL, JWT_SECRET,
 # API keys) should be configured in Render Dashboard for security.
@@ -61,7 +59,7 @@ services:
       #   - GMAIL_REFRESH_TOKEN
       #   - GMAIL_FROM_EMAIL
       #
-      # Cloudinary (for invoice PDF storage):
+      # Cloudinary (for image storage):
       #   - CLOUDINARY_CLOUD_NAME
       #   - CLOUDINARY_API_KEY
       #   - CLOUDINARY_API_SECRET

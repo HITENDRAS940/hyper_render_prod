@@ -153,30 +153,6 @@
             <version>1.38.0</version>
         </dependency>
 
-        <!-- Thymeleaf for HTML template processing -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-thymeleaf</artifactId>
-        </dependency>
-
-        <!-- OGNL - Required by Thymeleaf for expression evaluation -->
-        <dependency>
-            <groupId>ognl</groupId>
-            <artifactId>ognl</artifactId>
-            <version>3.3.4</version>
-        </dependency>
-
-        <!-- OpenHTMLtoPDF for HTML to PDF conversion -->
-        <dependency>
-            <groupId>com.openhtmltopdf</groupId>
-            <artifactId>openhtmltopdf-pdfbox</artifactId>
-            <version>1.0.10</version>
-        </dependency>
-        <dependency>
-            <groupId>com.openhtmltopdf</groupId>
-            <artifactId>openhtmltopdf-slf4j</artifactId>
-            <version>1.0.10</version>
-        </dependency>
 
         <!-- spring-web is already included via spring-boot-starter-web -->
 

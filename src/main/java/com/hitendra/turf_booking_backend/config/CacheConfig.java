@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
  * 
  * Cached data:
  * - activities: Activity list (rarely changes)
- * - activeInvoiceTemplate: Active invoice template (evicted on manager update)
  */
 @Configuration
 @EnableCaching
@@ -24,19 +23,19 @@ public class CacheConfig {
     @Bean
     public CacheManager cacheManager() {
         // Simple in-memory cache for static/semi-static data
-        return new ConcurrentMapCacheManager("activities", "activeInvoiceTemplate");
+        return new ConcurrentMapCacheManager("activities");
     }
 
     /**
      * Shared ExecutorService bean for parallel image uploads in CloudinaryService.
-     * Using a fixed thread pool of 4 threads (max images that can be uploaded at once).
+     * Using a fixed thread pool of 2 threads (optimized for 512MB RAM).
      * This is a singleton bean shared across the application to avoid thread proliferation.
      * Threads are non-daemon to ensure uploads complete before JVM shutdown.
      * The @PreDestroy hook in CloudinaryService ensures graceful termination.
      */
     @Bean(name = "imageUploadExecutor")
     public ExecutorService imageUploadExecutor() {
-        return Executors.newFixedThreadPool(4, r -> {
+        return Executors.newFixedThreadPool(2, r -> {
             Thread thread = new Thread(r);
             thread.setName("image-upload-" + thread.getId());
             thread.setDaemon(false); // Ensure uploads complete before shutdown

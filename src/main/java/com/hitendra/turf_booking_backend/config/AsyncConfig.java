@@ -3,6 +3,7 @@ package com.hitendra.turf_booking_backend.config;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -11,7 +12,11 @@ import java.util.concurrent.Executor;
 
 /**
  * Configuration for async task execution.
- * Used by @Async annotated methods (e.g., InvoiceGenerationEventListener).
+ * Used by @Async annotated methods for background processing.
+ *
+ * NOTE: Currently disabled as there are no @Async methods after invoice removal.
+ * This config is kept for future use when async processing is needed.
+ * Enable by setting: async.enabled=true
  *
  * CRITICAL: Without this config, @Async might use the default SimpleAsyncTaskExecutor
  * which creates a new thread for each task and doesn't have proper error handling.
@@ -23,16 +28,22 @@ import java.util.concurrent.Executor;
  * - Graceful shutdown
  */
 @Configuration
+@ConditionalOnProperty(
+    prefix = "async",
+    name = "enabled",
+    havingValue = "true",
+    matchIfMissing = false
+)
 @Slf4j
 public class AsyncConfig implements AsyncConfigurer {
 
-    @Value("${spring.task.execution.pool.core-size:2}")
+    @Value("${spring.task.execution.pool.core-size:1}")
     private int corePoolSize;
 
-    @Value("${spring.task.execution.pool.max-size:4}")
+    @Value("${spring.task.execution.pool.max-size:2}")
     private int maxPoolSize;
 
-    @Value("${spring.task.execution.pool.queue-capacity:100}")
+    @Value("${spring.task.execution.pool.queue-capacity:50}")
     private int queueCapacity;
 
     @Value("${spring.task.execution.thread-name-prefix:async-}")
@@ -40,7 +51,6 @@ public class AsyncConfig implements AsyncConfigurer {
 
     /**
      * Configure the async executor for @Async methods.
-     * This executor is used by InvoiceGenerationEventListener.
      */
     @Override
     public Executor getAsyncExecutor() {
@@ -65,12 +75,11 @@ public class AsyncConfig implements AsyncConfigurer {
      */
     @Override
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
-        return (throwable, method, params) -> {
+        return (throwable, method, params) ->
             log.error("❌ Uncaught exception in async method: {}.{}",
                     method.getDeclaringClass().getSimpleName(),
                     method.getName(),
                     throwable);
-        };
     }
 }
 

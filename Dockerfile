@@ -62,14 +62,14 @@ EXPOSE 8080
 # ═══════════════════════════════════════════════════════════════════════════
 # JVM Optimization Flags for 512MB RAM Limit (Render Free Tier)
 # ═══════════════════════════════════════════════════════════════════════════
-# Memory Allocation Strategy:
+# Memory Allocation Strategy (OPTIMIZED):
 # - Total Available: 512MB
-# - JVM Heap: 200MB max (Xmx)
-# - Metaspace: 96MB max
-# - Code Cache: 32MB
-# - Thread Stacks: ~50MB (estimated)
-# - Native Memory + Overhead: ~134MB
-# - SerialGC used for minimal memory overhead (no concurrent GC threads)
+# - JVM Heap: 280MB max (Xmx) - INCREASED for stability
+# - Metaspace: 80MB max - REDUCED (no invoice generation = fewer classes)
+# - Code Cache: 24MB - REDUCED
+# - Thread Stacks: ~40MB (optimized thread count)
+# - Native Memory + Overhead: ~88MB
+# - G1GC used for better throughput and concurrent processing
 # ═══════════════════════════════════════════════════════════════════════════
 
 ENTRYPOINT ["sh", "-c", "\
@@ -77,22 +77,29 @@ ENTRYPOINT ["sh", "-c", "\
     if [ -n \"$DATABASE_URL\" ] && echo \"$DATABASE_URL\" | grep -q '^postgres://'; then \
         export DATABASE_URL=$(echo $DATABASE_URL | sed 's/^postgres:/jdbc:postgresql:/'); \
     fi && \
-    # Run with aggressive memory optimization \
+    # Run with optimized memory settings for concurrent tasks \
     exec java \
-        -Xms128m \
-        -Xmx200m \
-        -XX:MaxMetaspaceSize=96m \
+        -Xms160m \
+        -Xmx280m \
+        -XX:MaxMetaspaceSize=80m \
         -XX:MetaspaceSize=64m \
-        -XX:ReservedCodeCacheSize=32m \
-        -XX:MaxDirectMemorySize=32m \
-        -XX:+UseSerialGC \
+        -XX:ReservedCodeCacheSize=24m \
+        -XX:MaxDirectMemorySize=24m \
+        -XX:+UseG1GC \
+        -XX:MaxGCPauseMillis=200 \
+        -XX:G1HeapRegionSize=1m \
+        -XX:InitiatingHeapOccupancyPercent=70 \
         -XX:+UseContainerSupport \
-        -XX:ActiveProcessorCount=1 \
+        -XX:ActiveProcessorCount=2 \
         -XX:+TieredCompilation \
-        -XX:TieredStopAtLevel=1 \
+        -XX:TieredStopAtLevel=2 \
         -XX:+UseCompressedOops \
         -XX:+UseCompressedClassPointers \
         -XX:+ExitOnOutOfMemoryError \
+        -XX:+HeapDumpOnOutOfMemoryError \
+        -XX:HeapDumpPath=/tmp/heapdump.hprof \
+        -XX:+UseStringDeduplication \
+        -XX:StringTableSize=10000 \
         -Djava.security.egd=file:/dev/./urandom \
         -Dfile.encoding=UTF-8 \
         -Djava.awt.headless=true \

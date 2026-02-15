@@ -4,7 +4,6 @@ import com.hitendra.turf_booking_backend.dto.payment.*;
 import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
 import com.hitendra.turf_booking_backend.entity.PaymentStatus;
-import com.hitendra.turf_booking_backend.event.BookingConfirmedEvent;
 import com.hitendra.turf_booking_backend.exception.PaymentException;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
 import com.razorpay.Order;
@@ -16,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +33,6 @@ public class RazorpayPaymentService {
     private final BookingRepository bookingRepository;
     private final SmsService smsService;
     private final EmailService emailService;
-    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${razorpay.key-id}")
     private String keyId;
@@ -284,20 +281,6 @@ public class RazorpayPaymentService {
                 // Send notifications (SMS and Email)
                 sendBookingNotifications(booking);
 
-                // ═══════════════════════════════════════════════════════════════════════
-                // PUBLISH BOOKING CONFIRMED EVENT FOR ASYNC INVOICE GENERATION
-                // ═══════════════════════════════════════════════════════════════════════
-                // Instead of generating invoice synchronously (which blocks webhook response),
-                // we publish an event that will be picked up by async listener.
-                // This keeps webhook response fast (< 200ms).
-                BookingConfirmedEvent bookingConfirmedEvent = BookingConfirmedEvent.builder()
-                        .bookingId(booking.getId())
-                        .timestamp(System.currentTimeMillis())
-                        .razorpayPaymentId(paymentId)
-                        .build();
-
-                eventPublisher.publishEvent(bookingConfirmedEvent);
-                log.info("📤 Published BookingConfirmedEvent for async invoice generation. Booking ID: {}", booking.getId());
 
                 log.info("✅ Payment captured successfully. Booking confirmed: ID={}, PaymentID={}",
                         booking.getId(), paymentId);
