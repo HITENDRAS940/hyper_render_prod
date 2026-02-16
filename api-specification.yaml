@@ -1720,6 +1720,98 @@ components:
         closingBalance:
           type: number
           format: double
+
+    RazorpayOrderResponse:
+      type: object
+      properties:
+        orderId:
+          type: string
+        amount:
+          type: string
+        currency:
+          type: string
+        receipt:
+          type: string
+        status:
+          type: string
+        bookingId:
+          type: integer
+          format: int64
+        keyId:
+          type: string
+
+    BookingStatusResponse:
+      type: object
+      properties:
+        bookingId:
+          type: integer
+          format: int64
+        reference:
+          type: string
+        bookingStatus:
+          type: string
+        paymentStatus:
+          type: string
+        razorpayOrderId:
+          type: string
+        razorpayPaymentId:
+          type: string
+        paymentInitiatedAt:
+          type: string
+          format: date-time
+        paymentCompletedAt:
+          type: string
+          format: date-time
+        message:
+          type: string
+        isCompleted:
+          type: boolean
+
+    RazorpayPaymentVerificationRequest:
+      type: object
+      required:
+        - razorpayOrderId
+        - razorpayPaymentId
+        - razorpaySignature
+      properties:
+        razorpayOrderId:
+          type: string
+        razorpayPaymentId:
+          type: string
+        razorpaySignature:
+          type: string
+        bookingId:
+          type: integer
+          format: int64
+
+    OAuthLoginDto:
+      type: object
+      required:
+        - idToken
+        - provider
+      properties:
+        idToken:
+          type: string
+        provider:
+          type: string
+        fullName:
+          type: string
+
+    OAuthResponseDto:
+      type: object
+      properties:
+        token:
+          type: string
+        isNewUser:
+          type: boolean
+        email:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+
+paths:
   /auth/request-otp:
     post:
       tags:
