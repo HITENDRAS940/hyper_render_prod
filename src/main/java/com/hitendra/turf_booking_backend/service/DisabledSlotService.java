@@ -469,17 +469,29 @@ public class DisabledSlotService {
     }
 
     /**
-     * Get all disabled slots for a service on a specific date.
+     * Get all disabled slots for a service.
+     * Optionally filter by specific date.
      *
      * @param serviceId Service ID
-     * @param date Date
+     * @param date Date (optional)
      * @return List of disabled slots
      */
     @Transactional(readOnly = true)
     public List<DisabledSlotDto> getDisabledSlotsByService(Long serviceId, LocalDate date) {
-        List<DisabledSlot> disabledSlots = disabledSlotRepository.findByResourceServiceIdAndDisabledDate(serviceId, date);
+        List<DisabledSlot> disabledSlots;
+
+        if (date != null) {
+            disabledSlots = disabledSlotRepository.findByResourceServiceIdAndDisabledDate(serviceId, date);
+        } else {
+            disabledSlots = disabledSlotRepository.findByResourceServiceId(serviceId);
+        }
 
         return disabledSlots.stream()
+                .sorted((a, b) -> {
+                    int dateCompare = a.getDisabledDate().compareTo(b.getDisabledDate());
+                    if (dateCompare != 0) return dateCompare;
+                    return a.getStartTime().compareTo(b.getStartTime());
+                })
                 .map(this::convertToDto)
                 .toList();
     }

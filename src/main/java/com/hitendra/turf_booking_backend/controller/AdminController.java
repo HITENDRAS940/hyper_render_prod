@@ -893,10 +893,10 @@ public class AdminController {
 
     @GetMapping("/services/{serviceId}/slots/disabled")
     @Operation(summary = "Get disabled slots for service",
-            description = "Get all disabled slots for all resources of a service on a specific date")
+            description = "Get all disabled slots for all resources of a service. Optionally filter by specific date.")
     public ResponseEntity<List<DisabledSlotDto>> getDisabledSlotsByService(
             @PathVariable Long serviceId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
         List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlotsByService(serviceId, date);
         return ResponseEntity.ok(disabledSlots);
