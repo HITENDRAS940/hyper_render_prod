@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,9 @@ public class RazorpayPaymentService {
     private final BookingRepository bookingRepository;
     private final SmsService smsService;
     private final EmailService emailService;
+
+    @Lazy
+    private final RefundService refundService;
 
     @Value("${razorpay.key-id}")
     private String keyId;
@@ -213,6 +217,7 @@ public class RazorpayPaymentService {
     /**
      * Handle Razorpay webhook events with idempotency.
      * This is the ONLY way bookings should be confirmed.
+     * Also handles refund status updates.
      */
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public void handleWebhook(String payload, String signature) {
@@ -230,84 +235,126 @@ public class RazorpayPaymentService {
             // Parse webhook payload
             JSONObject webhook = new JSONObject(payload);
             String event = webhook.getString("event");
-            JSONObject payloadObj = webhook.getJSONObject("payload");
-            JSONObject paymentEntity = payloadObj.getJSONObject("payment").getJSONObject("entity");
 
-            String orderId = paymentEntity.getString("order_id");
-            String paymentId = paymentEntity.getString("id");
-            String status = paymentEntity.getString("status");
-            String method = paymentEntity.optString("method", "unknown");
+            log.info("Webhook event type: {}", event);
 
-            log.info("Webhook event: {}, Order ID: {}, Payment ID: {}, Status: {}",
-                    event, orderId, paymentId, status);
-
-            // Fetch booking with lock
-            Booking booking = bookingRepository.findByRazorpayOrderId(orderId)
-                    .orElseThrow(() -> new PaymentException("Booking not found for order ID: " + orderId));
-
-            // Handle payment.captured event
-            if ("payment.captured".equals(event)) {
-                // IDEMPOTENCY: Check if already confirmed
-                if (booking.getStatus() == BookingStatus.CONFIRMED) {
-                    log.info("Booking already confirmed (idempotent webhook call). Booking ID: {}", booking.getId());
-                    return;
-                }
-
-                // STATE VALIDATION: Only confirm if in correct state
-                if (booking.getStatus() != BookingStatus.AWAITING_CONFIRMATION) {
-                    log.warn("Received payment.captured for booking not in AWAITING_CONFIRMATION. Status: {}, Booking ID: {}",
-                            booking.getStatus(), booking.getId());
-                    // Still process if payment succeeded (late webhook scenario)
-                }
-
-                // STATE TRANSITION: AWAITING_CONFIRMATION -> CONFIRMED
-                booking.setRazorpayPaymentId(paymentId);
-                booking.setPaymentMethod(method);
-                booking.setPaymentStatusEnum(PaymentStatus.SUCCESS);
-                booking.setPaymentTime(Instant.now());
-                booking.setStatus(BookingStatus.CONFIRMED);
-                booking.setLockExpiresAt(null); // Remove timeout
-
-                bookingRepository.save(booking);
-
-                // ═══════════════════════════════════════════════════════════════════════
-                // CRITICAL: EXPIRE ALL ABANDONED BOOKINGS FOR THIS SLOT
-                // ═══════════════════════════════════════════════════════════════════════
-                // When this booking is confirmed, all other pending bookings for the same
-                // slot must be marked as EXPIRED to ensure fair slot allocation.
-
-                expireAbandonedBookingsForSlot(booking);
-
-                // Send notifications (SMS and Email)
-                sendBookingNotifications(booking);
-
-
-                log.info("✅ Payment captured successfully. Booking confirmed: ID={}, PaymentID={}",
-                        booking.getId(), paymentId);
-            }
-
-            // Handle payment.failed event
-            if ("payment.failed".equals(event)) {
-                // IDEMPOTENCY: Check if already cancelled
-                if (booking.getStatus() == BookingStatus.CANCELLED) {
-                    log.info("Booking already cancelled (idempotent webhook call). Booking ID: {}", booking.getId());
-                    return;
-                }
-
-                // STATE TRANSITION: AWAITING_CONFIRMATION -> CANCELLED
-                booking.setRazorpayPaymentId(paymentId);
-                booking.setPaymentStatusEnum(PaymentStatus.FAILED);
-                booking.setStatus(BookingStatus.CANCELLED);
-                booking.setLockExpiresAt(null); // Remove timeout
-
-                bookingRepository.save(booking);
-
-                log.info("❌ Payment failed. Booking cancelled: ID={}", booking.getId());
+            // Route to appropriate handler based on event type
+            if (event.startsWith("payment.")) {
+                handlePaymentWebhook(webhook, event);
+            } else if (event.startsWith("refund.")) {
+                handleRefundWebhook(webhook, event);
+            } else {
+                log.warn("Unhandled webhook event type: {}", event);
             }
 
         } catch (Exception e) {
             log.error("Failed to process webhook", e);
             throw new PaymentException("Failed to process webhook: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Handle payment-related webhook events (payment.captured, payment.failed)
+     */
+    private void handlePaymentWebhook(JSONObject webhook, String event) {
+        JSONObject payloadObj = webhook.getJSONObject("payload");
+        JSONObject paymentEntity = payloadObj.getJSONObject("payment").getJSONObject("entity");
+
+        String orderId = paymentEntity.getString("order_id");
+        String paymentId = paymentEntity.getString("id");
+        String status = paymentEntity.getString("status");
+        String method = paymentEntity.optString("method", "unknown");
+
+        log.info("Payment webhook - Event: {}, Order ID: {}, Payment ID: {}, Status: {}",
+                event, orderId, paymentId, status);
+
+        // Fetch booking with lock
+        Booking booking = bookingRepository.findByRazorpayOrderId(orderId)
+                .orElseThrow(() -> new PaymentException("Booking not found for order ID: " + orderId));
+
+        // Handle payment.captured event
+        if ("payment.captured".equals(event)) {
+            // IDEMPOTENCY: Check if already confirmed
+            if (booking.getStatus() == BookingStatus.CONFIRMED) {
+                log.info("Booking already confirmed (idempotent webhook call). Booking ID: {}", booking.getId());
+                return;
+            }
+
+            // STATE VALIDATION: Only confirm if in correct state
+            if (booking.getStatus() != BookingStatus.AWAITING_CONFIRMATION) {
+                log.warn("Received payment.captured for booking not in AWAITING_CONFIRMATION. Status: {}, Booking ID: {}",
+                        booking.getStatus(), booking.getId());
+                // Still process if payment succeeded (late webhook scenario)
+            }
+
+            // STATE TRANSITION: AWAITING_CONFIRMATION -> CONFIRMED
+            booking.setRazorpayPaymentId(paymentId);
+            booking.setPaymentMethod(method);
+            booking.setPaymentStatusEnum(PaymentStatus.SUCCESS);
+            booking.setPaymentTime(Instant.now());
+            booking.setStatus(BookingStatus.CONFIRMED);
+            booking.setLockExpiresAt(null); // Remove timeout
+
+            bookingRepository.save(booking);
+
+            // ═══════════════════════════════════════════════════════════════════════
+            // CRITICAL: EXPIRE ALL ABANDONED BOOKINGS FOR THIS SLOT
+            // ═══════════════════════════════════════════════════════════════════════
+            // When this booking is confirmed, all other pending bookings for the same
+            // slot must be marked as EXPIRED to ensure fair slot allocation.
+
+            expireAbandonedBookingsForSlot(booking);
+
+            // Send notifications (SMS and Email)
+            sendBookingNotifications(booking);
+
+
+            log.info("✅ Payment captured successfully. Booking confirmed: ID={}, PaymentID={}",
+                    booking.getId(), paymentId);
+        }
+
+        // Handle payment.failed event
+        if ("payment.failed".equals(event)) {
+            // IDEMPOTENCY: Check if already cancelled
+            if (booking.getStatus() == BookingStatus.CANCELLED) {
+                log.info("Booking already cancelled (idempotent webhook call). Booking ID: {}", booking.getId());
+                return;
+            }
+
+            // STATE TRANSITION: AWAITING_CONFIRMATION -> CANCELLED
+            booking.setRazorpayPaymentId(paymentId);
+            booking.setPaymentStatusEnum(PaymentStatus.FAILED);
+            booking.setStatus(BookingStatus.CANCELLED);
+            booking.setLockExpiresAt(null); // Remove timeout
+
+            bookingRepository.save(booking);
+
+            log.info("❌ Payment failed. Booking cancelled: ID={}", booking.getId());
+        }
+    }
+
+    /**
+     * Handle refund-related webhook events (refund.processed, refund.failed)
+     */
+    private void handleRefundWebhook(JSONObject webhook, String event) {
+        JSONObject payloadObj = webhook.getJSONObject("payload");
+        JSONObject refundEntity = payloadObj.getJSONObject("refund").getJSONObject("entity");
+
+        String refundId = refundEntity.getString("id");
+        String paymentId = refundEntity.getString("payment_id");
+        String status = refundEntity.getString("status");
+        int amount = refundEntity.getInt("amount");
+
+        log.info("Refund webhook - Event: {}, Refund ID: {}, Payment ID: {}, Status: {}, Amount: {}",
+                event, refundId, paymentId, status, amount);
+
+        // Delegate to RefundService to update refund status
+        try {
+            refundService.updateRefundStatusFromWebhook(refundId, status);
+            log.info("✅ Refund status updated successfully via webhook: {}", refundId);
+        } catch (Exception e) {
+            log.error("Failed to update refund status from webhook: {}", refundId, e);
+            throw new PaymentException("Failed to process refund webhook: " + e.getMessage());
         }
     }
 

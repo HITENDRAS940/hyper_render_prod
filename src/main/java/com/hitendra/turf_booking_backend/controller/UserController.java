@@ -43,7 +43,7 @@ public class UserController {
 
     @GetMapping("/bookings")
     @Operation(summary = "Get user bookings",
-               description = "Get all bookings for the current logged-in user with turf name, status, date, slots, and amount")
+               description = "Get all bookings for the current logged-in user with venue name, status, date, slots, and amount")
     public ResponseEntity<List<UserBookingDto>> getUserBookings() {
         List<UserBookingDto> bookings = bookingService.getCurrentUserBookings();
         return ResponseEntity.ok(bookings);

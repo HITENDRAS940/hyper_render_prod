@@ -326,13 +326,1410 @@ components:
           format: date-time
           example: "2025-10-18T12:00:00Z"
 
-paths:
+    AdminProfileDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        city:
+          type: string
+        businessName:
+          type: string
+        businessAddress:
+          type: string
+        gstNumber:
+          type: string
+
+    DeleteProfileRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        confirmationText:
+          type: string
+
+    AdminDashboardStatsDto:
+      type: object
+      properties:
+        todayBooking:
+          $ref: '#/components/schemas/BookingStats'
+        monthlyBooking:
+          $ref: '#/components/schemas/BookingStats'
+        todayRevenue:
+          $ref: '#/components/schemas/RevenueStats'
+        monthlyRevenue:
+          $ref: '#/components/schemas/RevenueStats'
+
+    BookingStats:
+      type: object
+      properties:
+        online:
+          type: integer
+          format: int64
+        offline:
+          type: integer
+          format: int64
+
+    RevenueStats:
+      type: object
+      properties:
+        online:
+          type: number
+        offline:
+          type: number
+
+    AdminServiceSummaryDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        location:
+          type: string
+        city:
+          type: string
+        availability:
+          type: boolean
+
+    ServiceDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        location:
+          type: string
+        city:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        description:
+          type: string
+        contactNumber:
+          type: string
+        availability:
+          type: boolean
+        amenities:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        activities:
+          type: array
+          items:
+            type: string
+
+    CreateServiceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        location:
+          type: string
+        city:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        description:
+          type: string
+        contactNumber:
+          type: string
+        activityCodes:
+          type: array
+          items:
+            type: string
+        amenities:
+          type: array
+          items:
+            type: string
+
+    LocationUrlRequest:
+      type: object
+      properties:
+        locationUrl:
+          type: string
+
+    ServiceImageUploadResponse:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        message:
+          type: string
+        uploadedImageUrls:
+          type: array
+          items:
+            type: string
+        totalImages:
+          type: integer
+
+    ServiceResourceDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        activities:
+          type: array
+          items:
+            type: string  # Simplified, assuming Activity is complex but represented as string or object. Let's say it's just names/codes for now. Wait, Activity is entity. Let's assume list of objects or verify later. For DTO it usually serializes to object. Assuming object with minimal fields.
+            # But the DTO imports Activity entity.
+            # Assuming Activity has id, name, code.
+            # I will use type: object for now or just generic.
+            type: object
+
+    CreateServiceResourceRequest:
+      type: object
+      required:
+        - serviceId
+        - name
+        - openingTime
+        - closingTime
+        - slotDurationMinutes
+        - basePrice
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        openingTime:
+          type: string
+          format: time
+        closingTime:
+          type: string
+          format: time
+        slotDurationMinutes:
+          type: integer
+        basePrice:
+          type: number
+          format: double
+        activityCodes:
+          type: array
+          items:
+            type: string
+
+    UpdateServiceResourceRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+
+    ResourceSlotConfigDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        openingTime:
+          type: string
+          format: time
+        closingTime:
+          type: string
+          format: time
+        slotDurationMinutes:
+          type: integer
+        basePrice:
+          type: number
+          format: double
+        enabled:
+          type: boolean
+        totalSlots:
+          type: integer
+
+    ResourceSlotConfigRequest:
+      type: object
+      required:
+        - resourceId
+        - openingTime
+        - closingTime
+        - slotDurationMinutes
+        - basePrice
+      properties:
+        resourceId:
+          type: integer
+          format: int64
+        openingTime:
+          type: string
+          format: time
+        closingTime:
+          type: string
+          format: time
+        slotDurationMinutes:
+          type: integer
+        basePrice:
+          type: number
+          format: double
+        weekendPriceMultiplier:
+          type: number
+          format: double
+
+    ResourceSlotDetailDto:
+      type: object
+      properties:
+        slotId:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        displayName:
+          type: string
+        durationMinutes:
+          type: integer
+        basePrice:
+          type: number
+          format: double
+        totalPrice:
+          type: number
+          format: double
+        price:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [AVAILABLE, BOOKED, DISABLED]
+        statusReason:
+          type: string
+        isEnabled:
+          type: boolean
+        slotDate:
+          type: string
+          format: date
+
+    ServiceSlotsAnalysisDto:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        analysisDate:
+          type: string
+          format: date
+        totalResources:
+          type: integer
+        totalSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        bookedSlots:
+          type: integer
+        disabledSlots:
+          type: integer
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceSlotsDto'
+
+    ResourceSlotsDto:
+      type: object
+      properties:
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        resourceEnabled:
+          type: boolean
+        openingTime:
+          type: string
+        closingTime:
+          type: string
+        slotDurationMinutes:
+          type: integer
+        basePrice:
+          type: number
+          format: double
+        totalSlots:
+          type: integer
+        availableSlots:
+          type: integer
+        bookedSlots:
+          type: integer
+
+    ResourcePriceRuleDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        dayType:
+          type: string
+          enum: [WEEKDAY, WEEKEND, HOLIDAY, SPECIFIC_DATE] # Assuming DayType enum values
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        basePrice:
+          type: number
+          format: double
+        extraCharge:
+          type: number
+          format: double
+        reason:
+          type: string
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+
+    ResourcePriceRuleRequest:
+      type: object
+      required:
+        - resourceId
+        - dayType
+        - startTime
+        - endTime
+      properties:
+        resourceId:
+          type: integer
+          format: int64
+        dayType:
+          type: string
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        basePrice:
+          type: number
+          format: double
+        extraCharge:
+          type: number
+          format: double
+        reason:
+          type: string
+        priority:
+          type: integer
+
+    AdminBookingRequestDTO:
+      type: object
+      required:
+        - resourceId
+        - startTime
+        - endTime
+        - bookingDate
+      properties:
+        resourceId:
+          type: integer
+          format: int64
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        bookingDate:
+          type: string
+          format: date
+
+    PendingBookingDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        reference:
+          type: string
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        bookingDate:
+          type: string
+          format: date
+        amount:
+          type: number
+          format: double
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+
+    SlotAvailabilityResponseDto:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/AggregatedSlotDto'
+
+    AggregatedSlotDto:
+      type: object
+      properties:
+        slotKey:
+          type: string
+        slotGroupId:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        durationMinutes:
+          type: integer
+        displayPrice:
+          type: number
+          format: double
+        availableCount:
+          type: integer
+        totalCount:
+          type: integer
+
+    AdminManualBookingRequestDto:
+      type: object
+      properties:
+        slotKeys:
+          type: array
+          items:
+            type: string
+        allowSplit:
+          type: boolean
+        onlineAmountPaid:
+          type: number
+        venueAmountCollected:
+          type: number
+        customerName:
+          type: string
+        customerPhone:
+          type: string
+        remarks:
+          type: string
+
+    DirectManualBookingRequestDto:
+      type: object
+      required:
+        - serviceId
+        - resourceId
+        - activityCode
+        - bookingDate
+        - startTime
+        - endTime
+        - amount
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        activityCode:
+          type: string
+        bookingDate:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        amount:
+          type: number
+        onlineAmountPaid:
+          type: number
+        venueAmountCollected:
+          type: number
+        remarks:
+          type: string
+
+    UnifiedDisableSlotRequestDto:
+      type: object
+      required:
+        - startDate
+      properties:
+        resourceIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        serviceId:
+          type: integer
+          format: int64
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        reason:
+          type: string
+
+    UnifiedDisableSlotResponseDto:
+      type: object
+      properties:
+        totalDisabledCount:
+          type: integer
+        disabledSlots:
+          type: array
+          items:
+            $ref: '#/components/schemas/DisabledSlotDto'
+        message:
+          type: string
+
+    DisabledSlotDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        date:
+          type: string
+          format: date
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+        reason:
+          type: string
+        disabledByAdminName:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        displayTime:
+          type: string
+
+    DeleteDisabledSlotsRequest:
+      type: object
+      required:
+        - disabledSlotIds
+      properties:
+        disabledSlotIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    AdminRevenueReportDto:
+      type: object
+      properties:
+        adminId:
+          type: integer
+          format: int64
+        adminName:
+          type: string
+        adminPhone:
+          type: string
+        totalBookings:
+          type: integer
+          format: int64
+        totalRevenue:
+          type: number
+          format: double
+        averageRevenuePerBooking:
+          type: number
+          format: double
+        serviceRevenues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceRevenueDto'
+        generatedAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+
+    ServiceRevenueDto:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        totalBookings:
+          type: integer
+          format: int64
+        totalRevenue:
+          type: number
+          format: double
+        averageRevenuePerBooking:
+          type: number
+          format: double
+        resourceRevenues:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceRevenueDto'
+
+    ResourceRevenueDto:
+      type: object
+      properties:
+        resourceId:
+          type: integer
+          format: int64
+        resourceName:
+          type: string
+        totalBookings:
+          type: integer
+        totalRevenue:
+          type: number
+          format: double
+
+    ServiceTodayRevenueDto:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        date:
+          type: string
+          format: date
+        totalBookingsToday:
+          type: integer
+          format: int64
+        totalRevenueToday:
+          type: number
+          format: double
+        amountDueToday:
+          type: number
+          format: double
+        amountPendingAtVenue:
+          type: number
+          format: double
+        currency:
+          type: string
+
+    RequestEmailOtpDto:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    VerifyEmailOtpDto:
+      type: object
+      required:
+        - email
+        - otp
+      properties:
+        email:
+          type: string
+          format: email
+        otp:
+          type: string
+
+    CreateAdminRequest:
+      type: object
+      required:
+        - phone
+        - name
+      properties:
+        phone:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        city:
+          type: string
+        businessName:
+          type: string
+        businessAddress:
+          type: string
+        gstNumber:
+          type: string
+
+    ServiceCardDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        location:
+          type: string
+        availability:
+          type: boolean
+        images:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+
+    UserInfoDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        phone:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        totalBookings:
+          type: integer
+          format: int64
+        confirmedBookings:
+          type: integer
+          format: int64
+        cancelledBookings:
+          type: integer
+          format: int64
+
+    GetActivityDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+
+    ResourceAvailabilityResponseDto:
+      type: object
+      properties:
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceAvailableSlotDto'
+
+    ResourceAvailableSlotDto:
+      type: object
+      properties:
+        slotId:
+          type: string
+        startTime:
+          type: string
+        endTime:
+          type: string
+        status:
+          type: string
+        price:
+          type: number
+          format: double
+        tags:
+          type: array
+          items:
+            type: string
+        priceBreakup:
+          type: array
+          items:
+            $ref: '#/components/schemas/PriceComponentDto'
+        reason:
+          type: string
+
+    PriceComponentDto:
+      type: object
+      properties:
+        label:
+          type: string
+        amount:
+          type: number
+          format: double
+
+    ServiceSearchDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        location:
+          type: string
+        availability:
+          type: boolean
+
+    RefundPreviewDto:
+      type: object
+      properties:
+        canCancel:
+          type: boolean
+        bookingId:
+          type: integer
+
+    # Accounting Enums
+    ExpenseType:
+      type: string
+      enum: [FIXED, VARIABLE]
+
+    InventoryUnit:
+      type: string
+      enum: [PIECE, KG, GRAM, LITER, ML, BOX, DOZEN]
+
+    LedgerSource:
+      type: string
+      enum: [BOOKING, INVENTORY_SALE, EXPENSE, INVENTORY_PURCHASE, REFUND, ADJUSTMENT]
+
+    PaymentMode:
+      type: string
+      enum: [CASH, UPI, BANK_TRANSFER, CARD, CHEQUE]
+
+    ReferenceType:
+      type: string
+      enum: [BOOKING, INVENTORY_SALE, EXPENSE, INVENTORY_PURCHASE, REFUND, ADJUSTMENT]
+
+    # Accounting DTOs
+    CashLedgerDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        source:
+          $ref: '#/components/schemas/LedgerSource'
+        referenceType:
+          $ref: '#/components/schemas/ReferenceType'
+        referenceId:
+          type: integer
+          format: int64
+        creditAmount:
+          type: number
+          format: double
+        debitAmount:
+          type: number
+          format: double
+        balanceAfter:
+          type: number
+          format: double
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        description:
+          type: string
+        recordedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    CreateExpenseCategoryRequest:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/ExpenseType'
+
+    CreateExpenseRequest:
+      type: object
+      required:
+        - serviceId
+        - categoryId
+        - description
+        - amount
+        - paymentMode
+        - expenseDate
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        categoryId:
+          type: integer
+          format: int64
+        description:
+          type: string
+        amount:
+          type: number
+          format: double
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        expenseDate:
+          type: string
+          format: date
+        referenceNumber:
+          type: string
+
+    CreateInventoryItemRequest:
+      type: object
+      required:
+        - serviceId
+        - name
+        - costPrice
+        - sellingPrice
+        - unit
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        costPrice:
+          type: number
+          format: double
+        sellingPrice:
+          type: number
+          format: double
+        stockQuantity:
+          type: integer
+        minStockLevel:
+          type: integer
+        unit:
+          $ref: '#/components/schemas/InventoryUnit'
+
+    CreateInventoryPurchaseRequest:
+      type: object
+      required:
+        - serviceId
+        - purchaseDate
+        - paymentMode
+        - items
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        supplierName:
+          type: string
+        supplierContact:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        invoiceNumber:
+          type: string
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryPurchaseItemRequest'
+
+    InventoryPurchaseItemRequest:
+      type: object
+      required:
+        - itemId
+        - quantity
+        - costPrice
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+        costPrice:
+          type: number
+          format: double
+
+    CreateInventorySaleRequest:
+      type: object
+      required:
+        - serviceId
+        - paymentMode
+        - saleDate
+        - items
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        saleDate:
+          type: string
+          format: date
+        customerName:
+          type: string
+        notes:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventorySaleItemRequest'
+
+    InventorySaleItemRequest:
+      type: object
+      required:
+        - itemId
+        - quantity
+      properties:
+        itemId:
+          type: integer
+          format: int64
+        quantity:
+          type: integer
+
+    ExpenseCategoryDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        adminProfileId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/ExpenseType'
+        createdAt:
+          type: string
+          format: date-time
+
+    ExpenseDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        categoryId:
+          type: integer
+          format: int64
+        categoryName:
+          type: string
+        categoryType:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+          format: double
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        expenseDate:
+          type: string
+          format: date
+        referenceNumber:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    InventoryItemDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        costPrice:
+          type: number
+          format: double
+        sellingPrice:
+          type: number
+          format: double
+        stockQuantity:
+          type: integer
+        minStockLevel:
+          type: integer
+        unit:
+          $ref: '#/components/schemas/InventoryUnit'
+        active:
+          type: boolean
+        isLowStock:
+          type: boolean
+        isOutOfStock:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    InventoryPurchaseDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        totalAmount:
+          type: number
+          format: double
+        supplierName:
+          type: string
+        supplierContact:
+          type: string
+        purchaseDate:
+          type: string
+          format: date
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        invoiceNumber:
+          type: string
+        notes:
+          type: string
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryPurchaseItemDto'
+
+    InventoryPurchaseItemDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        quantity:
+          type: integer
+        costPrice:
+          type: number
+          format: double
+        lineTotal:
+          type: number
+          format: double
+
+    InventorySaleDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        totalAmount:
+          type: number
+          format: double
+        paymentMode:
+          $ref: '#/components/schemas/PaymentMode'
+        saleDate:
+          type: string
+          format: date
+        soldBy:
+          type: string
+        customerName:
+          type: string
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventorySaleItemDto'
+
+    InventorySaleItemDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        itemId:
+          type: integer
+          format: int64
+        itemName:
+          type: string
+        quantity:
+          type: integer
+        sellingPrice:
+          type: number
+          format: double
+        lineTotal:
+          type: number
+          format: double
+
+    ProfitLossReportDto:
+      type: object
+      properties:
+        serviceId:
+          type: integer
+          format: int64
+        serviceName:
+          type: string
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        bookingRevenue:
+          type: number
+          format: double
+        inventorySalesRevenue:
+          type: number
+          format: double
+        totalIncome:
+          type: number
+          format: double
+        totalExpenses:
+          type: number
+          format: double
+        expenseBreakdown:
+          type: object
+          additionalProperties:
+            type: number
+            format: double
+        inventoryPurchases:
+          type: number
+          format: double
+        inventorySales:
+          type: number
+          format: double
+        inventoryProfit:
+          type: number
+          format: double
+        netProfit:
+          type: number
+          format: double
+        profitMargin:
+          type: number
+          format: double
+        openingBalance:
+          type: number
+          format: double
+        totalCashIn:
+          type: number
+          format: double
+        totalCashOut:
+          type: number
+          format: double
+        closingBalance:
+          type: number
+          format: double
   /auth/request-otp:
     post:
       tags:
         - Authentication
       summary: Request OTP
-      description: Send OTP to user's phone number for login
+      description: Send OTP to user's phone number
       requestBody:
         required: true
         content:
@@ -346,77 +1743,180 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: "OTP sent successfully"
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
-  /auth/verify-otp/{phone}:
+  /auth/verify-otp:
     post:
       tags:
         - Authentication
       summary: Verify OTP
       description: Verify OTP and get JWT token
-      parameters:
-        - name: phone
-          in: path
-          required: true
-          schema:
-            type: string
-          example: "+919460629707"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - otp
-              properties:
-                otp:
-                  type: string
-                  example: "123456"
+              $ref: '#/components/schemas/VerifyOtpDto'
       responses:
         '200':
-          description: OTP verified successfully
+          description: Successful authentication
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/JwtResponseDto'
-        '400':
-          description: Invalid or expired OTP
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
 
-  /turfs:
-    get:
+  /auth/request-email-otp:
+    post:
       tags:
-        - Turfs
-      summary: List all turfs
-      description: Get all available turfs with their slots and pricing
+        - Authentication
+      summary: Request Email OTP
+      description: Send OTP to user's email address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestEmailOtpDto'
       responses:
         '200':
-          description: List of turfs
+          description: OTP sent successfully to your email
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /auth/verify-email-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify Email OTP
+      description: Verify email OTP and get JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailOtpDto'
+      responses:
+        '200':
+          description: Successful authentication
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TurfDto'
+                $ref: '#/components/schemas/JwtResponseDto'
 
-  /turfs/{id}:
+  /admin/profile:
     get:
       tags:
-        - Turfs
-      summary: Get turf details
-      description: Get detailed information about a specific turf
+        - Admin
+      summary: Get admin profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current admin profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfileDto'
+    delete:
+      tags:
+        - Admin
+      summary: Delete admin account
+      description: Permanently delete the admin's account. This action is IRREVERSIBLE.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteProfileRequest'
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/dashboard/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get dashboard statistics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Admin dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardStatsDto'
+
+  /admin/services:
+    get:
+      tags:
+        - Admin
+      summary: Get my services
+      security:
+        - BearerAuth: []
       parameters:
-        - name: id
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object # PaginatedResponse handling simplified here as generic object or specific schema if needed
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminServiceSummaryDto'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
+    post:
+      tags:
+        - Admin
+      summary: Create service
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '200':
+          description: Service created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /admin/services/{serviceId}:
+    get:
+      tags:
+        - Admin
+      summary: Get service by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
           in: path
           required: true
           schema:
@@ -424,92 +1924,117 @@ paths:
             format: int64
       responses:
         '200':
-          description: Turf details
+          description: Service details
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TurfDto'
-        '404':
-          description: Turf not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  /bookings:
-    post:
-      tags:
-        - Bookings
-      summary: Create booking
-      description: Create a new turf booking
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/BookingRequestDto'
-      responses:
-        '200':
-          description: Booking created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BookingResponseDto'
-        '400':
-          description: Bad request - Slot already booked or invalid data
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized - Invalid or missing JWT token
-        '403':
-          description: Forbidden
-
-  /admin/turf-details:
-    post:
+                $ref: '#/components/schemas/ServiceDto'
+    put:
       tags:
         - Admin
-      summary: Create turf (Step 1)
-      description: Create a new turf with basic details (without images). All 24 slots are automatically assigned.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateTurfRequest'
-      responses:
-        '200':
-          description: Turf created successfully with 24 slots assigned
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TurfDto'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-  /admin/turf/{turfId}/images:
-    post:
-      tags:
-        - Admin
-      summary: Upload turf images (Step 2)
-      description: Upload images for an existing turf to Cloudinary
+      summary: Update service
       security:
         - BearerAuth: []
       parameters:
-        - name: turfId
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '200':
+          description: Service updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+    delete:
+      tags:
+        - Admin
+      summary: Delete service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Service deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/services/{serviceId}/toggle:
+    patch:
+      tags:
+        - Admin
+      summary: Toggle service availability status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Updated service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /admin/services/{serviceId}/location-from-url:
+    put:
+      tags:
+        - Admin
+      summary: Update service location from URL
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationUrlRequest'
+      responses:
+        '200':
+          description: Updated service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /admin/services/{serviceId}/images:
+    post:
+      tags:
+        - Admin
+      summary: Upload service images
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
           in: path
           required: true
           schema:
@@ -521,8 +2046,6 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required:
-                - images
               properties:
                 images:
                   type: array
@@ -535,160 +2058,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TurfImageUploadResponse'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-  /admin/turfs:
-    get:
-      tags:
-        - Admin
-      summary: List all turfs
-      description: Get all turfs (admin view)
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of turfs
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TurfDto'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-  /admin/turf/{id}:
-    get:
-      tags:
-        - Admin
-      summary: Get turf details
-      description: Get turf details by ID
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: Turf details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TurfDto'
-        '404':
-          description: Turf not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-    put:
-      tags:
-        - Admin
-      summary: Update turf details
-      description: Update turf name, location, and description
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateTurfRequest'
-      responses:
-        '200':
-          description: Turf updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/TurfDto'
-        '400':
-          description: Bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: Turf not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-    delete:
-      tags:
-        - Admin
-      summary: Delete turf
-      description: Delete a turf and all its images from Cloudinary
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: Turf deleted successfully
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: "Turf and all associated images deleted successfully"
-        '404':
-          description: Turf not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
-
-  /admin/turf/{id}/images:
+                $ref: '#/components/schemas/ServiceImageUploadResponse'
     delete:
       tags:
         - Admin
       summary: Delete specific images
-      description: Delete specific images from a turf
       security:
         - BearerAuth: []
       parameters:
-        - name: id
+        - name: serviceId
           in: path
           required: true
           schema:
@@ -702,7 +2080,6 @@ paths:
               type: array
               items:
                 type: string
-              example: ["https://res.cloudinary.com/demo/image1.jpg"]
       responses:
         '200':
           description: Images deleted successfully
@@ -710,91 +2087,577 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: "Images deleted successfully"
-        '404':
-          description: Turf not found
+
+  /admin/services/{serviceId}/resources:
+    get:
+      tags:
+        - Admin
+      summary: Get service resources
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of service resources
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceResourceDto'
+    post:
+      tags:
+        - Admin
+      summary: Add resource to service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceResourceRequest'
+      responses:
+        '200':
+          description: Resource added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+
+  /admin/resources/{resourceId}:
+    get:
+      tags:
+        - Admin
+      summary: Get resource by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Resource details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+    put:
+      tags:
+        - Admin
+      summary: Update resource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateServiceResourceRequest'
+      responses:
+        '200':
+          description: Resource updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+    delete:
+      tags:
+        - Admin
+      summary: Delete resource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Resource deleted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/resources/{resourceId}/toggle:
+    patch:
+      tags:
+        - Admin
+      summary: Toggle resource status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Updated resource
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+
+  /admin/resources/{resourceId}/config:
+    get:
+      tags:
+        - Admin
+      summary: Get slot configuration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Slot configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSlotConfigDto'
+
+  /admin/resources/slot-config:
+    post:
+      tags:
+        - Admin
+      summary: Create/Update slot configuration
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourceSlotConfigRequest'
+      responses:
+        '200':
+          description: Slot configuration saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSlotConfigDto'
+
+  /admin/resources/{resourceId}/slots:
+    get:
+      tags:
+        - Admin
+      summary: Get resource slots with status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of resource slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceSlotDetailDto'
+
+  /admin/services/{serviceId}/slots/analysis:
+    get:
+      tags:
+        - Admin
+      summary: Get comprehensive slot analysis for a service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Service slots analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceSlotsAnalysisDto'
+
+  /admin/resources/{resourceId}/price-rules:
+    get:
+      tags:
+        - Admin
+      summary: Get enabled price rules
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of price rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourcePriceRuleDto'
+
+  /admin/resources/price-rules:
+    post:
+      tags:
+        - Admin
+      summary: Add price rule
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourcePriceRuleRequest'
+      responses:
+        '200':
+          description: Price rule added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePriceRuleDto'
+
+  /admin/resources/price-rules/{ruleId}:
+    put:
+      tags:
+        - Admin
+      summary: Update price rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResourcePriceRuleRequest'
+      responses:
+        '200':
+          description: Price rule updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePriceRuleDto'
+    delete:
+      tags:
+        - Admin
+      summary: Delete price rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Price rule deleted
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/resources/price-rules/{ruleId}/enable:
+    patch:
+      tags:
+        - Admin
+      summary: Enable price rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Price rule enabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePriceRuleDto'
+
+  /admin/resources/price-rules/{ruleId}/disable:
+    patch:
+      tags:
+        - Admin
+      summary: Disable price rule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Price rule disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePriceRuleDto'
 
   /admin/bookings:
     get:
       tags:
         - Admin
-      summary: Get all bookings
-      description: Get all bookings across all turfs
+      summary: Get all my bookings
       security:
         - BearerAuth: []
+      parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
       responses:
         '200':
-          description: List of all bookings
+          description: List of bookings
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BookingResponseDto'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
+    post:
+      tags:
+        - Admin
+      summary: Create booking
+      description: Create a booking on behalf of a walk-in customer (auto-confirmed)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminBookingRequestDTO'
+      responses:
+        '200':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
 
-  /admin/turf/{id}/bookings:
+  /admin/bookings/pending:
     get:
       tags:
         - Admin
-      summary: Get turf bookings
-      description: Get bookings for a specific turf
+      summary: Get pending bookings
       security:
         - BearerAuth: []
       parameters:
-        - name: id
-          in: path
-          required: true
+        - name: page
+          in: query
           schema:
             type: integer
-            format: int64
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
       responses:
         '200':
-          description: List of bookings for the turf
+          description: List of pending bookings
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BookingResponseDto'
-        '404':
-          description: Turf not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PendingBookingDto'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
 
-  /admin/turf/{turfId}/slot/{slotId}/disable:
-    patch:
+  /admin/services/{serviceId}/bookings:
+    get:
       tags:
         - Admin
-      summary: Disable slot for turf
-      description: Disable a specific slot for a specific turf
+      summary: Get bookings by service
       security:
         - BearerAuth: []
       parameters:
-        - name: turfId
+        - name: serviceId
           in: path
           required: true
           schema:
             type: integer
             format: int64
-        - name: slotId
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/resources/{resourceId}/bookings:
+    get:
+      tags:
+        - Admin
+      summary: Get bookings by resource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/bookings/{bookingId}:
+    get:
+      tags:
+        - Admin
+      summary: Get booking details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
           in: path
           required: true
           schema:
@@ -802,39 +2665,246 @@ paths:
             format: int64
       responses:
         '200':
-          description: Slot disabled successfully
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/bookings/by-reference/{reference}:
+    get:
+      tags:
+        - Admin
+      summary: Get booking by reference
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/bookings/{bookingId}/approve:
+    put:
+      tags:
+        - Admin
+      summary: Approve booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/bookings/{bookingId}/complete:
+    put:
+      tags:
+        - Admin
+      summary: Complete booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/bookings/{bookingId}/cancel:
+    put:
+      tags:
+        - Admin
+      summary: Cancel booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking cancelled
           content:
             text/plain:
               schema:
                 type: string
-                example: "Slot disabled for this turf successfully"
-        '404':
-          description: Turf or slot not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
 
-  /admin/turf/{turfId}/slot/{slotId}/enable:
-    patch:
+  /admin/slots/availability:
+    get:
       tags:
         - Admin
-      summary: Enable slot for turf
-      description: Enable a specific slot for a specific turf
+      summary: Get slot availability for manual booking
       security:
         - BearerAuth: []
       parameters:
-        - name: turfId
-          in: path
+        - name: serviceId
+          in: query
           required: true
           schema:
             type: integer
             format: int64
-        - name: slotId
+        - name: activityCode
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Slot availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotAvailabilityResponseDto'
+
+  /admin/slots/book:
+    post:
+      tags:
+        - Admin
+      summary: Create manual booking for walk-in customer (with slot keys)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminManualBookingRequestDto'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/slots/cancel/{reference}:
+    post:
+      tags:
+        - Admin
+      summary: Cancel booking by reference
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/manual-bookings:
+    post:
+      tags:
+        - Admin
+      summary: Create direct manual booking (no slot keys)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DirectManualBookingRequestDto'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/manual-bookings/{reference}:
+    get:
+      tags:
+        - Admin
+      summary: Get manual booking details by reference
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /admin/slots/disable:
+    post:
+      tags:
+        - Admin
+      summary: Disable slots (Unified API)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnifiedDisableSlotRequestDto'
+      responses:
+        '200':
+          description: Slots disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnifiedDisableSlotResponseDto'
+
+  /admin/slots/disabled/{disabledSlotId}:
+    delete:
+      tags:
+        - Admin
+      summary: Enable a disabled slot
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: disabledSlotId
           in: path
           required: true
           schema:
@@ -847,220 +2917,1425 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: "Slot enabled for this turf successfully"
-        '404':
-          description: Turf or slot not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
 
-  /admin/turf/{turfId}/slot/{slotId}/price:
-    patch:
+  /admin/slots/disabled/by-time:
+    delete:
       tags:
         - Admin
-      summary: Update slot price
-      description: Update the price for a specific slot on a specific turf
+      summary: Enable slot by time
       security:
         - BearerAuth: []
       parameters:
-        - name: turfId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: slotId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-        - name: price
+        - name: resourceId
           in: query
           required: true
           schema:
-            type: number
-            format: double
-          example: 2500.0
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: startTime
+          in: query
+          required: true
+          schema:
+            type: string
+            format: time
+            example: "10:00"
       responses:
         '200':
-          description: Slot price updated successfully
+          description: Slot enabled successfully
           content:
             text/plain:
               schema:
                 type: string
-                example: "Slot price updated successfully"
-        '404':
-          description: Turf or slot not found
+
+  /admin/resources/{resourceId}/slots/disabled/date/{date}:
+    delete:
+      tags:
+        - Admin
+      summary: Enable all disabled slots on a date
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Count of enabled slots
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized
-        '403':
-          description: Forbidden - Admin role required
+                type: integer
 
-  /payments/confirm:
-    post:
+  /admin/resources/{resourceId}/slots/disabled:
+    get:
       tags:
-        - Payments
-      summary: Payment confirmation
-      description: Webhook endpoint for payment gateway
+        - Admin
+      summary: Get disabled slots for resource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of disabled slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DisabledSlotDto'
+
+  /admin/services/{serviceId}/slots/disabled:
+    get:
+      tags:
+        - Admin
+      summary: Get disabled slots for service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of disabled slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DisabledSlotDto'
+
+  /admin/resources/{resourceId}/slots/disabled/range:
+    get:
+      tags:
+        - Admin
+      summary: Get disabled slots in date range
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of disabled slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DisabledSlotDto'
+
+  /admin/slots/disabled/all:
+    get:
+      tags:
+        - Admin
+      summary: Get all disabled slots for admin's services
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of disabled slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DisabledSlotDto'
+
+  /admin/slots/disabled:
+    delete:
+      tags:
+        - Admin
+      summary: Delete specific disabled slots by IDs
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  example: "success"
-                reference:
-                  type: string
-                  example: "TRF12345678"
+              $ref: '#/components/schemas/DeleteDisabledSlotsRequest'
       responses:
         '200':
-          description: Payment processed
+          description: Success message
           content:
             text/plain:
               schema:
                 type: string
-                example: "Payment processed"
-        '500':
-          description: Error processing payment
-          content:
-            text/plain:
-              schema:
-                type: string
-                example: "Error processing payment"
 
-  /api/payment/create-order:
+  /admin/revenue:
+    get:
+      tags:
+        - Admin
+      summary: Get my revenue report
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Revenue report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRevenueReportDto'
+
+  /admin/services/{serviceId}/revenue:
+    get:
+      tags:
+        - Admin
+      summary: Get service revenue report
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Service revenue report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRevenueDto'
+
+  /admin/services/{serviceId}/revenue/today:
+    get:
+      tags:
+        - Admin
+      summary: Get today's revenue for service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Service today's revenue report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceTodayRevenueDto'
+
+  /manager/admins:
     post:
       tags:
-        - Payments
-      summary: Create Cashfree order
-      description: Create a payment order with Cashfree for turf booking
+        - Manager
+      summary: Create admin
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - internalBookingId
-                - amount
-                - customerId
-                - customerName
-                - customerPhone
-              properties:
-                internalBookingId:
-                  type: string
-                  description: Your booking reference ID
-                amount:
-                  type: number
-                  description: Amount in INR
-                customerId:
-                  type: string
-                  description: Customer ID
-                customerName:
-                  type: string
-                  description: Customer name
-                customerEmail:
-                  type: string
-                  description: Customer email (optional)
-                customerPhone:
-                  type: string
-                  description: Customer phone number
-                returnUrl:
-                  type: string
-                  description: Return URL after payment (optional)
-                notifyUrl:
-                  type: string
-                  description: Webhook URL (optional)
+              $ref: '#/components/schemas/CreateAdminRequest'
       responses:
         '200':
-          description: Order created successfully
+          description: Admin created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfileDto'
+    get:
+      tags:
+        - Manager
+      summary: List all admins
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of admins
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  orderId:
-                    type: string
-                  paymentSessionId:
-                    type: string
-                  orderStatus:
-                    type: string
-                  message:
-                    type: string
-        '500':
-          description: Error creating order
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AdminProfileDto'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
 
-  /webhook/cashfree:
-    post:
+  /manager/admins/{id}:
+    get:
       tags:
-        - Payments
-      summary: Cashfree webhook
-      description: Webhook endpoint for Cashfree payment notifications
+        - Manager
+      summary: Get admin by ID
+      security:
+        - BearerAuth: []
       parameters:
-        - name: x-webhook-timestamp
-          in: header
+        - name: id
+          in: path
+          required: true
           schema:
-            type: string
-        - name: x-webhook-signature
-          in: header
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Cashfree webhook payload
+            type: integer
+            format: int64
       responses:
         '200':
-          description: Webhook processed
+          description: Admin details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProfileDto'
+
+  /manager/admins/{userId}:
+    delete:
+      tags:
+        - Manager
+      summary: Delete admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Admin deleted successfully
           content:
             text/plain:
               schema:
                 type: string
-                example: "OK"
-        '403':
-          description: Invalid signature
 
-  /user/profile:
+  /manager/services:
     get:
       tags:
-        - User
-      summary: Get user profile
-      description: Retrieve the authenticated user's profile information
+        - Manager
+      summary: Get all the services
       security:
         - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
       responses:
         '200':
-          description: User profile retrieved successfully
+          description: List of all services
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfileDto'
-        '401':
-          description: Unauthorized - Invalid or missing JWT token
-        '403':
-          description: Forbidden
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCardDto'
 
+  /manager/admins/{adminProfileId}/services:
+    get:
+      tags:
+        - Manager
+      summary: Get services by admin
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: adminProfileId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of services for admin
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceDto'
+
+  /manager/services/{serviceId}/bookings:
+    get:
+      tags:
+        - Manager
+      summary: Get bookings by service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/service-details/{adminId}:
+    post:
+      tags:
+        - Manager
+      summary: Create service details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: adminId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '200':
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /manager/services/{serviceId}/resources:
+    post:
+      tags:
+        - Manager
+      summary: Add resource with slot configuration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceResourceRequest'
+      responses:
+        '200':
+          description: Resource added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+
+  /manager/services/{serviceId}/location-from-url:
     put:
       tags:
-        - User
-      summary: Update user profile
-      description: Update the authenticated user's profile information
+        - Manager
+      summary: Update service location from URL
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocationUrlRequest'
+      responses:
+        '200':
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /manager/services/{id}/resources:
+    get:
+      tags:
+        - Manager
+      summary: Get service resources
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceResourceDto'
+
+  /manager/services/{id}:
+    put:
+      tags:
+        - Manager
+      summary: Update service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateServiceRequest'
+      responses:
+        '200':
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /manager/services/{serviceId}/images:
+    post:
+      tags:
+        - Manager
+      summary: Upload service images
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '200':
+          description: Images uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceImageUploadResponse'
+
+  /manager/bookings/{bookingId}/approve:
+    put:
+      tags:
+        - Manager
+      summary: Approve booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/bookings/{bookingId}/complete:
+    put:
+      tags:
+        - Manager
+      summary: Complete booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/bookings/pending:
+    get:
+      tags:
+        - Manager
+      summary: Get pending bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of pending bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PendingBookingDto'
+                  totalElements:
+                    type: integer
+                  totalPages:
+                    type: integer
+
+  /manager/bookings:
+    get:
+      tags:
+        - Manager
+      summary: Get all bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/resources/{resourceId}/bookings:
+    get:
+      tags:
+        - Manager
+      summary: Get bookings by resource
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/bookings/{bookingId}/cancel:
+    put:
+      tags:
+        - Manager
+      summary: Cancel booking
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking cancelled
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /manager/resources/{resourceId}/slots:
+    get:
+      tags:
+        - Manager
+      summary: Get resource slots with status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceSlotDetailDto'
+
+  /manager/users:
+    get:
+      tags:
+        - Manager
+      summary: Get all users
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserInfoDto'
+
+  /manager/users/{userId}:
+    get:
+      tags:
+        - Manager
+      summary: Get user by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoDto'
+
+  /manager/users/{userId}/bookings:
+    get:
+      tags:
+        - Manager
+      summary: Get user bookings
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of user bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/booking/{bookingId}:
+    get:
+      tags:
+        - Manager
+      summary: Get booking details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponseDto'
+
+  /manager/{resourceId}/price-rules:
+    get:
+      tags:
+        - Manager
+      summary: Get enabled price rules
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of price rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourcePriceRuleDto'
+
+  /manager/{resourceId}/config:
+    get:
+      tags:
+        - Manager
+      summary: Get slot configuration
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Slot configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSlotConfigDto'
+
+  /services:
+    get:
+      tags:
+        - Services
+      summary: List Services
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of service cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCardDto'
+
+  /services/{id}:
+    get:
+      tags:
+        - Services
+      summary: Get services details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Service details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDto'
+
+  /services/{id}/lowest-price:
+    get:
+      tags:
+        - Services
+      summary: Get lowest slot price
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Lowest price
+          content:
+            application/json:
+              schema:
+                type: number
+                format: double
+
+  /services/{id}/availability/check:
+    get:
+      tags:
+        - Services
+      summary: Check if service is available
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Service available boolean
+          content:
+            application/json:
+              schema:
+                type: boolean
+
+  /services/cities:
+    get:
+      tags:
+        - Services
+      summary: Get available cities
+      responses:
+        '200':
+          description: List of cities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+
+  /services/by-city:
+    get:
+      tags:
+        - Services
+      summary: Get services by city
+      parameters:
+        - name: city
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of services in city
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCardDto'
+
+  /services/search-by-availability:
+    get:
+      tags:
+        - Services
+      summary: Search services by date and slot availability
+      parameters:
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: startTime
+          in: query
+          schema:
+            type: string
+            format: time
+        - name: endTime
+          in: query
+          schema:
+            type: string
+            format: time
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: activityCode
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceSearchDto'
+
+  /services/{serviceId}/resources:
+    get:
+      tags:
+        - Services
+      summary: Get service resources
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceResourceDto'
+
+  /services/resources/{resourceId}:
+    get:
+      tags:
+        - Services
+      summary: Get resource by ID
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Resource details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceResourceDto'
+
+  /services/resources/{resourceId}/availability:
+    get:
+      tags:
+        - Services
+      summary: Get slot availability for a resource
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Slot availability
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceAvailabilityResponseDto'
+
+  /services/activity:
+    get:
+      tags:
+        - Services
+      summary: Get all activities
+      responses:
+        '200':
+          description: List of activities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GetActivityDto'
+
+  /services/{activityId}/activity:
+    get:
+      tags:
+        - Services
+      summary: Get services by activity and city
+      parameters:
+        - name: activityId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: city
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ServiceCardDto'
+
+  /services/search:
+    get:
+      tags:
+        - Services
+      summary: Search services
+      parameters:
+        - name: keyword
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: city
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: activity
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ServiceSearchDto'
+
+  /services/resources/{resourceId}/slots-by-date:
+    get:
+      tags:
+        - Services
+      summary: Get detailed slots for resource on a date
+      parameters:
+        - name: resourceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of detailed slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ResourceSlotDetailDto'
+
+  /api/razorpay/create-order/{bookingId}:
+    post:
+      tags:
+        - Razorpay Payment
+      summary: Create Razorpay Order
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Razorpay order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RazorpayOrderResponse'
+
+  /api/razorpay/booking-status/{bookingId}:
+    get:
+      tags:
+        - Razorpay Payment
+      summary: Get Booking Status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: bookingId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Booking status details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingStatusResponse'
+
+  /api/razorpay/verify-payment:
+    post:
+      tags:
+        - Razorpay Payment
+      summary: Verify Payment Signature (Informational Only)
       security:
         - BearerAuth: []
       requestBody:
@@ -1068,28 +4343,750 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: "John Doe"
-                phone:
-                  type: string
-                  example: "+919876543210"
+              $ref: '#/components/schemas/RazorpayPaymentVerificationRequest'
       responses:
         '200':
-          description: User profile updated successfully
+          description: Verification result
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserProfileDto'
-        '400':
-          description: Bad request
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/razorpay/webhook:
+    post:
+      tags:
+        - Razorpay Payment
+      summary: Razorpay Webhook
+      parameters:
+        - name: X-Razorpay-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: string # Raw payload
+      responses:
+        '200':
+          description: Webhook processed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          description: Unauthorized - Invalid or missing JWT token
-        '403':
-          description: Forbidden
+                type: object
+                properties:
+                  status:
+                    type: string
+
+  /api/razorpay/payment/{paymentId}:
+    get:
+      tags:
+        - Razorpay Payment
+      summary: Get Payment Details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: paymentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment details
+          content:
+            application/json:
+              schema:
+                type: object # Dynamic map
+
+  /api/razorpay/order/{orderId}:
+    get:
+      tags:
+        - Razorpay Payment
+      summary: Get Order Details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                type: object # Dynamic map
+
+  /auth/oauth/login:
+    post:
+      tags:
+        - OAuth Authentication
+      summary: OAuth Login (Google/Apple)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLoginDto'
+      responses:
+        '200':
+          description: OAuth login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuthResponseDto'
+
+  /auth/oauth/test:
+    get:
+      tags:
+        - OAuth Authentication
+      summary: Test OAuth Endpoint
+      responses:
+        '200':
+          description: Test successful
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /api/admin/accounting/reports/profit-loss:
+    get:
+      tags:
+        - Accounting Reports
+      summary: Get P&L report
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Profit & Loss statement
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfitLossReportDto'
+
+  /api/admin/accounting/reports/ledger/service/{serviceId}:
+    get:
+      tags:
+        - Accounting Reports
+      summary: Get ledger entries
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CashLedgerDto'
+
+  /api/admin/accounting/reports/ledger/service/{serviceId}/range:
+    get:
+      tags:
+        - Accounting Reports
+      summary: Get ledger by date range
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CashLedgerDto'
+
+  /api/admin/accounting/reports/balance/{serviceId}:
+    get:
+      tags:
+        - Accounting Reports
+      summary: Get current balance
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Current balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currentBalance:
+                    type: number
+                    format: double
+
+  /api/admin/accounting/reports/cash-flow:
+    get:
+      tags:
+        - Accounting Reports
+      summary: Get cash flow summary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Cash flow summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  startDate:
+                    type: string
+                    format: date
+                  endDate:
+                    type: string
+                    format: date
+                  totalCashIn:
+                    type: number
+                    format: double
+                  totalCashOut:
+                    type: number
+                    format: double
+                  netCashFlow:
+                    type: number
+                    format: double
+                  currentBalance:
+                    type: number
+                    format: double
+
+  /api/admin/accounting/expense-categories:
+    post:
+      tags:
+        - Expense Categories
+      summary: Create expense category
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseCategoryRequest'
+      responses:
+        '200':
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategoryDto'
+    get:
+      tags:
+        - Expense Categories
+      summary: Get my expense categories
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseCategoryDto'
+
+  /api/admin/accounting/expense-categories/type/{type}:
+    get:
+      tags:
+        - Expense Categories
+      summary: Get my categories by type
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ExpenseType'
+      responses:
+        '200':
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseCategoryDto'
+
+  /api/admin/accounting/expense-categories/{id}:
+    get:
+      tags:
+        - Expense Categories
+      summary: Get category by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Category details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseCategoryDto'
+
+  /api/admin/accounting/expenses:
+    post:
+      tags:
+        - Expenses
+      summary: Record an expense
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '200':
+          description: Created expense
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseDto'
+
+  /api/admin/accounting/expenses/service/{serviceId}:
+    get:
+      tags:
+        - Expenses
+      summary: Get expenses by service
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseDto'
+
+  /api/admin/accounting/expenses/service/{serviceId}/range:
+    get:
+      tags:
+        - Expenses
+      summary: Get expenses by date range
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExpenseDto'
+
+  /api/admin/accounting/expenses/service/{serviceId}/total:
+    get:
+      tags:
+        - Expenses
+      summary: Get total expenses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Total expenses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalExpenses:
+                    type: number
+                    format: double
+
+  /api/admin/accounting/expenses/service/{serviceId}/breakdown:
+    get:
+      tags:
+        - Expenses
+      summary: Get expense breakdown
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Expense breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: number
+                  format: double
+
+  /api/admin/accounting/inventory/items:
+    post:
+      tags:
+        - Inventory Management
+      summary: Create inventory item
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryItemRequest'
+      responses:
+        '200':
+          description: Created item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/items/{itemId}:
+    get:
+      tags:
+        - Inventory Management
+      summary: Get inventory item
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: serviceId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Inventory item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemDto'
+    put:
+      tags:
+        - Inventory Management
+      summary: Update inventory item
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryItemRequest'
+      responses:
+        '200':
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/items/{itemId}/toggle-active:
+    patch:
+      tags:
+        - Inventory Management
+      summary: Toggle item active status
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: serviceId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Updated item
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/items/service/{serviceId}:
+    get:
+      tags:
+        - Inventory Management
+      summary: Get inventory items
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: activeOnly
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/items/service/{serviceId}/low-stock:
+    get:
+      tags:
+        - Inventory Management
+      summary: Get low stock items
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of low stock items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/items/service/{serviceId}/out-of-stock:
+    get:
+      tags:
+        - Inventory Management
+      summary: Get out of stock items
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: serviceId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: List of out of stock items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InventoryItemDto'
+
+  /api/admin/accounting/inventory/purchases:
+    post:
+      tags:
+        - Inventory Management
+      summary: Record purchase
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryPurchaseRequest'
+      responses:
+        '200':
+          description: Recorded purchase
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventoryPurchaseDto'
+
+  /api/admin/accounting/inventory/sales:
+    post:
+      tags:
+        - Inventory Management
+      summary: Record sale
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventorySaleRequest'
+      responses:
+        '200':
+          description: Recorded sale
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InventorySaleDto'

@@ -576,4 +576,81 @@ public class RefundService {
             log.error("Failed to send refund notifications for booking {}", booking.getReference(), e);
         }
     }
+
+    /**
+     * Update refund status from Razorpay webhook.
+     * This is called when Razorpay sends refund status updates via webhook.
+     *
+     * @param razorpayRefundId Razorpay refund ID
+     * @param status Refund status from Razorpay
+     */
+    @Transactional(isolation = Isolation.SERIALIZABLE)
+    public void updateRefundStatusFromWebhook(String razorpayRefundId, String status) {
+        log.info("Updating refund status from webhook: refundId={}, status={}", razorpayRefundId, status);
+
+        Refund refund = refundRepository.findByRazorpayRefundId(razorpayRefundId)
+                .orElseThrow(() -> new PaymentException("Refund not found with Razorpay ID: " + razorpayRefundId));
+
+        // Map Razorpay status to our enum
+        RefundStatus newStatus = mapRazorpayRefundStatus(status);
+
+        // Check if status actually changed (idempotency)
+        if (refund.getStatus() == newStatus) {
+            log.info("Refund status unchanged (idempotent webhook). RefundId={}, Status={}",
+                    razorpayRefundId, newStatus);
+            return;
+        }
+
+        RefundStatus oldStatus = refund.getStatus();
+        refund.setStatus(newStatus);
+
+        // Set processed timestamp when refund completes
+        if (newStatus == RefundStatus.SUCCESS && refund.getProcessedAt() == null) {
+            refund.setProcessedAt(Instant.now());
+        }
+
+        refundRepository.save(refund);
+
+        log.info("✅ Refund status updated: refundId={}, {} -> {}",
+                razorpayRefundId, oldStatus, newStatus);
+
+        // Send notification if refund succeeded
+        if (newStatus == RefundStatus.SUCCESS) {
+            try {
+                Booking booking = refund.getBooking();
+                User user = refund.getUser();
+
+                // Send SMS notification
+                String smsMessage = String.format(
+                        "Refund completed! ₹%.2f has been refunded to your account. Booking: %s",
+                        refund.getRefundAmount(),
+                        booking.getReference()
+                );
+                smsService.sendBookingConfirmation(user.getPhone(), smsMessage);
+
+                // Send email notification
+                if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+                    EmailService.RefundDetails refundDetails = EmailService.RefundDetails.builder()
+                            .bookingReference(booking.getReference())
+                            .refundStatus(newStatus.toString())
+                            .originalAmount(refund.getOriginalAmount())
+                            .refundAmount(refund.getRefundAmount())
+                            .refundPercent(refund.getRefundPercent())
+                            .build();
+
+                    // Reuse sendRefundInitiatedEmail - template handles status dynamically
+                    emailService.sendRefundInitiatedEmail(
+                            user.getEmail(),
+                            user.getName(),
+                            refundDetails
+                    );
+                }
+
+                log.info("Refund success notifications sent for booking {}", booking.getReference());
+            } catch (Exception e) {
+                log.error("Failed to send refund success notifications", e);
+            }
+        }
+    }
 }
+

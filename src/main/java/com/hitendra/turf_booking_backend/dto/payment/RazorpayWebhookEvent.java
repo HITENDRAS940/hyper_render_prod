@@ -23,6 +23,7 @@ public class RazorpayWebhookEvent {
     public static class WebhookPayload {
         private WebhookPayment payment;
         private WebhookOrder order;
+        private WebhookRefund refund;
     }
 
     @Data
@@ -37,6 +38,13 @@ public class RazorpayWebhookEvent {
     @AllArgsConstructor
     public static class WebhookOrder {
         private Entity entity;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class WebhookRefund {
+        private RefundEntity entity;
     }
 
     @Data
@@ -63,6 +71,22 @@ public class RazorpayWebhookEvent {
         private String email;
         private String contact;
         private Long created_at;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class RefundEntity {
+        private String id;
+        private String entity;
+        private Integer amount;
+        private String currency;
+        private String payment_id;
+        private String status;
+        private String speed_requested;
+        private String speed_processed;
+        private Long created_at;
+        private java.util.Map<String, Object> notes;
     }
 }
 

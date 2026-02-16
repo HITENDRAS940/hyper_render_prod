@@ -39,6 +39,9 @@ public class BookingService {
     @Value("${pricing.online-payment-percent:20}")
     private Double onlinePaymentPercent;
 
+    @Value("${pricing.platform-fee-rate:2.0}")
+    private Double platformFeeRate;
+
     // Auto-confirm is now handled via Razorpay webhook only
 
     /**
@@ -110,7 +113,7 @@ public class BookingService {
         Booking saved = bookingRepository.save(booking);
         log.info("Created booking {} for user {} from {} to {}, total: {} (subtotal: {}, tax: {}, fee: {})",
                 reference, user.getPhone(), request.getStartTime(), request.getEndTime(), totalAmount,
-                priceBreakdown.getSubtotal(),  priceBreakdown.getConvenienceFee());
+                priceBreakdown.getSubtotal(), 0.0, priceBreakdown.getConvenienceFee());
 
         return convertToResponseDto(saved);
     }
@@ -910,9 +913,9 @@ public class BookingService {
                 dto.setAmountBreakdown(amountBreakdown);
             } catch (Exception e) {
                 log.warn("Failed to calculate price breakdown for booking {}: {}", booking.getId(), e.getMessage());
-                // Fallback: derive from stored amount with default 2% fee
+                // Fallback: derive from stored amount with default fee
                 double storedTotal = booking.getAmount();
-                double platformFeePercent = 2.0;
+                double platformFeePercent = platformFeeRate != null ? platformFeeRate : 0.0;
                 double slotSubtotal = storedTotal / (1 + platformFeePercent / 100.0);
                 double platformFee = storedTotal - slotSubtotal;
 
