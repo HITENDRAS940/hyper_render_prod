@@ -509,10 +509,6 @@ components:
         activities:
           type: array
           items:
-            type: string  # Simplified, assuming Activity is complex but represented as string or object. Let's say it's just names/codes for now. Wait, Activity is entity. Let's assume list of objects or verify later. For DTO it usually serializes to object. Assuming object with minimal fields.
-            # But the DTO imports Activity entity.
-            # Assuming Activity has id, name, code.
-            # I will use type: object for now or just generic.
             type: object
 
     CreateServiceResourceRequest:
