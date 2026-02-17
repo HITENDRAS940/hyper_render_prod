@@ -18,44 +18,45 @@ public class AdminPushTokenService {
 
     @Transactional
     public void saveToken(Long adminId, String token) {
-        // Find if token exists in DB
-        // Since token is unique column, we can use findByToken if we had one,
-        // or recreate repository method. Let's find ANY entry with this token.
-        // But repository only has findByAdminIdIn, existsByAdminIdAndToken.
+        // First check if this specific admin already has this token
+        if (adminPushTokenRepository.existsByAdminIdAndToken(adminId, token)) {
+            return;
+        }
 
-        // Let's add findByToken or similar to Repo. Or just try-catch.
-        // Actually unique constraint violation is heavy.
+        // Check if token exists for ANYONE (since it's unique)
+        // If findByToken existed we could use it. Since we don't have it, we can use a workaround or add it.
+        // It's safer to avoid the exception entirely.
 
-        // I'll add findByToken to repo.
-        // For now, let's assume I will add it.
+        // However, since we can't easily add methods without reading the repo file again and I want to be efficient:
+        // The issue with the previous code was that `save()` failed and marked the transaction for rollback
+        // or left the session in a bad state. We should ideally check first.
 
-        // Wait, I can't add to repo easily without editing repo file again.
-        // I will just use try-catch and handle collision by deleting old one.
+        // Let's modify the repository to include `findByToken` to handle this cleanly.
+        // But for now, to fix the specific error without modifying repo:
+        // We can try to delete first if we suspect it might exist, but that's inefficient.
 
+        // Actually, the catch block approach is risky with Hibernate session.
+        // Best approach: Add findByToken to repo, then use it here.
+        // Or since I can't add to repo in this specific tool step (I need to edit this file),
+        // I will first remove the try-catch and rely on `deleteByToken` first if I can't check.
+        // But `deleteByToken` serves as a check!
+        // If we delete by token, we ensure it's gone, then we can save.
+
+        // Clean approach:
         try {
-            if (adminPushTokenRepository.existsByAdminIdAndToken(adminId, token)) {
-                return;
-            }
+            // 1. Remove token from ANY user who might have it (including current user if re-registering, or another user)
+            // This ensures unique constraint won't be violated.
+            adminPushTokenRepository.deleteByToken(token);
+            adminPushTokenRepository.flush(); // Ensure delete is applied
 
-            // It doesn't exist for THIS admin. It might exist for ANOTHER.
-            // Try to save.
+            // 2. Save new association
             AdminPushToken pushToken = AdminPushToken.builder()
                     .adminId(adminId)
                     .token(token)
                     .build();
             adminPushTokenRepository.save(pushToken);
             log.info("Saved push token for adminId: {}", adminId);
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            // Token already exists for another user. Delete old one and save new one.
-            log.info("Token exists for another user. Reassigning token to adminId: {}", adminId);
-            adminPushTokenRepository.deleteByToken(token);
-            adminPushTokenRepository.flush(); // Force delete
 
-            AdminPushToken pushToken = AdminPushToken.builder()
-                    .adminId(adminId)
-                    .token(token)
-                    .build();
-            adminPushTokenRepository.save(pushToken);
         } catch (Exception e) {
              log.warn("Failed to save push token: {}", e.getMessage());
         }
@@ -63,6 +64,14 @@ public class AdminPushTokenService {
 
     @Transactional
     public void removeToken(String token) {
+        adminPushTokenRepository.deleteByToken(token);
+        log.info("Removed push token: {}", token);
+    }
+
+    public List<AdminPushToken> getTokensForAdmins(List<Long> adminIds) {
+        return adminPushTokenRepository.findByAdminIdIn(adminIds);
+    }
+}
         adminPushTokenRepository.deleteByToken(token);
         log.info("Removed push token: {}", token);
     }
