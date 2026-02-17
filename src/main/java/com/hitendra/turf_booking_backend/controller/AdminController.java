@@ -62,6 +62,7 @@ public class AdminController {
     private final DisabledSlotService disabledSlotService;
     private final RefundService refundService;
     private final BookingRepository bookingRepository;
+    private final AdminPushTokenService adminPushTokenService;
 
     // ==================== Profile Management ====================
 
@@ -1045,6 +1046,31 @@ public class AdminController {
         com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto report =
                 revenueService.getServiceTodayRevenueReport(serviceId);
         return ResponseEntity.ok(report);
+    }
+
+    // ==================== Push Notification Token Management ====================
+
+    @PostMapping("/push-token")
+    @Operation(summary = "Save Admin Push Token", description = "Register a push notification token for the current admin")
+    public ResponseEntity<Void> savePushToken(@RequestBody java.util.Map<String, String> payload) {
+        String token = payload.get("token");
+        if (token == null || token.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long adminId = getCurrentUserId();
+        adminPushTokenService.saveToken(adminId, token);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/push-token")
+    @Operation(summary = "Remove Admin Push Token", description = "Remove a push notification token on logout")
+    public ResponseEntity<Void> removePushToken(@RequestBody java.util.Map<String, String> payload) {
+        String token = payload.get("token");
+        if (token != null && !token.isEmpty()) {
+            adminPushTokenService.removeToken(token);
+        }
+        return ResponseEntity.ok().build();
     }
 
     // ==================== Helper Methods ====================

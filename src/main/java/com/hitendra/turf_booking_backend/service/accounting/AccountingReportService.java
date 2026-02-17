@@ -37,8 +37,6 @@ public class AccountingReportService {
     private final ServiceRepository serviceRepository;
     private final BookingRepository bookingRepository;
     private final ExpenseRepository expenseRepository;
-    private final InventorySaleRepository saleRepository;
-    private final InventoryPurchaseRepository purchaseRepository;
     private final CashLedgerRepository ledgerRepository;
 
     /**
@@ -97,15 +95,10 @@ public class AccountingReportService {
             serviceId, startDate, endDate);
         if (bookingRevenue == null) bookingRevenue = 0.0;
 
-        // Inventory Sales Revenue
-        Double inventorySalesRevenue = saleRepository.getTotalSalesByServiceAndDateRange(
-            serviceId, startDate, endDate);
-        if (inventorySalesRevenue == null) inventorySalesRevenue = 0.0;
+        Double totalIncome = bookingRevenue;
 
-        Double totalIncome = bookingRevenue + inventorySalesRevenue;
-
-        log.info("INCOME - Bookings: {}, Inventory Sales: {}, Total: {}",
-            bookingRevenue, inventorySalesRevenue, totalIncome);
+        log.info("INCOME - Bookings: {}, Total: {}",
+            bookingRevenue, totalIncome);
 
         // ═══════════════════════════════════════════════════════════════════════
         // STEP 2: CALCULATE EXPENSES
@@ -131,27 +124,10 @@ public class AccountingReportService {
             totalExpenses, expenseBreakdown.size());
 
         // ═══════════════════════════════════════════════════════════════════════
-        // STEP 3: CALCULATE INVENTORY METRICS
+        // STEP 3: CALCULATE NET PROFIT
         // ═══════════════════════════════════════════════════════════════════════
 
-        // Inventory Purchases (money spent buying stock)
-        Double inventoryPurchases = purchaseRepository.getTotalPurchasesByServiceAndDateRange(
-            serviceId, startDate, endDate);
-        if (inventoryPurchases == null) inventoryPurchases = 0.0;
-
-        // Inventory Profit = Sales - Purchases
-        Double inventoryProfit = inventorySalesRevenue - inventoryPurchases;
-
-        log.info("INVENTORY - Purchases: {}, Sales: {}, Profit: {}",
-            inventoryPurchases, inventorySalesRevenue, inventoryProfit);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // STEP 4: CALCULATE NET PROFIT
-        // ═══════════════════════════════════════════════════════════════════════
-
-        // Net Profit = Total Income - Total Expenses - Inventory Purchases
-        // Note: Inventory purchases are already counted in expenses,
-        // but we separate them for clarity
+        // Net Profit = Total Income - Total Expenses
         Double netProfit = totalIncome - totalExpenses;
 
         // Profit Margin % = (Net Profit / Total Income) * 100
@@ -160,7 +136,7 @@ public class AccountingReportService {
         log.info("NET PROFIT: {}, Margin: {}%", netProfit, profitMargin);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // STEP 5: CALCULATE CASH FLOW (from ledger)
+        // STEP 4: CALCULATE CASH FLOW (from ledger)
         // ═══════════════════════════════════════════════════════════════════════
 
         // Opening balance (before start date)
@@ -177,7 +153,7 @@ public class AccountingReportService {
         if (totalCashOut == null) totalCashOut = 0.0;
 
         // Closing balance
-        Double closingBalance = openingBalance;
+        Double closingBalance = openingBalance + totalCashIn - totalCashOut;
 
         log.info("CASH FLOW - Opening: {}, In: {}, Out: {}, Closing: {}",
             openingBalance, totalCashIn, totalCashOut, closingBalance);
@@ -193,15 +169,10 @@ public class AccountingReportService {
             .endDate(endDate)
             // Income
             .bookingRevenue(bookingRevenue)
-            .inventorySalesRevenue(inventorySalesRevenue)
             .totalIncome(totalIncome)
             // Expenses
             .totalExpenses(totalExpenses)
             .expenseBreakdown(expenseBreakdown)
-            // Inventory
-            .inventoryPurchases(inventoryPurchases)
-            .inventorySales(inventorySalesRevenue)
-            .inventoryProfit(inventoryProfit)
             // Summary
             .netProfit(netProfit)
             .profitMargin(Math.round(profitMargin * 100.0) / 100.0)

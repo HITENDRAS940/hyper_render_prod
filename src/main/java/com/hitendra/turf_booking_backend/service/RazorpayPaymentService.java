@@ -34,6 +34,7 @@ public class RazorpayPaymentService {
     private final BookingRepository bookingRepository;
     private final SmsService smsService;
     private final EmailService emailService;
+    private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
 
     @Lazy
     private final RefundService refundService;
@@ -307,6 +308,14 @@ public class RazorpayPaymentService {
 
             // Send notifications (SMS and Email)
             sendBookingNotifications(booking);
+
+            // Publish event for async processing (e.g. Admin Push Notifications)
+            try {
+                applicationEventPublisher.publishEvent(new com.hitendra.turf_booking_backend.event.BookingConfirmedEvent(booking));
+                log.info("Published BookingConfirmedEvent for booking ID: {}", booking.getId());
+            } catch (Exception e) {
+                log.error("Failed to publish BookingConfirmedEvent for booking ID: {}", booking.getId(), e);
+            }
 
 
             log.info("✅ Payment captured successfully. Booking confirmed: ID={}, PaymentID={}",

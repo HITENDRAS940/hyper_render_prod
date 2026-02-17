@@ -6,9 +6,7 @@ package com.hitendra.turf_booking_backend.entity.accounting;
  */
 public enum ReferenceType {
     BOOKING,            // References Booking entity
-    INVENTORY_SALE,     // References InventorySale entity
     EXPENSE,            // References Expense entity
-    INVENTORY_PURCHASE, // References InventoryPurchase entity
     REFUND,             // References Refund/Cancellation entity
     ADJUSTMENT          // Manual adjustment (no entity reference)
 }

@@ -24,17 +24,12 @@ public class ProfitLossReportDto {
 
     // INCOME
     private Double bookingRevenue;
-    private Double inventorySalesRevenue;
     private Double totalIncome;
 
     // EXPENSES
     private Double totalExpenses;
     private Map<String, Double> expenseBreakdown; // Category → Amount
 
-    // INVENTORY
-    private Double inventoryPurchases;
-    private Double inventorySales;
-    private Double inventoryProfit;
 
     // SUMMARY
     private Double netProfit;      // Total Income - Total Expenses

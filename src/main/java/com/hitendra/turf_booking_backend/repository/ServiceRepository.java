@@ -189,5 +189,9 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
     @Query("SELECT DISTINCT s.city FROM Service s WHERE s.city IS NOT NULL AND s.city != '' AND s.city != 'Unknown' ORDER BY s.city")
     List<String> findAllDistinctCities();
 
-    // ==================== END OPTIMIZED PROJECTION QUERIES ====================
+    /**
+     * Get admin IDs associated with a service.
+     */
+    @Query("SELECT s.createdBy.user.id FROM Service s WHERE s.id = :serviceId")
+    List<Long> findAdminIdsByServiceId(@Param("serviceId") Long serviceId);
 }
