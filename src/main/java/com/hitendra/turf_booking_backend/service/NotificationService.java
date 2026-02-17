@@ -111,6 +111,8 @@ public class NotificationService {
                     String invalidToken = (String) sentMessages.get(i).get("to");
                     log.info("Removing invalid token: {}", invalidToken);
                     adminPushTokenService.removeToken(invalidToken);
+                } else if ("InvalidCredentials".equals(error) || "MismatchSenderId".equals(error)) {
+                    log.error("Expo/FCM Configuration Error: {}. Please check your Expo Dashboard credentials for this project.", message);
                 }
             }
         }
