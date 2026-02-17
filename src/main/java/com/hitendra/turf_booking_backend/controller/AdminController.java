@@ -1068,7 +1068,8 @@ public class AdminController {
     public ResponseEntity<Void> removePushToken(@RequestBody java.util.Map<String, String> payload) {
         String token = payload.get("token");
         if (token != null && !token.isEmpty()) {
-            adminPushTokenService.removeToken(token);
+            Long adminId = getCurrentUserId();
+            adminPushTokenService.removeTokenForAdmin(adminId, token);
         }
         return ResponseEntity.ok().build();
     }

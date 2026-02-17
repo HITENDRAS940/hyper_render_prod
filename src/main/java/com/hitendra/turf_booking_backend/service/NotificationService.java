@@ -21,6 +21,7 @@ public class NotificationService {
 
     private final AdminPushTokenService adminPushTokenService;
     private final ServiceRepository serviceRepository;
+    private final com.hitendra.turf_booking_backend.repository.BookingRepository bookingRepository;
     private final RestTemplate restTemplate;
 
     @Value("${expo.push.url:https://exp.host/--/api/v2/push/send}")
@@ -29,13 +30,18 @@ public class NotificationService {
     @Value("${expo.push.enabled:true}")
     private boolean expoPushEnabled;
 
-    public void notifyAdmins(Booking booking) {
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public void notifyAdmins(Booking bookingEventPayload) {
         if (!expoPushEnabled) {
-            log.info("Expo push notifications are disabled. Skipping notification for booking: {}", booking.getId());
+            log.info("Expo push notifications are disabled. Skipping notification for booking: {}", bookingEventPayload.getId());
             return;
         }
 
         try {
+            // Re-fetch booking with all relationships to avoid LazyInitializationException in async thread
+            Booking booking = bookingRepository.findByIdWithAllRelationships(bookingEventPayload.getId())
+                    .orElse(bookingEventPayload);
+
             Long serviceId = booking.getService().getId();
             log.info("Notifying admins for booking ID: {}, Service ID: {}", booking.getId(), serviceId);
 
@@ -55,19 +61,30 @@ public class NotificationService {
 
             // 4. Send push notifications in bulk
             List<Map<String, Object>> pushMessages = new ArrayList<>();
+
+            String serviceName = booking.getService().getName();
+            String userName = booking.getUser().getName() != null ? booking.getUser().getName() : "Customer";
+            String date = booking.getBookingDate().toString();
+            String time = booking.getStartTime() + " - " + booking.getEndTime();
+
             for (AdminPushToken token : tokens) {
                 Map<String, Object> message = new HashMap<>();
                 message.put("to", token.getToken());
-                message.put("title", "New Booking Confirmed");
-                message.put("body", "Slot: " + booking.getStartTime() + " - " + booking.getEndTime());
-                message.put("data", Map.of("bookingId", booking.getId()));
+                message.put("title", "New Booking @ " + serviceName);
+                message.put("body", String.format("%s booked for %s at %s", userName, date, time));
+
+                Map<String, Object> data = new HashMap<>();
+                data.put("bookingId", booking.getId());
+                data.put("serviceId", booking.getService().getId());
+                message.put("data", data);
+
                 pushMessages.add(message);
             }
 
             sendExpoPushNotifications(pushMessages, tokens);
 
         } catch (Exception e) {
-            log.error("Failed to notify admins for booking: {}", booking.getId(), e);
+            log.error("Failed to notify admins for booking: {}", bookingEventPayload.getId(), e);
         }
     }
 

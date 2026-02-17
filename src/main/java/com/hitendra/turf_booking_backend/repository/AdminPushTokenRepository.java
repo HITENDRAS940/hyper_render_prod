@@ -13,6 +13,8 @@ public interface AdminPushTokenRepository extends JpaRepository<AdminPushToken, 
 
     boolean existsByAdminIdAndToken(Long adminId, String token);
 
+    void deleteByAdminIdAndToken(Long adminId, String token);
+
     void deleteByToken(String token);
 }
 

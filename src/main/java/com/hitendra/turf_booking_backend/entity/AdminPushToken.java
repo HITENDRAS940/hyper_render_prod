@@ -21,7 +21,7 @@ public class AdminPushToken {
     @Column(nullable = false)
     private Long adminId;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private String token;
 
     @Column(nullable = false)
