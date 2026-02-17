@@ -72,13 +72,5 @@ public class AdminPushTokenService {
         return adminPushTokenRepository.findByAdminIdIn(adminIds);
     }
 }
-        adminPushTokenRepository.deleteByToken(token);
-        log.info("Removed push token: {}", token);
-    }
-
-    public List<AdminPushToken> getTokensForAdmins(List<Long> adminIds) {
-        return adminPushTokenRepository.findByAdminIdIn(adminIds);
-    }
-}
 
 
