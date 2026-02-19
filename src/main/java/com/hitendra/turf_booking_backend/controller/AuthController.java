@@ -36,10 +36,13 @@ public class AuthController {
     }
 
     @PostMapping("/request-email-otp")
-    @Operation(summary = "Request Email OTP", description = "Send OTP to user's email address")
-    public ResponseEntity<String> requestEmailOtp(@Valid @RequestBody RequestEmailOtpDto request) {
-        emailOtpService.requestEmailOtp(request);
-        return ResponseEntity.ok("OTP sent successfully to your email");
+    @Operation(
+        summary = "Request Email OTP",
+        description = "Send OTP to user's email address. For test accounts (googletest@hyper.com, razorpaytest@hyper.com), returns JWT token directly without OTP."
+    )
+    public ResponseEntity<EmailOtpResponseDto> requestEmailOtp(@Valid @RequestBody RequestEmailOtpDto request) {
+        EmailOtpResponseDto response = emailOtpService.requestEmailOtp(request);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify-email-otp")

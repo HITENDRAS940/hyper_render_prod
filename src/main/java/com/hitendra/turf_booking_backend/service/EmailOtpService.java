@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.service;
 
+import com.hitendra.turf_booking_backend.dto.auth.EmailOtpResponseDto;
 import com.hitendra.turf_booking_backend.dto.auth.JwtResponseDto;
 import com.hitendra.turf_booking_backend.dto.auth.RequestEmailOtpDto;
 import com.hitendra.turf_booking_backend.dto.auth.VerifyEmailOtpDto;
@@ -29,11 +30,22 @@ public class EmailOtpService {
     private final JwtUtils jwtUtils;
     private final EmailService emailService;
 
+    // Test accounts that bypass OTP and generate token directly
+    private static final String GOOGLE_TEST_EMAIL = "googletest@hyper.com";
+    private static final String RAZORPAY_TEST_EMAIL = "razorpaytest@hyper.com";
+
     /**
      * Request OTP for email
+     * For test accounts (googletest@hyper.com, razorpaytest@hyper.com), bypass OTP and return token directly
      */
-    public void requestEmailOtp(RequestEmailOtpDto request) {
+    public EmailOtpResponseDto requestEmailOtp(RequestEmailOtpDto request) {
         String email = request.getEmail().toLowerCase().trim();
+
+        // Check if this is a test account - bypass OTP and generate token directly
+        if (isTestAccount(email)) {
+            log.info("Test account detected - bypassing OTP and generating token directly: {}", email);
+            return handleTestAccountLogin(email);
+        }
 
         // Generate 6-digit OTP
         String otpCode = generateOtpCode(email);
@@ -60,6 +72,8 @@ public class EmailOtpService {
                 "Failed to send OTP email. Please try again."
             );
         }
+
+        return EmailOtpResponseDto.otpSent();
     }
 
     /**
@@ -164,6 +178,66 @@ public class EmailOtpService {
 
         // For production users, use random OTP
         return String.format("%06d", new Random().nextInt(1000000));
+    }
+
+    /**
+     * Check if the provided email is a test account
+     */
+    private boolean isTestAccount(String email) {
+        return GOOGLE_TEST_EMAIL.equalsIgnoreCase(email) ||
+               RAZORPAY_TEST_EMAIL.equalsIgnoreCase(email);
+    }
+
+    /**
+     * Handle test account login - bypass OTP and generate token directly
+     */
+    private EmailOtpResponseDto handleTestAccountLogin(String email) {
+        log.info("Processing test account login via email OTP - Email: {}", email);
+
+        // Check if user exists (login) or needs to be created (registration)
+        User user = userRepository.findByEmail(email).orElse(null);
+        boolean isNewUser = false;
+
+        if (user == null) {
+            // REGISTRATION FLOW: Create new user
+            log.info("New test user registration via email: {}", email);
+
+            // Determine name based on email
+            String name = email.equals(GOOGLE_TEST_EMAIL) ? "Google Test User" : "Razorpay Test User";
+
+            user = User.builder()
+                    .email(email)
+                    .name(name)
+                    .emailVerified(true)
+                    .build();
+
+            user = userRepository.save(user);
+            isNewUser = true;
+        } else {
+            // LOGIN FLOW: User already exists
+            log.info("Existing test user login via email: userId={}, email={}", user.getId(), email);
+
+            // Update email verified status if not already set
+            if (!user.isEmailVerified()) {
+                user.setEmailVerified(true);
+                userRepository.save(user);
+            }
+
+            isNewUser = false;
+        }
+
+        // Generate JWT token (email-based)
+        String token = jwtUtils.generateTokenFromEmail(
+                user.getEmail(),
+                "ROLE_" + user.getRole().name(),
+                user.getId(),
+                user.getName(),
+                user.getPhone()
+        );
+
+        log.info("Test account email login successful - generated token for user: {}", user.getId());
+
+        return EmailOtpResponseDto.testAccountLogin(token, isNewUser, email);
     }
 }
 

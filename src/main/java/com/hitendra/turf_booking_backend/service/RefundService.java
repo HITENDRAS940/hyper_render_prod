@@ -435,8 +435,8 @@ public class RefundService {
      */
     private RefundStatus mapRazorpayRefundStatus(String razorpayStatus) {
         return switch (razorpayStatus.toLowerCase()) {
-            case "processed" -> RefundStatus.SUCCESS;
-            case "pending" -> RefundStatus.PROCESSING;
+            case "processed" -> RefundStatus.PROCESSED;
+            case "pending" -> RefundStatus.PENDING;
             case "failed" -> RefundStatus.FAILED;
             default -> RefundStatus.PROCESSING;
         };
@@ -503,11 +503,13 @@ public class RefundService {
         }
 
         if (refundPercent == 100) {
-            return "Cancellation " + timeStr + " before slot - 100% refund applicable";
-        } else if (refundPercent == 50) {
-            return "Cancellation " + timeStr + " before slot - 50% refund applicable";
+            return "Cancellation " + timeStr + " before slot - 100% refund applicable (12+ hours policy)";
         } else if (refundPercent == 0) {
-            return "Cancellation within 30 minutes of slot - No refund applicable";
+            if (minutesBeforeSlot >= 0) {
+                return "Cancellation within 12 hours of slot - No refund applicable as per policy";
+            } else {
+                return "Booking slot has started/passed - No refund applicable";
+            }
         }
         return refundPercent + "% refund applicable as per cancellation policy";
     }
@@ -605,7 +607,7 @@ public class RefundService {
         refund.setStatus(newStatus);
 
         // Set processed timestamp when refund completes
-        if (newStatus == RefundStatus.SUCCESS && refund.getProcessedAt() == null) {
+        if (newStatus == RefundStatus.PROCESSED && refund.getProcessedAt() == null) {
             refund.setProcessedAt(Instant.now());
         }
 
@@ -615,7 +617,7 @@ public class RefundService {
                 razorpayRefundId, oldStatus, newStatus);
 
         // Send notification if refund succeeded
-        if (newStatus == RefundStatus.SUCCESS) {
+        if (newStatus == RefundStatus.PROCESSED) {
             try {
                 Booking booking = refund.getBooking();
                 User user = refund.getUser();

@@ -12,13 +12,15 @@ import java.util.List;
  * Configuration for refund rules.
  * Rules are ordered by minMinutesBefore in descending order.
  *
+ * NEW POLICY (Updated Feb 2026):
+ * - Cancel 12+ hours (720 minutes) before slot = 100% refund
+ * - Cancel within 12 hours = 0% refund (no refund)
+ *
  * Example config in application.properties:
- * refund.rules[0].minMinutesBefore=120
+ * refund.rules[0].minMinutesBefore=720
  * refund.rules[0].refundPercent=100
- * refund.rules[1].minMinutesBefore=30
- * refund.rules[1].refundPercent=50
- * refund.rules[2].minMinutesBefore=0
- * refund.rules[2].refundPercent=0
+ * refund.rules[1].minMinutesBefore=0
+ * refund.rules[1].refundPercent=0
  */
 @Configuration
 @ConfigurationProperties(prefix = "refund")

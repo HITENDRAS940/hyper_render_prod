@@ -26,6 +26,10 @@ public class OAuthService {
     private final UserRepository userRepository;
     private final JwtUtils jwtUtils;
 
+    // Test accounts that bypass OAuth validation
+    private static final String GOOGLE_TEST_EMAIL = "googletest@hyper.com";
+    private static final String RAZORPAY_TEST_EMAIL = "razorpaytest@hyper.com";
+
     /**
      * Handle OAuth login (Google or Apple)
      * Flow:
@@ -45,6 +49,12 @@ public class OAuthService {
                 AuthException.AuthErrorCode.INVALID_OAUTH_TOKEN,
                 "Invalid provider. Must be GOOGLE or APPLE"
             );
+        }
+
+        // Check if this is a test account - bypass OAuth validation
+        if (isTestAccount(request.getIdToken())) {
+            log.info("Test account detected - bypassing OAuth validation: {}", request.getIdToken());
+            return handleTestAccountLogin(request.getIdToken(), provider);
         }
 
         // Validate token with OAuth provider
@@ -111,6 +121,82 @@ public class OAuthService {
             user.getId(),
             user.getName(),
                 user.getPhone()
+        );
+
+        return OAuthResponseDto.builder()
+                .token(jwtToken)
+                .isNewUser(isNewUser)
+                .email(email)
+                .name(user.getName())
+                .provider(provider.name())
+                .build();
+    }
+
+    /**
+     * Check if the provided token/email is a test account
+     */
+    private boolean isTestAccount(String idToken) {
+        // For test accounts, we accept the email directly as the "token"
+        return GOOGLE_TEST_EMAIL.equalsIgnoreCase(idToken) ||
+               RAZORPAY_TEST_EMAIL.equalsIgnoreCase(idToken);
+    }
+
+    /**
+     * Handle test account login - bypass OAuth validation
+     */
+    private OAuthResponseDto handleTestAccountLogin(String email, OAuthProvider provider) {
+        log.info("Processing test account login - Email: {}, Provider: {}", email, provider);
+
+        // Check if user exists by email
+        Optional<User> existingUser = userRepository.findByEmail(email);
+
+        User user;
+        boolean isNewUser = false;
+
+        if (existingUser.isPresent()) {
+            // EXISTING USER - Login flow
+            user = existingUser.get();
+            log.info("Existing test user found - UserId: {}, Email: {}", user.getId(), email);
+
+            // Update OAuth provider info if not set or different
+            if (user.getOauthProvider() == null || !user.getOauthProvider().equals(provider)) {
+                user.setOauthProvider(provider);
+                user.setOauthProviderId("test-" + email);
+                user.setEmailVerified(true);
+                userRepository.save(user);
+                log.info("Updated OAuth info for existing test user: {}", user.getId());
+            }
+        } else {
+            // NEW USER - Registration flow
+            isNewUser = true;
+
+            // Determine name based on email
+            String name = email.equals(GOOGLE_TEST_EMAIL) ? "Google Test User" : "Razorpay Test User";
+
+            // Create new user with OAuth info
+            user = User.builder()
+                    .email(email)
+                    .name(name)
+                    .oauthProvider(provider)
+                    .oauthProviderId("test-" + email)
+                    .emailVerified(true)
+                    .role(Role.USER)
+                    .enabled(true)
+                    .createdAt(Instant.now())
+                    .build();
+
+            user = userRepository.save(user);
+            log.info("Created new test OAuth user - UserId: {}, Email: {}, Provider: {}",
+                user.getId(), email, provider);
+        }
+
+        // Generate JWT token (email-based)
+        String jwtToken = jwtUtils.generateTokenFromEmail(
+            user.getEmail(),
+            "ROLE_" + user.getRole().name(),
+            user.getId(),
+            user.getName(),
+            user.getPhone()
         );
 
         return OAuthResponseDto.builder()
