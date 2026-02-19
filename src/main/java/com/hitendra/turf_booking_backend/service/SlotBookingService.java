@@ -17,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -423,7 +424,7 @@ public class SlotBookingService {
      * @param request The booking request with multiple slot keys
      * @return BookingResponseDto with merged booking details
      */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookingResponseDto createSlotBooking(SlotBookingRequestDto request) {
 
         log.info("Processing slot booking request with {} slotKeys, paymentMethod={}",
@@ -719,7 +720,14 @@ public class SlotBookingService {
                 .idempotencyKey(request.getIdempotencyKey())
                 .build();
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking;
+        try {
+            savedBooking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent booking conflict detected for resource {} on {} at {}-{}. Slot was just booked by another user.",
+                    resource.getId(), bookingDate, startTime, endTime);
+            throw new BookingException("This slot was just booked by someone else. Please refresh and try again.");
+        }
 
         BookingResponseDto response = convertToResponseDto(savedBooking);
         response.setBookingType("SINGLE_RESOURCE");
@@ -796,7 +804,14 @@ public class SlotBookingService {
                     .idempotencyKey(idempotencyKey)
                     .build();
 
-            Booking savedBooking = bookingRepository.save(booking);
+            Booking savedBooking;
+            try {
+                savedBooking = bookingRepository.save(booking);
+            } catch (DataIntegrityViolationException e) {
+                log.warn("Concurrent booking conflict in split booking for resource {} at {}",
+                        assignedResource.getId(), payload.getStartTime());
+                throw new BookingException("A slot was just booked by someone else. Please refresh and try again.");
+            }
             responses.add(convertToResponseDto(savedBooking));
         }
         return responses;
@@ -1135,7 +1150,7 @@ public class SlotBookingService {
      * @param adminProfileId Admin profile ID who is creating the booking
      * @return BookingResponseDto with booking details
      */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookingResponseDto createAdminManualBooking(AdminManualBookingRequestDto request, Long adminProfileId) {
 
         log.info("Processing admin manual booking request with {} slotKeys",
@@ -1312,7 +1327,14 @@ public class SlotBookingService {
                 .paymentStatusEnum(PaymentStatus.SUCCESS) // Mark payment as complete
                 .build();
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking;
+        try {
+            savedBooking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent booking conflict in admin manual booking for resource {} on {} at {}-{}",
+                    availableResource.getId(), bookingDate, startTime, endTime);
+            throw new BookingException("This slot was just booked by someone else. Please refresh and try again.");
+        }
 
         log.info("Admin manual booking created: reference={}, adminId={}", reference, adminProfileId);
 
@@ -1374,7 +1396,7 @@ public class SlotBookingService {
      * @param reference Booking reference
      * @return Cancelled booking details
      */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookingResponseDto cancelBookingByReference(String reference) {
         return cancelBooking(reference);
     }
@@ -1387,7 +1409,7 @@ public class SlotBookingService {
      * @param adminProfileId Admin profile ID who is creating the booking
      * @return BookingResponseDto with CONFIRMED status
      */
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public BookingResponseDto createDirectManualBooking(DirectManualBookingRequestDto request, Long adminProfileId) {
 
         log.info("Processing direct manual booking - Service: {}, Resource: {}, Date: {}, Time: {} to {}",
@@ -1500,7 +1522,14 @@ public class SlotBookingService {
                 .reference(reference)
                 .build();
 
-        Booking savedBooking = bookingRepository.save(booking);
+        Booking savedBooking;
+        try {
+            savedBooking = bookingRepository.save(booking);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent booking conflict in direct manual booking for resource {} on {} at {}-{}",
+                    request.getResourceId(), request.getBookingDate(), request.getStartTime(), request.getEndTime());
+            throw new BookingException("This slot was just booked by someone else. Please refresh and try again.");
+        }
 
         log.info("Direct manual booking created: reference={}, adminId={}, adminProfile set={}, resourceId={}, amount={}",
                 reference, adminProfileId, savedBooking.getAdminProfile() != null,
