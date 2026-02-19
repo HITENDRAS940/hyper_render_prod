@@ -13,13 +13,6 @@ import java.math.BigDecimal;
 public class EmailService {
 
     private final GmailService gmailService;
-
-    @Value("${email.from-email}")
-    private String fromEmail;
-
-    @Value("${email.from-name}")
-    private String fromName;
-
     /**
      * Send OTP email to user using Gmail API
      */

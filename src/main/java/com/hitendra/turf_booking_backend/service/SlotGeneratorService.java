@@ -110,49 +110,5 @@ public class SlotGeneratorService {
         return slots;
     }
 
-    /**
-     * Find a specific slot by start time.
-     *
-     * @param config The ResourceSlotConfig
-     * @param startTime The start time to find
-     * @return The matching slot, or null if not found
-     */
-    public GeneratedSlot findSlotByStartTime(ResourceSlotConfig config, LocalTime startTime) {
-        List<GeneratedSlot> slots = generateSlots(config);
-
-        return slots.stream()
-                .filter(slot -> slot.getStartTime().equals(startTime))
-                .findFirst()
-                .orElse(null);
-    }
-
-    /**
-     * Check if a given time range is valid for the config.
-     *
-     * @param config The ResourceSlotConfig
-     * @param startTime Start time of the requested slot
-     * @param endTime End time of the requested slot
-     * @return true if the time range matches a valid slot
-     */
-    public boolean isValidSlot(ResourceSlotConfig config, LocalTime startTime, LocalTime endTime) {
-        if (config == null || startTime == null || endTime == null) {
-            return false;
-        }
-
-        // Check if start and end are within operating hours
-        if (startTime.isBefore(config.getOpeningTime()) || endTime.isAfter(config.getClosingTime())) {
-            return false;
-        }
-
-        // Check if duration matches slot duration
-        int requestedMinutes = (endTime.toSecondOfDay() - startTime.toSecondOfDay()) / 60;
-        if (requestedMinutes != config.getSlotDurationMinutes()) {
-            return false;
-        }
-
-        // Check if start time aligns with slot boundaries
-        int minutesFromOpening = (startTime.toSecondOfDay() - config.getOpeningTime().toSecondOfDay()) / 60;
-        return minutesFromOpening % config.getSlotDurationMinutes() == 0;
-    }
 }
 

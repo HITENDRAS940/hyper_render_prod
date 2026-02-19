@@ -11,9 +11,7 @@ import com.hitendra.turf_booking_backend.dto.dashboard.AdminDashboardStatsDto;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
-import com.hitendra.turf_booking_backend.dto.slot.BulkDisableSlotRequestDto;
 import com.hitendra.turf_booking_backend.dto.slot.DeleteDisabledSlotsRequest;
-import com.hitendra.turf_booking_backend.dto.slot.DisableSlotRequestDto;
 import com.hitendra.turf_booking_backend.dto.slot.DisabledSlotDto;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.DeleteProfileRequest;
@@ -126,35 +124,6 @@ public class AdminController {
         return ResponseEntity.ok(service);
     }
 
-    @PostMapping("/services")
-    @Operation(summary = "Create service",
-            description = "Create a new service with basic details, activities, and amenities. " +
-                    "Request body should include: name, location, city, latitude, longitude, description, contactNumber, " +
-                    "activityCodes (list of activity codes like CRICKET, FOOTBALL), " +
-                    "amenities (list of amenity names like Parking, WiFi, Cafeteria, Lighting)")
-    public ResponseEntity<ServiceDto> createService(@Valid @RequestBody CreateServiceRequest request) {
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-        ServiceDto created = serviceService.createServiceDetails(request, adminProfile.getId());
-        return ResponseEntity.ok(created);
-    }
-
-    @PutMapping("/services/{serviceId}")
-    @Operation(summary = "Update service", description = "Update service details")
-    public ResponseEntity<ServiceDto> updateService(
-            @PathVariable Long serviceId,
-            @Valid @RequestBody CreateServiceRequest request) {
-        ServiceDto updatedService = serviceService.updateService(serviceId, request);
-        return ResponseEntity.ok(updatedService);
-    }
-
-    @DeleteMapping("/services/{serviceId}")
-    @Operation(summary = "Delete service", description = "Delete a service and all its images")
-    public ResponseEntity<String> deleteService(@PathVariable Long serviceId) {
-        serviceService.deleteService(serviceId);
-        return ResponseEntity.ok("Service deleted successfully");
-    }
-
     @PatchMapping("/services/{serviceId}/toggle")
     @Operation(summary = "Toggle service availability status",
             description = """
@@ -193,33 +162,6 @@ public class AdminController {
         return ResponseEntity.ok(service);
     }
 
-    @PutMapping("/services/{serviceId}/location-from-url")
-    @Operation(summary = "Update service location from URL", description = "Extract latitude and longitude from a Google Maps URL and save to the service")
-    public ResponseEntity<ServiceDto> updateServiceLocationFromUrl(
-            @PathVariable Long serviceId,
-            @Valid @RequestBody LocationUrlRequest request) {
-        ServiceDto updated = serviceService.updateServiceLocationFromUrl(serviceId, request.getLocationUrl());
-        return ResponseEntity.ok(updated);
-    }
-
-    @PostMapping(value = "/services/{serviceId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Upload service images", description = "Upload multiple images (maximum 4) for an existing service to Cloudinary")
-    public ResponseEntity<ServiceImageUploadResponse> uploadServiceImages(
-            @PathVariable Long serviceId,
-            @RequestPart("images") List<MultipartFile> images) {
-        ServiceImageUploadResponse response = serviceService.uploadServiceImages(serviceId, images);
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/services/{serviceId}/images")
-    @Operation(summary = "Delete specific images", description = "Delete specific images from a service")
-    public ResponseEntity<String> deleteServiceImages(
-            @PathVariable Long serviceId,
-            @RequestBody List<String> imageUrls) {
-        serviceService.deleteSpecificImages(serviceId, imageUrls);
-        return ResponseEntity.ok("Images deleted successfully");
-    }
-
     // ==================== Resource Management ====================
 
     @GetMapping("/services/{serviceId}/resources")
@@ -234,36 +176,6 @@ public class AdminController {
     public ResponseEntity<ServiceResourceDto> getResourceById(@PathVariable Long resourceId) {
         ServiceResourceDto resource = serviceResourceService.getResourceById(resourceId);
         return ResponseEntity.ok(resource);
-    }
-
-    @PostMapping("/services/{serviceId}/resources")
-    @Operation(summary = "Add resource to service",
-            description = "Add a new resource to a service with default slot configuration and activities. " +
-                    "Request body should include: name, description (optional), enabled, " +
-                    "openingTime, closingTime, slotDurationMinutes, basePrice, " +
-                    "activityCodes (list of activities this resource supports, e.g., [\"CRICKET\", \"FOOTBALL\"])")
-    public ResponseEntity<ServiceResourceDto> addResource(
-            @PathVariable Long serviceId,
-            @Valid @RequestBody CreateServiceResourceRequest request) {
-        request.setServiceId(serviceId);
-        ServiceResourceDto created = serviceResourceService.createResource(request);
-        return ResponseEntity.ok(created);
-    }
-
-    @PutMapping("/resources/{resourceId}")
-    @Operation(summary = "Update resource", description = "Update resource details (name, description, enabled)")
-    public ResponseEntity<ServiceResourceDto> updateResource(
-            @PathVariable Long resourceId,
-            @Valid @RequestBody UpdateServiceResourceRequest request) {
-        ServiceResourceDto updated = serviceResourceService.updateResource(resourceId, request);
-        return ResponseEntity.ok(updated);
-    }
-
-    @DeleteMapping("/resources/{resourceId}")
-    @Operation(summary = "Delete resource", description = "Delete a resource from the service")
-    public ResponseEntity<String> deleteResource(@PathVariable Long resourceId) {
-        serviceResourceService.deleteResource(resourceId);
-        return ResponseEntity.ok("Resource deleted successfully");
     }
 
     @PatchMapping("/resources/{resourceId}/toggle")
@@ -304,15 +216,6 @@ public class AdminController {
         return ResponseEntity.ok(config);
     }
 
-    @PostMapping("/resources/slot-config")
-    @Operation(summary = "Create/Update slot configuration",
-            description = "Create or update slot configuration for a resource (opening time, closing time, slot duration, base price)")
-    public ResponseEntity<ResourceSlotConfigDto> createOrUpdateSlotConfig(
-            @Valid @RequestBody ResourceSlotConfigRequest request) {
-        ResourceSlotConfigDto config = resourceSlotService.createOrUpdateSlotConfig(request);
-        return ResponseEntity.ok(config);
-    }
-
     @GetMapping("/resources/{resourceId}/slots")
     @Operation(summary = "Get resource slots with status", description = "Get all slots for a resource on a specific date with their status (AVAILABLE, BOOKED, DISABLED)")
     public ResponseEntity<List<ResourceSlotDetailDto>> getResourceSlots(
@@ -343,139 +246,7 @@ public class AdminController {
         return ResponseEntity.ok(rules);
     }
 
-    @PostMapping("/resources/price-rules")
-    @Operation(summary = "Add price rule",
-            description = "Add a dynamic pricing rule for a resource (e.g., night lighting charges, peak hours, weekend pricing)")
-    public ResponseEntity<ResourcePriceRuleDto> addPriceRule(
-            @Valid @RequestBody ResourcePriceRuleRequest request) {
-        ResourcePriceRuleDto rule = pricingService.createPriceRule(request);
-        return ResponseEntity.ok(rule);
-    }
-
-    @PutMapping("/resources/price-rules/{ruleId}")
-    @Operation(summary = "Update price rule",
-            description = "Update an existing pricing rule (time range, day type, price, etc.)")
-    public ResponseEntity<ResourcePriceRuleDto> updatePriceRule(
-            @PathVariable Long ruleId,
-            @Valid @RequestBody ResourcePriceRuleRequest request) {
-        ResourcePriceRuleDto updatedRule = pricingService.updateRuleById(ruleId, request);
-        return ResponseEntity.ok(updatedRule);
-    }
-
-    @DeleteMapping("/resources/price-rules/{ruleId}")
-    @Operation(summary = "Delete price rule", description = "Delete a pricing rule permanently")
-    public ResponseEntity<String> deletePriceRule(@PathVariable Long ruleId) {
-        pricingService.deletePriceRule(ruleId);
-        return ResponseEntity.ok("Price rule deleted successfully");
-    }
-
-    @PatchMapping("/resources/price-rules/{ruleId}/enable")
-    @Operation(summary = "Enable price rule", description = "Enable a disabled pricing rule")
-    public ResponseEntity<ResourcePriceRuleDto> enablePriceRule(@PathVariable Long ruleId) {
-        ResourcePriceRuleDto rule = pricingService.togglePriceRule(ruleId, true);
-        return ResponseEntity.ok(rule);
-    }
-
-    @PatchMapping("/resources/price-rules/{ruleId}/disable")
-    @Operation(summary = "Disable price rule", description = "Disable a pricing rule without deleting it")
-    public ResponseEntity<ResourcePriceRuleDto> disablePriceRule(@PathVariable Long ruleId) {
-        ResourcePriceRuleDto rule = pricingService.togglePriceRule(ruleId, false);
-        return ResponseEntity.ok(rule);
-    }
-
     // ==================== Booking Management ====================
-
-    @GetMapping("/bookings/debug")
-    @Operation(summary = "Debug bookings query", description = "Debug endpoint to see raw booking data for troubleshooting")
-    public ResponseEntity<String> debugBookings() {
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-
-        // Get bookings with eager loading using a dedicated query
-        List<com.hitendra.turf_booking_backend.entity.Booking> allBookings =
-                bookingRepository.findTop50ByOrderByCreatedAtDesc();
-
-        StringBuilder debug = new StringBuilder();
-        debug.append("Current Admin Profile ID: ").append(adminProfile.getId()).append("\n");
-        debug.append("Current User ID: ").append(userId).append("\n\n");
-        debug.append("Recent Bookings (Top 50):\n");
-        debug.append("=".repeat(80)).append("\n");
-
-        for (com.hitendra.turf_booking_backend.entity.Booking booking : allBookings) {
-            debug.append("ID: ").append(booking.getId())
-                    .append(" | Ref: ").append(booking.getReference())
-                    .append(" | Status: ").append(booking.getStatus())
-                    .append(" | PaymentSource: ").append(booking.getPaymentSource())
-                    .append("\n");
-
-            // Safely access properties
-            Long bookingUserId = booking.getUser() != null ? booking.getUser().getId() : null;
-            Long bookingAdminProfileId = booking.getAdminProfile() != null ? booking.getAdminProfile().getId() : null;
-            Long serviceId = booking.getService() != null ? booking.getService().getId() : null;
-            Long serviceCreatedById = (booking.getService() != null && booking.getService().getCreatedBy() != null)
-                    ? booking.getService().getCreatedBy().getId() : null;
-
-            debug.append("  User ID: ").append(bookingUserId != null ? bookingUserId : "NULL")
-                    .append(" | Admin Profile ID (created_by_admin_id): ")
-                    .append(bookingAdminProfileId != null ? bookingAdminProfileId : "NULL")
-                    .append("\n");
-            debug.append("  Service ID: ").append(serviceId != null ? serviceId : "NULL")
-                    .append(" | Service CreatedBy ID: ")
-                    .append(serviceCreatedById != null ? serviceCreatedById : "NULL")
-                    .append("\n");
-            debug.append("  Date: ").append(booking.getBookingDate())
-                    .append(" | Amount: ").append(booking.getAmount())
-                    .append("\n");
-
-            // Check if this booking should appear for current admin
-            boolean shouldAppear = false;
-            String reason = "";
-            if (serviceCreatedById != null && serviceCreatedById.equals(adminProfile.getId())) {
-                shouldAppear = true;
-                reason = "service.createdBy matches";
-            }
-            if (bookingAdminProfileId != null && bookingAdminProfileId.equals(adminProfile.getId())) {
-                shouldAppear = true;
-                reason += (reason.isEmpty() ? "" : " AND ") + "adminProfile matches";
-            }
-
-            debug.append("  >>> Should appear for current admin: ").append(shouldAppear)
-                    .append(shouldAppear ? " (" + reason + ")" : "")
-                    .append("\n");
-            debug.append("-".repeat(80)).append("\n");
-        }
-
-        return ResponseEntity.ok(debug.toString());
-    }
-
-    @GetMapping("/bookings/test")
-    @Operation(summary = "Test booking query", description = "Test endpoint to directly query bookings")
-    public ResponseEntity<String> testBookingQuery() {
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-
-        log.info("TEST: Querying bookings for adminId: {}", adminProfile.getId());
-
-        // Try to get projections directly
-        var projections = bookingRepository.findBookingsByAdminIdProjected(
-                adminProfile.getId(),
-                org.springframework.data.domain.PageRequest.of(0, 100)
-        );
-
-        StringBuilder result = new StringBuilder();
-        result.append("Admin Profile ID: ").append(adminProfile.getId()).append("\n");
-        result.append("Total bookings found: ").append(projections.getTotalElements()).append("\n");
-        result.append("Page content size: ").append(projections.getContent().size()).append("\n\n");
-
-        for (var proj : projections.getContent()) {
-            result.append("ID: ").append(proj.getId())
-                    .append(" | Ref: ").append(proj.getReference())
-                    .append(" | Status: ").append(proj.getStatus())
-                    .append("\n");
-        }
-
-        return ResponseEntity.ok(result.toString());
-    }
 
     @GetMapping("/bookings")
     @Operation(summary = "Get all my bookings", description = "Get all bookings for services created by this admin. Optionally filter by date and/or status.")
@@ -556,17 +327,15 @@ public class AdminController {
         return ResponseEntity.ok(booking);
     }
 
-    @PutMapping("/bookings/{bookingId}/approve")
-    @Operation(summary = "Approve booking", description = "Manually approve a pending booking")
-    public ResponseEntity<BookingResponseDto> approveBooking(@PathVariable Long bookingId) {
-        BookingResponseDto approvedBooking = bookingService.approveBooking(bookingId);
-        return ResponseEntity.ok(approvedBooking);
-    }
-
     @PutMapping("/bookings/{bookingId}/complete")
-    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered")
-    public ResponseEntity<BookingResponseDto> completeBooking(@PathVariable Long bookingId) {
-        BookingResponseDto completedBooking = bookingService.completeBooking(bookingId);
+    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered. Requires venue payment collection details.")
+    public ResponseEntity<BookingResponseDto> completeBooking(
+            @PathVariable Long bookingId,
+            @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Venue payment collection details",
+                    required = true
+            ) com.hitendra.turf_booking_backend.dto.booking.CompleteBookingRequestDto request) {
+        BookingResponseDto completedBooking = bookingService.completeBooking(bookingId, request);
         return ResponseEntity.ok(completedBooking);
     }
 
@@ -612,41 +381,6 @@ public class AdminController {
                 .getAggregatedSlotAvailability(serviceId, activityCode, date);
 
         return ResponseEntity.ok(availability);
-    }
-
-    @PostMapping("/slots/book")
-    @Operation(summary = "Create manual booking for walk-in customer",
-            description = """
-                Create a manual booking for walk-in customers. This is similar to the user booking API but:
-                - No user authentication required (user_id will be null)
-                - Sets created_by_admin_id to current admin
-                - Booking is immediately CONFIRMED (no payment webhook required)
-                - Payment details are recorded as provided by admin
-                - Idempotency key is auto-generated
-                
-                **Intent-Based Booking:**
-                - Send `slotKeys` from the availability response
-                - Backend assigns an available resource automatically
-                - Slots must be contiguous
-                
-                **Payment Details:**
-                - Set onlineAmountPaid if customer paid via UPI/card to admin
-                - Set venueAmountCollected if cash was collected
-                - Can set both if partial payment was made
-                
-                **Customer Info:**
-                - customerName and customerPhone are optional
-                - Useful for tracking walk-in customers
-                """)
-    public ResponseEntity<BookingResponseDto> createManualBooking(
-            @Valid @RequestBody AdminManualBookingRequestDto request) {
-
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-
-        BookingResponseDto booking = slotBookingService.createAdminManualBooking(request, adminProfile.getId());
-
-        return ResponseEntity.status(201).body(booking);
     }
 
     @PostMapping("/slots/cancel/{reference}")
@@ -912,44 +646,6 @@ public class AdminController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
 
         List<DisabledSlotDto> disabledSlots = disabledSlotService.getDisabledSlotsInRange(resourceId, startDate, endDate);
-        return ResponseEntity.ok(disabledSlots);
-    }
-
-    @GetMapping("/slots/disabled/all")
-    @Operation(summary = "Get all disabled slots for admin's services",
-            description = """
-                Get all disabled slots across all services managed by the current admin.
-                Optionally filter by date range.
-                
-                **Without Date Filter:**
-                Returns all future disabled slots (from today onwards)
-                
-                **With Date Filter:**
-                Returns disabled slots within the specified date range
-                
-                **Use Cases:**
-                - View all upcoming disabled slots across all services
-                - Manage disabled slots from a central dashboard
-                - Audit which slots are currently disabled
-                
-                **Response:**
-                Each disabled slot includes:
-                - Disabled slot ID (for deletion)
-                - Resource information
-                - Date and time range
-                - Reason for disabling
-                - Who disabled it and when
-                """)
-    public ResponseEntity<List<DisabledSlotDto>> getAllDisabledSlotsForAdmin(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-
-        List<DisabledSlotDto> disabledSlots = disabledSlotService.getAllDisabledSlotsForAdmin(
-                adminProfile.getId(), startDate, endDate);
-
         return ResponseEntity.ok(disabledSlots);
     }
 

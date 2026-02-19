@@ -32,31 +32,30 @@ public class Expense {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id", nullable = false)
-    private Service service;
+    @JoinColumn(name = "venue_id", nullable = false)
+    private Service venue;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    private ExpenseCategory category;
+    @Column(nullable = false)
+    private String category;
 
     @Column(nullable = false)
     private String description;
 
-    @Column(nullable = false)
-    private Double amount;
+    @Column(nullable = false, precision = 15, scale = 2)
+    private java.math.BigDecimal amount;
 
+    @Column(name = "payment_mode")
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private PaymentMode paymentMode;
+    private PaymentMode paymentMode; // CASH, BANK
 
     @Column(nullable = false)
     private LocalDate expenseDate;
 
-    @Column
-    private String referenceNumber; // Bill number, transaction ID, etc.
+    @Column(name = "bill_url")
+    private String billUrl;
 
-    @Column
-    private String createdBy; // Admin/Staff who recorded this
+    @Column(name = "created_by")
+    private Long createdBy;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -65,5 +64,14 @@ public class Expense {
     protected void onCreate() {
         createdAt = Instant.now();
     }
-}
 
+    // Legacy getter alias
+    public Service getService() {
+        return venue;
+    }
+
+    // Legacy setter alias
+    public void setService(Service service) {
+        this.venue = service;
+    }
+}

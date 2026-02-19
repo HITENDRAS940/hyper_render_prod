@@ -76,6 +76,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName,
@@ -96,6 +97,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName,
@@ -179,6 +181,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
                r.id as resourceId, r.name as resourceName,
@@ -205,6 +208,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
                r.id as resourceId, r.name as resourceName,
@@ -232,6 +236,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
                r.id as resourceId, r.name as resourceName,
@@ -259,6 +264,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
                r.id as resourceId, r.name as resourceName,
@@ -286,6 +292,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName,
@@ -306,6 +313,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName,
@@ -326,6 +334,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.status AS string) as status, b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
                b.venueAmountCollected as venueAmountCollected,
+               CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName,
@@ -1043,4 +1052,45 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    // ==================== FINANCIAL AGGREGATION QUERIES ====================
+
+    /**
+     * Calculate Gross Revenue for a venue within a date range.
+     * Sum of total amount for non-cancelled bookings.
+     * Note: "bookings" table amount might be Double, so we cast to BigDecimal if needed or handle in Java.
+     * Ideally amount should be BigDecimal. The entity uses Double, but new fields are BigDecimal.
+     * Assuming amount column is compatible with sum.
+     */
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Booking b WHERE b.service.id = :venueId AND b.bookingDate BETWEEN :startDate AND :endDate AND b.status != 'CANCELLED' AND b.status != 'EXPIRED'")
+    Double calculateGrossRevenue(@Param("venueId") Long venueId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    /**
+     * Calculate Cancelled Revenue.
+     */
+    @Query("SELECT COALESCE(SUM(b.amount), 0) FROM Booking b WHERE b.service.id = :venueId AND b.status = 'CANCELLED'")
+    Double calculateCancelledRevenue(@Param("venueId") Long venueId);
+
+    /**
+     * Calculate Advance Pending (Held by platform).
+     * Sum of advance_amount where transfer_status is PENDING.
+     */
+    @Query("SELECT COALESCE(SUM(b.advanceAmount), 0) FROM Booking b WHERE b.service.id = :venueId AND b.transferStatus = 'PENDING'")
+    java.math.BigDecimal calculateAdvancePending(@Param("venueId") Long venueId);
+
+    /**
+     * Calculate Advance Received (Bank Inflow).
+     * Sum of advance_amount where transfer_status is TRANSFERRED.
+     */
+    @Query("SELECT COALESCE(SUM(b.advanceAmount), 0) FROM Booking b WHERE b.service.id = :venueId AND b.transferStatus = 'TRANSFERRED'")
+    java.math.BigDecimal calculateAdvanceReceived(@Param("venueId") Long venueId);
+
+    /**
+     * Calculate Cash Collected (Remaining amount).
+     * Sum of remaining_amount for COMPLETED bookings (assuming completed means played/paid).
+     * Or maybe bookings where venue_amount_collected is true?
+     * The prompt says: "Cash Collected ... WHERE status = 'COMPLETED'"
+     */
+    @Query("SELECT COALESCE(SUM(b.remainingAmount), 0) FROM Booking b WHERE b.service.id = :venueId AND b.status = 'COMPLETED'")
+    java.math.BigDecimal calculateCashCollected(@Param("venueId") Long venueId);
 }

@@ -1,9 +1,14 @@
 package com.hitendra.turf_booking_backend.service;
 
+import com.hitendra.turf_booking_backend.config.PlatformConfig;
 import com.hitendra.turf_booking_backend.dto.booking.*;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.entity.*;
+import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
+import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
+import com.hitendra.turf_booking_backend.entity.accounting.ReferenceType;
 import com.hitendra.turf_booking_backend.repository.*;
+import com.hitendra.turf_booking_backend.service.accounting.LedgerService;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +20,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,7 +38,9 @@ public class BookingService {
     private final EmailService emailService;
     private final ResourceSlotService resourceSlotService;
     private final PricingService pricingService;
+    private final LedgerService ledgerService;
     private final AuthUtil authUtil;
+    private final PlatformConfig platformConfig;
 
     @Value("${pricing.online-payment-percent:20}")
     private Double onlinePaymentPercent;
@@ -43,105 +49,6 @@ public class BookingService {
     private Double platformFeeRate;
 
     // Auto-confirm is now handled via Razorpay webhook only
-
-    /**
-     * Create a booking for a user
-     */
-    public BookingResponseDto createUserBooking(BookingRequestDto request) {
-
-        // Fetch resource
-        ServiceResource resource = serviceResourceRepository.findById(request.getResourceId())
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
-
-        // Validate time range
-        if (!request.getStartTime().isBefore(request.getEndTime())) {
-            throw new RuntimeException("Start time must be before end time");
-        }
-
-        // Check if resource is enabled
-        if (!resource.isEnabled()) {
-            throw new RuntimeException("Resource is not available for booking");
-        }
-
-        Service service = resource.getService();
-
-        // Don't allow booking for past dates
-        if (request.getBookingDate().isBefore(LocalDate.now())) {
-            throw new RuntimeException("Cannot book slots for past dates");
-        }
-
-        User user = authUtil.getCurrentUser();
-
-        // Check for overlapping bookings
-        List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(
-                request.getResourceId(),
-                request.getBookingDate(),
-                request.getStartTime(),
-                request.getEndTime()
-        );
-
-        if (!overlappingBookings.isEmpty()) {
-            throw new RuntimeException("Selected time range overlaps with an existing booking");
-        }
-
-        // Calculate total amount with taxes and fees using PricingService
-        PriceBreakdownDto priceBreakdown = pricingService.calculatePriceBreakdownForTimeRange(
-                request.getResourceId(),
-                request.getStartTime(),
-                request.getEndTime(),
-                request.getBookingDate()
-        );
-        double totalAmount = priceBreakdown.getTotalAmount();
-
-        String reference = generateBookingReference();
-
-        // Create booking
-        Booking booking = Booking.builder()
-                .user(user)
-                .service(service)
-                .resource(resource)
-                .startTime(request.getStartTime())
-                .endTime(request.getEndTime())
-                .bookingDate(request.getBookingDate())
-                .amount(totalAmount)
-                .reference(reference)
-                .status(BookingStatus.PENDING)
-                .createdAt(java.time.Instant.now())
-                .paymentSource(PaymentSource.BY_USER)
-                .build();
-
-        Booking saved = bookingRepository.save(booking);
-        log.info("Created booking {} for user {} from {} to {}, total: {} (subtotal: {}, tax: {}, fee: {})",
-                reference, user.getPhone(), request.getStartTime(), request.getEndTime(), totalAmount,
-                priceBreakdown.getSubtotal(), 0.0, priceBreakdown.getConvenienceFee());
-
-        return convertToResponseDto(saved);
-    }
-
-    /**
-     * Confirm a booking after payment
-     */
-    public void confirmBooking(String reference) {
-        Booking booking = findBookingByReference(reference);
-        booking.setStatus(BookingStatus.CONFIRMED);
-        bookingRepository.save(booking);
-
-
-        log.info("Confirmed booking {}", reference);
-        sendBookingNotifications(booking);
-    }
-
-    /**
-     * Cancel a booking by reference
-     */
-    public void cancelBooking(String reference) {
-        Booking booking = findBookingByReference(reference);
-
-
-        booking.setStatus(BookingStatus.CANCELLED);
-        bookingRepository.save(booking);
-        log.info("Cancelled booking {}", reference);
-    }
 
     /**
      * Cancel a booking by ID (admin)
@@ -238,50 +145,6 @@ public class BookingService {
     }
 
     /**
-     * Get bookings by status (optimized with projection)
-     */
-    public PaginatedResponse<BookingResponseDto> getBookingsByStatus(BookingStatus status, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
-                bookingRepository.findBookingsByStatusProjected(status, pageable);
-
-        List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertProjectionToResponseDto)
-                .collect(Collectors.toList());
-
-        return new PaginatedResponse<>(
-                content,
-                bookingPage.getNumber(),
-                bookingPage.getSize(),
-                bookingPage.getTotalElements(),
-                bookingPage.getTotalPages(),
-                bookingPage.isLast()
-        );
-    }
-
-    /**
-     * Get bookings by resource ID (optimized with projection)
-     */
-    public PaginatedResponse<BookingResponseDto> getBookingsByResource(Long resourceId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
-                bookingRepository.findBookingsByResourceIdProjected(resourceId, pageable);
-
-        List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertProjectionToResponseDto)
-                .collect(Collectors.toList());
-
-        return new PaginatedResponse<>(
-                content,
-                bookingPage.getNumber(),
-                bookingPage.getSize(),
-                bookingPage.getTotalElements(),
-                bookingPage.getTotalPages(),
-                bookingPage.isLast()
-        );
-    }
-
-    /**
      * Get bookings by resource ID and optional date (optimized with projection)
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByResourceAndDate(Long resourceId, LocalDate date, int page, int size) {
@@ -317,28 +180,6 @@ public class BookingService {
 
         List<BookingResponseDto> content = bookingPage.getContent().stream()
                 .map(this::convertToResponseDto)
-                .collect(Collectors.toList());
-
-        return new PaginatedResponse<>(
-                content,
-                bookingPage.getNumber(),
-                bookingPage.getSize(),
-                bookingPage.getTotalElements(),
-                bookingPage.getTotalPages(),
-                bookingPage.isLast()
-        );
-    }
-
-    /**
-     * Get bookings by admin ID (optimized with projection - for services created by this admin)
-     */
-    public PaginatedResponse<BookingResponseDto> getBookingsByAdminId(Long adminId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage =
-                bookingRepository.findBookingsByAdminIdProjected(adminId, pageable);
-
-        List<BookingResponseDto> content = bookingPage.getContent().stream()
-                .map(this::convertProjectionToResponseDto)
                 .collect(Collectors.toList());
 
         return new PaginatedResponse<>(
@@ -590,8 +431,9 @@ public class BookingService {
      * Mark a booking as completed (service has been delivered)
      * Only CONFIRMED bookings can be marked as completed
      * Only the admin who owns the service can mark it as complete
+     * Records venue payment collection details and updates ledger
      */
-    public BookingResponseDto completeBooking(Long bookingId) {
+    public BookingResponseDto completeBooking(Long bookingId, com.hitendra.turf_booking_backend.dto.booking.CompleteBookingRequestDto request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
 
@@ -605,10 +447,50 @@ public class BookingService {
             throw new RuntimeException("Only CONFIRMED bookings can be marked as completed. Current status: " + booking.getStatus());
         }
 
+        // Validate that amount collected matches or is less than venue amount due
+        if (booking.getVenueAmountDue() != null && request.getAmountCollected().compareTo(booking.getVenueAmountDue()) > 0) {
+            throw new RuntimeException("Amount collected cannot be greater than venue amount due");
+        }
+
+        // Update booking with collection details
         booking.setStatus(BookingStatus.COMPLETED);
+        booking.setVenueAmountCollected(request.getAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0);
+        booking.setVenuePaymentCollectionMethod(request.getCollectionMethod());
+
         Booking savedBooking = bookingRepository.save(booking);
 
-        log.info("Booking {} marked as completed by admin {}", bookingId, currentAdmin.getId());
+        // Record venue payment collection in ledger if amount collected > 0
+        if (request.getAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            // Map VenuePaymentCollectionMethod to PaymentMode
+            PaymentMode paymentMode = request.getCollectionMethod() == VenuePaymentCollectionMethod.CASH
+                    ? PaymentMode.CASH
+                    : PaymentMode.ONLINE;
+
+            String description = String.format("Venue payment collected for booking %s (%s-%s on %s)",
+                    savedBooking.getReference(),
+                    savedBooking.getStartTime(),
+                    savedBooking.getEndTime(),
+                    savedBooking.getBookingDate());
+
+            String recordedBy = authUtil.getCurrentUser().getPhone();
+
+            ledgerService.recordCredit(
+                    savedBooking.getService(),
+                    LedgerSource.BOOKING,
+                    ReferenceType.BOOKING,
+                    savedBooking.getId(),
+                    request.getAmountCollected().doubleValue(),
+                    paymentMode,
+                    description,
+                    recordedBy
+            );
+
+            log.info("Ledger entry created for venue payment collection: {} via {}",
+                    request.getAmountCollected(), paymentMode);
+        }
+
+        log.info("Booking {} marked as completed by admin {}. Amount collected: {} via {}",
+                bookingId, currentAdmin.getId(), request.getAmountCollected(), request.getCollectionMethod());
 
         return convertToResponseDto(savedBooking);
     }
@@ -635,11 +517,6 @@ public class BookingService {
     }
 
     // ==================== Helper Methods ====================
-
-    private Booking findBookingByReference(String reference) {
-        return bookingRepository.findByReference(reference)
-                .orElseThrow(() -> new RuntimeException("Booking not found with reference: " + reference));
-    }
 
     private String generateBookingReference() {
         return "BK" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -694,36 +571,6 @@ public class BookingService {
         log.info("Booking notification sent for {}", booking.getReference());
     }
 
-    private UserBookingDto convertToUserBookingDto(Booking booking) {
-        List<UserBookingDto.SlotTimeDto> slotTimes = List.of(UserBookingDto.SlotTimeDto.builder()
-                .startTime(booking.getStartTime().toString())
-                .endTime(booking.getEndTime().toString())
-                .build());
-
-        // Extract paid and due amounts from booking
-        Double paidAmount = booking.getOnlineAmountPaid() != null
-                ? booking.getOnlineAmountPaid().doubleValue()
-                : 0.0;
-        Double dueAmount = booking.getVenueAmountDue() != null
-                ? booking.getVenueAmountDue().doubleValue()
-                : (booking.getAmount() != null ? booking.getAmount() - paidAmount : 0.0);
-
-        return UserBookingDto.builder()
-                .id(booking.getId())
-                .reference(booking.getReference())
-                .serviceId(booking.getService().getId())
-                .serviceName(booking.getService().getName())
-                .resourceId(booking.getResource() != null ? booking.getResource().getId() : null)
-                .resourceName(booking.getResource() != null ? booking.getResource().getName() : null)
-                .status(booking.getStatus().name())
-                .date(booking.getBookingDate())
-                .slots(slotTimes)
-                .totalAmount(booking.getAmount())
-                .paidAmount(paidAmount)
-                .dueAmount(dueAmount)
-                .createdAt(booking.getCreatedAt())
-                .build();
-    }
 
     /**
      * Convert BookingListProjection to BookingResponseDto (optimized - uses projection data)
@@ -778,6 +625,7 @@ public class BookingService {
             Boolean venueAmountCollected = projection.getVenueAmountCollected() != null
                     ? projection.getVenueAmountCollected()
                     : false;
+            String venuePaymentCollectionMethod = projection.getVenuePaymentCollectionMethod();
 
             // Calculate breakdown from total (assume 2% platform fee)
             double platformFeePercent = 2.0;
@@ -798,6 +646,7 @@ public class BookingService {
                     .onlineAmount(onlineAmount)
                     .venueAmount(venueAmount)
                     .venueAmountCollected(venueAmountCollected)
+                    .venuePaymentCollectionMethod(venuePaymentCollectionMethod)
                     .currency("INR")
                     .build();
 
@@ -897,6 +746,8 @@ public class BookingService {
                 }
 
                 Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+                String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
+                        ? booking.getVenuePaymentCollectionMethod().name() : null;
 
                 BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
@@ -907,6 +758,7 @@ public class BookingService {
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
                         .venueAmountCollected(venueAmountCollected)
+                        .venuePaymentCollectionMethod(venuePaymentCollectionMethod)
                         .currency("INR")
                         .build();
 
@@ -937,6 +789,8 @@ public class BookingService {
                 }
 
                 Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+                String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
+                        ? booking.getVenuePaymentCollectionMethod().name() : null;
 
                 BookingResponseDto.AmountBreakdown fallbackBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
@@ -947,6 +801,7 @@ public class BookingService {
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
                         .venueAmountCollected(venueAmountCollected)
+                        .venuePaymentCollectionMethod(venuePaymentCollectionMethod)
                         .currency("INR")
                         .build();
                 dto.setAmountBreakdown(fallbackBreakdown);

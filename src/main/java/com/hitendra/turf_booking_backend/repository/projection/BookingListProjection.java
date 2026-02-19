@@ -21,6 +21,7 @@ public interface BookingListProjection {
     BigDecimal getOnlineAmountPaid();
     BigDecimal getVenueAmountDue();
     Boolean getVenueAmountCollected();
+    String getVenuePaymentCollectionMethod();
     String getPaymentStatus();
 
     // Service info

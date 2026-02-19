@@ -6,87 +6,52 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Repository
 public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
-    // ==================== EAGER FETCH QUERIES (Prevent LazyInitializationException) ====================
+    // ==================== NEW LEDGER METHODS ====================
+
+    List<Expense> findByVenueIdOrderByExpenseDateDesc(Long venueId);
+
+    List<Expense> findByVenueIdAndExpenseDateBetweenOrderByExpenseDateDesc(Long venueId, LocalDate startDate, LocalDate endDate);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId AND e.paymentMode = :paymentMode")
+    BigDecimal sumAmountByVenueIdAndPaymentMode(@Param("venueId") Long venueId, @Param("paymentMode") com.hitendra.turf_booking_backend.entity.accounting.PaymentMode paymentMode);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId")
+    BigDecimal sumAmountByVenueId(@Param("venueId") Long venueId);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId AND e.category = :category AND e.expenseDate BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByVenueIdAndCategoryAndDateRange(@Param("venueId") Long venueId, @Param("category") String category, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    // ==================== LEGACY ADAPTER METHODS (Fixing Compilation Errors) ====================
 
     /**
-     * Get expenses by service with eager loading of service and category.
-     * Prevents LazyInitializationException when accessing service.name or category.name.
+     * Legacy support: Map 'serviceId' to 'venue.id'.
+     * 'category' is now a String, so eager fetch of category entity is no longer needed/possible.
      */
-    @Query("""
-        SELECT e FROM Expense e
-        LEFT JOIN FETCH e.service s
-        LEFT JOIN FETCH e.category c
-        WHERE e.service.id = :serviceId
-        ORDER BY e.expenseDate DESC
-        """)
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.venue WHERE e.venue.id = :serviceId ORDER BY e.expenseDate DESC")
     List<Expense> findByServiceIdWithRelationships(@Param("serviceId") Long serviceId);
 
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.venue WHERE e.venue.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate ORDER BY e.expenseDate DESC")
+    List<Expense> findByServiceIdAndDateRangeWithRelationships(@Param("serviceId") Long serviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COALESCE(SUM(e.amount), 0.0) FROM Expense e WHERE e.venue.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate")
+    Double getTotalExpensesByServiceAndDateRange(@Param("serviceId") Long serviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     /**
-     * Get expenses by service and date range with eager loading.
+     * Adapted for String category. Returns category string name and amount.
      */
     @Query("""
-        SELECT e FROM Expense e
-        LEFT JOIN FETCH e.service s
-        LEFT JOIN FETCH e.category c
-        WHERE e.service.id = :serviceId
-        AND e.expenseDate BETWEEN :startDate AND :endDate
-        ORDER BY e.expenseDate DESC
-        """)
-    List<Expense> findByServiceIdAndDateRangeWithRelationships(
-        @Param("serviceId") Long serviceId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
-    );
-
-    // ==================== LEGACY METHODS (Deprecated - use eager fetch versions) ====================
-
-    @Deprecated
-    List<Expense> findByServiceIdOrderByExpenseDateDesc(Long serviceId);
-
-    @Deprecated
-    List<Expense> findByServiceIdAndExpenseDateBetweenOrderByExpenseDateDesc(
-        Long serviceId, LocalDate startDate, LocalDate endDate);
-
-    List<Expense> findByCategoryIdAndServiceId(Long categoryId, Long serviceId);
-
-    @Query("""
-        SELECT e FROM Expense e
-        WHERE e.service.id = :serviceId
-        AND e.category.id = :categoryId
-        AND e.expenseDate BETWEEN :startDate AND :endDate
-        ORDER BY e.expenseDate DESC
-    """)
-    List<Expense> findByCategoryAndDateRange(
-        @Param("serviceId") Long serviceId,
-        @Param("categoryId") Long categoryId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
-    );
-
-    @Query("""
-        SELECT COALESCE(SUM(e.amount), 0.0)
+        SELECT e.category, COALESCE(SUM(e.amount), 0.0)
         FROM Expense e
-        WHERE e.service.id = :serviceId
+        WHERE e.venue.id = :serviceId
         AND e.expenseDate BETWEEN :startDate AND :endDate
-    """)
-    Double getTotalExpensesByServiceAndDateRange(
-        @Param("serviceId") Long serviceId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
-    );
-
-    @Query("""
-        SELECT e.category.name, COALESCE(SUM(e.amount), 0.0)
-        FROM Expense e
-        WHERE e.service.id = :serviceId
-        AND e.expenseDate BETWEEN :startDate AND :endDate
-        GROUP BY e.category.id, e.category.name
+        GROUP BY e.category
         ORDER BY SUM(e.amount) DESC
     """)
     List<Object[]> getExpenseBreakdownByCategory(
@@ -94,35 +59,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
         @Param("startDate") LocalDate startDate,
         @Param("endDate") LocalDate endDate
     );
-
-    // ==================== OPTIMIZED QUERIES ====================
-
-    /**
-     * Count expenses for a service (for pagination info).
-     */
-    @Query("SELECT COUNT(e) FROM Expense e WHERE e.service.id = :serviceId")
-    long countByServiceId(@Param("serviceId") Long serviceId);
-
-    /**
-     * Count expenses for a service in date range.
-     */
-    @Query("SELECT COUNT(e) FROM Expense e WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate")
-    long countByServiceIdAndDateRange(
-        @Param("serviceId") Long serviceId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
-    );
-
-    /**
-     * Get expense IDs for a service in date range (for batch operations).
-     */
-    @Query("SELECT e.id FROM Expense e WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate ORDER BY e.expenseDate DESC")
-    List<Long> findExpenseIdsByServiceIdAndDateRange(
-        @Param("serviceId") Long serviceId,
-        @Param("startDate") LocalDate startDate,
-        @Param("endDate") LocalDate endDate
-    );
-
-    // ==================== END OPTIMIZED QUERIES ====================
 }
+
+
 

@@ -80,17 +80,6 @@ public class ServiceService {
         );
     }
 
-    public List<ServiceDto> getServicesByAdminId(Long adminProfileId) {
-        // Verify admin profile exists (optimized)
-        if (!adminProfileRepository.existsById(adminProfileId)) {
-            throw new RuntimeException("Admin profile not found with id: " + adminProfileId);
-        }
-
-        return serviceRepository.findByCreatedById(adminProfileId).stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-    }
-
     public PaginatedResponse<ServiceDto> getServicesByAdminId(Long adminProfileId, int page, int size) {
         // Verify admin profile exists (optimized)
         if (!adminProfileRepository.existsById(adminProfileId)) {
@@ -99,40 +88,6 @@ public class ServiceService {
 
         Pageable pageable = PageRequest.of(page, size);
         Page<com.hitendra.turf_booking_backend.entity.Service> servicePage = serviceRepository.findByCreatedById(adminProfileId, pageable);
-
-        List<ServiceDto> content = servicePage.getContent().stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-
-        return new PaginatedResponse<>(
-                content,
-                servicePage.getNumber(),
-                servicePage.getSize(),
-                servicePage.getTotalElements(),
-                servicePage.getTotalPages(),
-                servicePage.isLast()
-        );
-    }
-
-    public List<ServiceDto> getServicesByUserId(Long userId) {
-        // Find admin profile by user ID
-        AdminProfile adminProfile = adminProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Admin profile not found for user id: " + userId));
-
-        // Get services created by this admin
-        return serviceRepository.findByCreatedById(adminProfile.getId()).stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-    }
-
-    public PaginatedResponse<ServiceDto> getServicesByUserId(Long userId, int page, int size) {
-        // Find admin profile by user ID
-        AdminProfile adminProfile = adminProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Admin profile not found for user id: " + userId));
-
-        // Get services created by this admin
-        Pageable pageable = PageRequest.of(page, size);
-        Page<com.hitendra.turf_booking_backend.entity.Service> servicePage = serviceRepository.findByCreatedById(adminProfile.getId(), pageable);
 
         List<ServiceDto> content = servicePage.getContent().stream()
                 .map(this::convertToDto)
@@ -226,28 +181,6 @@ public class ServiceService {
         }
 
         return convertToDto(savedService);
-    }
-
-    /**
-     * Get current authenticated admin's profile
-     * Throws exception if user is not an admin or manager
-     */
-    private AdminProfile getCurrentAdminProfile() {
-        User user = authUtil.getCurrentUser();
-        if (user == null) {
-            throw new RuntimeException("User not found");
-        }
-
-        if (user.getRole() != Role.ADMIN && user.getRole() != Role.MANAGER) {
-            throw new RuntimeException("Only admins can create services");
-        }
-
-        if (user.getRole() == Role.ADMIN) {
-            return adminProfileRepository.findByUserId(user.getId())
-                    .orElseThrow(() -> new RuntimeException("Admin profile not found. Please complete your profile first."));
-        } else {
-            throw new RuntimeException("Managers should delegate service creation to admins");
-        }
     }
 
     /**
@@ -623,13 +556,6 @@ public class ServiceService {
                 servicePage.getTotalPages(),
                 servicePage.isLast()
         );
-    }
-
-    /**
-     * Get city from coordinates using reverse geocoding
-     */
-    public CityResponse getCityFromCoordinates(Double latitude, Double longitude) {
-        return locationService.getCityFromCoordinates(latitude, longitude);
     }
 
     /**

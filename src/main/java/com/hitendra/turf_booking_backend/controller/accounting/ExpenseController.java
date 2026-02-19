@@ -98,15 +98,15 @@ public class ExpenseController {
             .id(expense.getId())
             .serviceId(expense.getService().getId())
             .serviceName(expense.getService().getName())
-            .categoryId(expense.getCategory().getId())
-            .categoryName(expense.getCategory().getName())
-            .categoryType(expense.getCategory().getType().name())
+            .categoryId(null) // Category is now just a string
+            .categoryName(expense.getCategory())
+            .categoryType("EXPENSE") // Default generic type
             .description(expense.getDescription())
-            .amount(expense.getAmount())
+            .amount(expense.getAmount() != null ? expense.getAmount().doubleValue() : 0.0)
             .paymentMode(expense.getPaymentMode())
             .expenseDate(expense.getExpenseDate())
-            .referenceNumber(expense.getReferenceNumber())
-            .createdBy(expense.getCreatedBy())
+            .referenceNumber(expense.getBillUrl()) // Map billUrl to referenceNumber
+            .createdBy(String.valueOf(expense.getCreatedBy()))
             .createdAt(expense.getCreatedAt())
             .build();
     }

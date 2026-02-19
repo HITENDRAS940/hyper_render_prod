@@ -4,8 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hitendra.turf_booking_backend.dto.booking.*;
 import com.hitendra.turf_booking_backend.dto.slot.GeneratedSlot;
 import com.hitendra.turf_booking_backend.entity.*;
+import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
+import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
+import com.hitendra.turf_booking_backend.entity.accounting.ReferenceType;
 import com.hitendra.turf_booking_backend.exception.BookingException;
 import com.hitendra.turf_booking_backend.repository.*;
+import com.hitendra.turf_booking_backend.service.accounting.LedgerService;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import com.hitendra.turf_booking_backend.util.CryptoUtil;
 import lombok.RequiredArgsConstructor;
@@ -108,6 +112,7 @@ public class SlotBookingService {
     private final DisabledSlotRepository disabledSlotRepository;
     private final ActivityRepository activityRepository;
     private final AdminProfileRepository adminProfileRepository;
+    private final LedgerService ledgerService;
     private final AuthUtil authUtil;
     private final SlotGeneratorService slotGeneratorService;
     private final CryptoUtil cryptoUtil;
@@ -1085,6 +1090,8 @@ public class SlotBookingService {
         }
 
         Boolean venueAmountCollected = booking.getVenueAmountCollected() != null ? booking.getVenueAmountCollected() : false;
+        String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
+                ? booking.getVenuePaymentCollectionMethod().name() : null;
 
         BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                 .slotSubtotal(slotSubtotal)
@@ -1095,6 +1102,7 @@ public class SlotBookingService {
                 .onlineAmount(onlineAmount)
                 .venueAmount(venueAmount)
                 .venueAmountCollected(venueAmountCollected)
+                .venuePaymentCollectionMethod(venuePaymentCollectionMethod)
                 .currency("INR")
                 .build();
 
@@ -1308,6 +1316,54 @@ public class SlotBookingService {
 
         log.info("Admin manual booking created: reference={}, adminId={}", reference, adminProfileId);
 
+        // Record payments in ledger
+        try {
+            String recordedBy = adminProfile.getUser().getPhone();
+
+            // Record online payment if any
+            if (onlineAmountPaid.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                String onlineDescription = String.format("Admin manual booking (online) %s (%s-%s on %s)",
+                        reference, startTime, endTime, bookingDate);
+
+                ledgerService.recordCredit(
+                        service,
+                        LedgerSource.BOOKING,
+                        ReferenceType.BOOKING,
+                        savedBooking.getId(),
+                        onlineAmountPaid.doubleValue(),
+                        PaymentMode.ONLINE,
+                        onlineDescription,
+                        recordedBy
+                );
+
+                log.info("Ledger entry created for admin manual booking online payment: {}", onlineAmountPaid);
+            }
+
+            // Record venue payment if collected
+            if (request.getVenueAmountCollected() != null &&
+                request.getVenueAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0) {
+
+                String venueDescription = String.format("Admin manual booking (venue) %s (%s-%s on %s)",
+                        reference, startTime, endTime, bookingDate);
+
+                ledgerService.recordCredit(
+                        service,
+                        LedgerSource.BOOKING,
+                        ReferenceType.BOOKING,
+                        savedBooking.getId(),
+                        request.getVenueAmountCollected().doubleValue(),
+                        PaymentMode.CASH, // Default to CASH for venue collection in manual bookings
+                        venueDescription,
+                        recordedBy
+                );
+
+                log.info("Ledger entry created for admin manual booking venue payment: {}", request.getVenueAmountCollected());
+            }
+        } catch (Exception e) {
+            log.error("Failed to record admin manual booking payments in ledger: {}", e.getMessage(), e);
+            // Don't fail the booking if ledger recording fails
+        }
+
         return convertToResponseDto(savedBooking);
     }
 
@@ -1456,6 +1512,52 @@ public class SlotBookingService {
                     savedBooking.getAdminProfile().getUser() != null ? savedBooking.getAdminProfile().getUser().getId() : "null");
         } else {
             log.warn("WARNING: AdminProfile was not set on the booking even though it was specified!");
+        }
+
+        // Record payments in ledger
+        try {
+            String recordedBy = adminProfile.getUser().getPhone();
+
+            // Record online payment if any
+            if (onlineAmountPaid.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                String onlineDescription = String.format("Direct manual booking (online) %s (%s-%s on %s)",
+                        reference, request.getStartTime(), request.getEndTime(), request.getBookingDate());
+
+                ledgerService.recordCredit(
+                        service,
+                        LedgerSource.BOOKING,
+                        ReferenceType.BOOKING,
+                        savedBooking.getId(),
+                        onlineAmountPaid.doubleValue(),
+                        PaymentMode.ONLINE,
+                        onlineDescription,
+                        recordedBy
+                );
+
+                log.info("Ledger entry created for direct manual booking online payment: {}", onlineAmountPaid);
+            }
+
+            // Record venue payment if collected
+            if (venueAmountCollected.compareTo(java.math.BigDecimal.ZERO) > 0) {
+                String venueDescription = String.format("Direct manual booking (venue) %s (%s-%s on %s)",
+                        reference, request.getStartTime(), request.getEndTime(), request.getBookingDate());
+
+                ledgerService.recordCredit(
+                        service,
+                        LedgerSource.BOOKING,
+                        ReferenceType.BOOKING,
+                        savedBooking.getId(),
+                        venueAmountCollected.doubleValue(),
+                        PaymentMode.CASH, // Default to CASH for venue collection in manual bookings
+                        venueDescription,
+                        recordedBy
+                );
+
+                log.info("Ledger entry created for direct manual booking venue payment: {}", venueAmountCollected);
+            }
+        } catch (Exception e) {
+            log.error("Failed to record direct manual booking payments in ledger: {}", e.getMessage(), e);
+            // Don't fail the booking if ledger recording fails
         }
 
         return convertToResponseDto(savedBooking);

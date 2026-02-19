@@ -2,9 +2,7 @@ package com.hitendra.turf_booking_backend.service;
 
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
-import com.hitendra.turf_booking_backend.dto.user.UserDto;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
-import com.hitendra.turf_booking_backend.entity.BookingStatus;
 import com.hitendra.turf_booking_backend.entity.Role;
 import com.hitendra.turf_booking_backend.entity.User;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
@@ -16,9 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,22 +26,6 @@ public class UserService {
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
     private final AuthUtil authUtil;
-
-    public String setNewUserName(UserDto userDto) {
-
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        String email = ((UserDetails) authentication.getPrincipal()).getUsername();
-
-        User user = userRepository.findUserByEmail(email).orElseThrow(
-                () -> new IllegalArgumentException("User Not found")
-        );
-
-        user.setName(userDto.getName());
-        userRepository.save(user);
-
-        return "User name updated successfully";
-    }
 
     /**
      * Get all regular users (excluding admins and managers) with complete information
@@ -116,20 +95,6 @@ public class UserService {
 
 
         return dto;
-    }
-
-    public String setNewUserPhone(@Valid String phone) {
-        User user = userRepository.findUserByPhone(phone);
-
-        if(user == null) {
-            User loggedInUser = authUtil.getCurrentUser();
-            loggedInUser.setPhone(phone);
-            userRepository.save(loggedInUser);
-
-            return "Phone number updated successfully";
-        } else {
-            return "Phone number already exists";
-        }
     }
 
     /**

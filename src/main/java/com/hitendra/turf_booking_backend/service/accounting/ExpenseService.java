@@ -76,14 +76,14 @@ public class ExpenseService {
 
         // Create expense - it's automatically admin-specific because service belongs to admin
         Expense expense = Expense.builder()
-            .service(service)
-            .category(category)
+            .venue(service)
+            .category(category.getName())
             .description(request.getDescription())
-            .amount(request.getAmount())
+            .amount(java.math.BigDecimal.valueOf(request.getAmount()))
             .paymentMode(request.getPaymentMode())
             .expenseDate(request.getExpenseDate())
-            .referenceNumber(request.getReferenceNumber())
-            .createdBy(currentUser)
+            .billUrl(request.getReferenceNumber()) // Mapping reference number to billUrl as fallback
+            .createdBy(authUtil.getCurrentUserId())
             .build();
 
         Expense savedExpense = expenseRepository.save(expense);
@@ -97,7 +97,7 @@ public class ExpenseService {
             LedgerSource.EXPENSE,
             ReferenceType.EXPENSE,
             savedExpense.getId(),
-            savedExpense.getAmount(),
+            savedExpense.getAmount().doubleValue(),
             savedExpense.getPaymentMode(),
             "Expense: " + category.getName() + " - " + savedExpense.getDescription(),
             currentUser

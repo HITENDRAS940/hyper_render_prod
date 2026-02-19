@@ -9,6 +9,7 @@ import com.hitendra.turf_booking_backend.service.UserRegistrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
@@ -20,6 +21,7 @@ import java.util.List;
  * Enabled for local development - creates sample services and users
  */
 @Component
+@Lazy(false)  // Force eager initialization even with lazy-initialization=true
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements CommandLineRunner {
@@ -36,33 +38,51 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        // Initialize activities (required for system)
-        if (activityRepository.count() == 0) {
-            initializeActivities();
+        log.info("🚀 DataInitializer started...");
+
+        try {
+            // Initialize activities (required for system)
+            if (activityRepository.count() == 0) {
+                log.info("📋 No activities found, initializing...");
+                initializeActivities();
+            } else {
+                log.info("✅ Activities already initialized (count: {})", activityRepository.count());
+            }
+
+            // NOTE: Expense categories are now admin-specific (after V12 migration)
+            // They will be created automatically when admins create their services/expenses
+            // Or they can be created via the expense category API endpoint
+
+            // Create manager user
+            if (userRepository.findByEmail("gethyperadmin@gmail.com").isEmpty()) {
+                log.info("👤 Manager user not found, creating...");
+                initializeManagerUser();
+            } else {
+                log.info("✅ Manager user already exists");
+            }
+
+            // Add minimal test service in Mumbai
+            if (serviceRepository.count() == 0) {
+                log.info("🏟️ No services found, creating test services...");
+                initializeMinimalTestService();
+            } else {
+                log.info("✅ Services already exist (count: {})", serviceRepository.count());
+            }
+
+            log.info("🎉 DataInitializer completed successfully!");
+
+            // COMMENTED OUT: Full sample data initialization
+            // if (userRepository.count() == 0) {
+            //     initializeSampleData();
+            // }
+
+            // COMMENTED OUT: Weekend price rule
+            // addWeekendExtraPriceRuleForResource(1L, 150.0);
+
+        } catch (Exception e) {
+            log.error("❌ FATAL ERROR in DataInitializer: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to initialize data", e);
         }
-
-        // Initialize expense categories (required for system)
-        if (expenseCategoryRepository.count() == 0) {
-            initializeExpenseCategories();
-        }
-
-        // Create manager user
-        if (userRepository.findByEmail("gethyperadmin@gmail.com").isEmpty()) {
-            initializeManagerUser();
-        }
-
-        // Add minimal test service in Mumbai
-        if (serviceRepository.count() == 0) {
-            initializeMinimalTestService();
-        }
-
-        // COMMENTED OUT: Full sample data initialization
-        // if (userRepository.count() == 0) {
-        //     initializeSampleData();
-        // }
-
-        // COMMENTED OUT: Weekend price rule
-        // addWeekendExtraPriceRuleForResource(1L, 150.0);
     }
 
     /**
@@ -98,6 +118,10 @@ public class DataInitializer implements CommandLineRunner {
                     .build();
             mumbaiProfile = adminProfileRepository.save(mumbaiProfile);
 
+            // Create expense categories for Mumbai admin
+            createExpenseCategoriesForAdmin(mumbaiProfile);
+            log.info("✅ Created expense categories for Mumbai admin");
+
             // Create Vellore Admin
             User velloreAdmin = User.builder()
                     .email("vellore.admin@hyper.com")
@@ -117,6 +141,10 @@ public class DataInitializer implements CommandLineRunner {
                     .gstNumber("33AABCV5678G1Z9")
                     .build();
             velloreProfile = adminProfileRepository.save(velloreProfile);
+
+            // Create expense categories for Vellore admin
+            createExpenseCategoriesForAdmin(velloreProfile);
+            log.info("✅ Created expense categories for Vellore admin");
 
             // === MUMBAI SERVICE ===
             Service mumbaiService = Service.builder()
@@ -287,33 +315,93 @@ public class DataInitializer implements CommandLineRunner {
 
 
     /**
-     * Initialize expense categories
+     * Initialize expense categories for a specific admin
      */
-    private void initializeExpenseCategories() {
-        log.info("Initializing expense categories...");
+    private void createExpenseCategoriesForAdmin(AdminProfile adminProfile) {
+        log.info("Initializing expense categories for admin {}...", adminProfile.getBusinessName());
         List<ExpenseCategory> categories = new ArrayList<>();
 
         // FIXED EXPENSES
-        categories.add(ExpenseCategory.builder().name("Electricity Bill").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Water Bill").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Rent").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Staff Salary").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Internet & Phone").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Insurance").type(ExpenseType.FIXED).build());
-        categories.add(ExpenseCategory.builder().name("Subscription & Software").type(ExpenseType.FIXED).build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Electricity Bill")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Water Bill")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Rent")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Staff Salary")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Internet & Phone")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Insurance")
+                .type(ExpenseType.FIXED)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Subscription & Software")
+                .type(ExpenseType.FIXED)
+                .build());
 
         // VARIABLE EXPENSES
-        categories.add(ExpenseCategory.builder().name("Maintenance & Repairs").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Equipment Purchase").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Cleaning Supplies").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Inventory Purchase").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Marketing & Advertising").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Transportation").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Office Supplies").type(ExpenseType.VARIABLE).build());
-        categories.add(ExpenseCategory.builder().name("Miscellaneous").type(ExpenseType.VARIABLE).build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Maintenance & Repairs")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Equipment Purchase")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Cleaning Supplies")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Inventory Purchase")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Marketing & Advertising")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Transportation")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Office Supplies")
+                .type(ExpenseType.VARIABLE)
+                .build());
+        categories.add(ExpenseCategory.builder()
+                .adminProfile(adminProfile)
+                .name("Miscellaneous")
+                .type(ExpenseType.VARIABLE)
+                .build());
 
         expenseCategoryRepository.saveAll(categories);
-        log.info("Expense categories initialized.");
+        log.info("Expense categories initialized for admin {}.", adminProfile.getBusinessName());
     }
 
     /*

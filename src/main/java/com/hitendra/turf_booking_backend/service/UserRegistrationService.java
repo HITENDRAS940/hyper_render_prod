@@ -47,14 +47,4 @@ public class UserRegistrationService {
         return savedUser;
     }
 
-    /**
-     * Check if a user exists by phone number (optimized).
-     *
-     * @param phone The phone number to check
-     * @return true if user exists, false otherwise
-     */
-    @Transactional(readOnly = true)
-    public boolean userExists(String phone) {
-        return userRepository.existsByPhone(phone);
-    }
 }

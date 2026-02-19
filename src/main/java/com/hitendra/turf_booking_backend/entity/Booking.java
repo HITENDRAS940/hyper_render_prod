@@ -138,4 +138,31 @@ public class Booking {
     @Column(name = "venue_amount_collected")
     @Builder.Default
     private Boolean venueAmountCollected = false;
+
+    /**
+     * Method used to collect venue amount (CASH or ONLINE).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "venue_payment_collection_method")
+    private VenuePaymentCollectionMethod venuePaymentCollectionMethod;
+
+    /**
+     * Advance amount paid by user (calculated dynamically based on config at booking time).
+     */
+    @Column(name = "advance_amount", precision = 19, scale = 2)
+    private java.math.BigDecimal advanceAmount;
+
+    /**
+     * Remaining amount to be paid at venue.
+     */
+    @Column(name = "remaining_amount", precision = 19, scale = 2)
+    private java.math.BigDecimal remainingAmount;
+
+    /**
+     * Status of transfer of advance amount to venue.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_status")
+    @Builder.Default
+    private TransferStatus transferStatus = TransferStatus.PENDING;
 }

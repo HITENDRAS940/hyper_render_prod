@@ -33,9 +33,6 @@ public class PricingService {
     @Value("${pricing.platform-fee-rate:2.0}")
     private Double platformFeeRate;  // Platform fee percentage (2%)
 
-    @Value("${pricing.platform-fee-fixed:0.0}")
-    private Double platformFeeFixed;  // Fixed platform fee (not used currently)
-
     // ==================== Price Rule Management ====================
 
     /**
@@ -104,36 +101,6 @@ public class PricingService {
     }
 
     // ==================== Price Calculation ====================
-
-    /**
-     * Calculate simple total price for a slot time on a date (for availability display)
-     */
-    public Double calculateSlotPriceForTime(Long resourceId, LocalTime startTime, LocalDate date) {
-        ResourceSlotConfig config = resourceSlotConfigRepository.findByResourceId(resourceId)
-                .orElseThrow(() -> new RuntimeException("Slot config not found for resource: " + resourceId));
-
-        boolean isWeekend = isWeekend(date);
-        DayType dayType = isWeekend ? DayType.WEEKEND : DayType.WEEKDAY;
-
-        // Start with base price from config
-        double basePrice = config.getBasePrice();
-
-        // Get applicable rules
-        List<ResourcePriceRule> rules = priceRuleRepository.findApplicableRules(resourceId, dayType, startTime);
-
-        // Apply highest priority rule's base price if set
-        if (!rules.isEmpty() && rules.get(0).getBasePrice() != null) {
-            basePrice = rules.get(0).getBasePrice();
-        }
-
-        // Add extra charges from all matching rules
-        double extraCharges = rules.stream()
-                .filter(r -> r.getExtraCharge() != null)
-                .mapToDouble(ResourcePriceRule::getExtraCharge)
-                .sum();
-
-        return roundToTwoDecimals(basePrice + extraCharges);
-    }
 
     /**
      * Calculate complete price breakdown for a time range

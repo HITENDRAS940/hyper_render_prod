@@ -119,4 +119,8 @@ public class Refund {
     @Column(name = "currency", nullable = false)
     @Builder.Default
     private String currency = "INR";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "venue_id")
+    private Service venue;
 }

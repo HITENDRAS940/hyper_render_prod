@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,4 +72,16 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
     List<Long> findPendingRefundIds();
 
     // ==================== END OPTIMIZED QUERIES ====================
+
+    // ==================== FINANCIAL AGGREGATION QUERIES ====================
+
+    /**
+     * Calculate Refunded Revenue.
+     * Sum of refund_amount for a venue within a date range.
+     * Note: Refunds table now has venue_id.
+     */
+    @Query("SELECT COALESCE(SUM(r.refundAmount), 0) FROM Refund r WHERE r.venue.id = :venueId AND DATE(r.initiatedAt) BETWEEN :startDate AND :endDate")
+    java.math.BigDecimal calculateRefundedRevenue(@Param("venueId") Long venueId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    // ==================== END FINANCIAL AGGREGATION QUERIES ====================
 }

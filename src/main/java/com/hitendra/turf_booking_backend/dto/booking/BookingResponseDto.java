@@ -59,6 +59,7 @@ public class BookingResponseDto {
         private Double onlineAmount;       // Amount paid online (X% of totalAmount)
         private Double venueAmount;        // Amount to pay at venue (100-X% of totalAmount)
         private Boolean venueAmountCollected; // Whether venue amount has been collected
+        private String venuePaymentCollectionMethod; // Method used to collect venue amount (CASH or ONLINE)
         private String currency;           // Currency code (e.g., "INR")
     }
 }
