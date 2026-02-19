@@ -77,11 +77,11 @@ public interface RefundRepository extends JpaRepository<Refund, Long> {
 
     /**
      * Calculate Refunded Revenue.
-     * Sum of refund_amount for a venue within a date range.
-     * Note: Refunds table now has venue_id.
+     * Sum of refund_amount for a service within a date range.
+     * Note: Refunds table now has service_id.
      */
-    @Query("SELECT COALESCE(SUM(r.refundAmount), 0) FROM Refund r WHERE r.venue.id = :venueId AND DATE(r.initiatedAt) BETWEEN :startDate AND :endDate")
-    java.math.BigDecimal calculateRefundedRevenue(@Param("venueId") Long venueId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    @Query("SELECT COALESCE(SUM(r.refundAmount), 0) FROM Refund r WHERE r.service.id = :serviceId AND DATE(r.initiatedAt) BETWEEN :startDate AND :endDate")
+    java.math.BigDecimal calculateRefundedRevenue(@Param("serviceId") Long serviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     // ==================== END FINANCIAL AGGREGATION QUERIES ====================
 }

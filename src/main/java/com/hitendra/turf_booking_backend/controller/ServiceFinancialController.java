@@ -3,8 +3,8 @@ package com.hitendra.turf_booking_backend.controller;
 import com.hitendra.turf_booking_backend.dto.CashBankSummary;
 import com.hitendra.turf_booking_backend.dto.ExpenseRequest;
 import com.hitendra.turf_booking_backend.dto.ExpenseResponse;
-import com.hitendra.turf_booking_backend.dto.VenueFinancialSummary;
-import com.hitendra.turf_booking_backend.service.VenueFinancialService;
+import com.hitendra.turf_booking_backend.dto.ServiceFinancialSummary;
+import com.hitendra.turf_booking_backend.service.ServiceFinancialService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -17,13 +17,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/service/financial")
 @RequiredArgsConstructor
-public class VenueFinancialController {
+public class ServiceFinancialController {
 
-    private final VenueFinancialService financialService;
+    private final ServiceFinancialService financialService;
 
     @GetMapping("/{serviceId}/dashboard")
     @PreAuthorize("hasRole('PLATFORM_ADMIN') or @securityService.isServiceAdmin(#serviceId)")
-    public ResponseEntity<VenueFinancialSummary> getDashboardSummary(
+    public ResponseEntity<ServiceFinancialSummary> getDashboardSummary(
             @PathVariable Long serviceId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {

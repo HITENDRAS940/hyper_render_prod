@@ -15,32 +15,32 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     // ==================== NEW LEDGER METHODS ====================
 
-    List<Expense> findByVenueIdOrderByExpenseDateDesc(Long venueId);
+    List<Expense> findByServiceIdOrderByExpenseDateDesc(Long serviceId);
 
-    List<Expense> findByVenueIdAndExpenseDateBetweenOrderByExpenseDateDesc(Long venueId, LocalDate startDate, LocalDate endDate);
+    List<Expense> findByServiceIdAndExpenseDateBetweenOrderByExpenseDateDesc(Long serviceId, LocalDate startDate, LocalDate endDate);
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId AND e.paymentMode = :paymentMode")
-    BigDecimal sumAmountByVenueIdAndPaymentMode(@Param("venueId") Long venueId, @Param("paymentMode") com.hitendra.turf_booking_backend.entity.accounting.PaymentMode paymentMode);
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.service.id = :serviceId AND e.paymentMode = :paymentMode")
+    BigDecimal sumAmountByServiceIdAndPaymentMode(@Param("serviceId") Long serviceId, @Param("paymentMode") com.hitendra.turf_booking_backend.entity.accounting.PaymentMode paymentMode);
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId")
-    BigDecimal sumAmountByVenueId(@Param("venueId") Long venueId);
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.service.id = :serviceId")
+    BigDecimal sumAmountByServiceId(@Param("serviceId") Long serviceId);
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.venue.id = :venueId AND e.category = :category AND e.expenseDate BETWEEN :startDate AND :endDate")
-    BigDecimal sumAmountByVenueIdAndCategoryAndDateRange(@Param("venueId") Long venueId, @Param("category") String category, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE e.service.id = :serviceId AND e.category = :category AND e.expenseDate BETWEEN :startDate AND :endDate")
+    BigDecimal sumAmountByServiceIdAndCategoryAndDateRange(@Param("serviceId") Long serviceId, @Param("category") String category, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     // ==================== LEGACY ADAPTER METHODS (Fixing Compilation Errors) ====================
 
     /**
-     * Legacy support: Map 'serviceId' to 'venue.id'.
+     * Legacy support: Map 'serviceId' to 'service.id'.
      * 'category' is now a String, so eager fetch of category entity is no longer needed/possible.
      */
-    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.venue WHERE e.venue.id = :serviceId ORDER BY e.expenseDate DESC")
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.service WHERE e.service.id = :serviceId ORDER BY e.expenseDate DESC")
     List<Expense> findByServiceIdWithRelationships(@Param("serviceId") Long serviceId);
 
-    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.venue WHERE e.venue.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate ORDER BY e.expenseDate DESC")
+    @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.service WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate ORDER BY e.expenseDate DESC")
     List<Expense> findByServiceIdAndDateRangeWithRelationships(@Param("serviceId") Long serviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT COALESCE(SUM(e.amount), 0.0) FROM Expense e WHERE e.venue.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate")
+    @Query("SELECT COALESCE(SUM(e.amount), 0.0) FROM Expense e WHERE e.service.id = :serviceId AND e.expenseDate BETWEEN :startDate AND :endDate")
     Double getTotalExpensesByServiceAndDateRange(@Param("serviceId") Long serviceId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     /**
@@ -49,7 +49,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("""
         SELECT e.category, COALESCE(SUM(e.amount), 0.0)
         FROM Expense e
-        WHERE e.venue.id = :serviceId
+        WHERE e.service.id = :serviceId
         AND e.expenseDate BETWEEN :startDate AND :endDate
         GROUP BY e.category
         ORDER BY SUM(e.amount) DESC

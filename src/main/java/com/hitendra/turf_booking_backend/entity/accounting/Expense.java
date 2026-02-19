@@ -32,8 +32,8 @@ public class Expense {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "venue_id", nullable = false)
-    private Service venue;
+    @JoinColumn(name = "service_id", nullable = false)
+    private Service service;
 
     @Column(nullable = false)
     private String category;
@@ -63,15 +63,5 @@ public class Expense {
     @PrePersist
     protected void onCreate() {
         createdAt = Instant.now();
-    }
-
-    // Legacy getter alias
-    public Service getService() {
-        return venue;
-    }
-
-    // Legacy setter alias
-    public void setService(Service service) {
-        this.venue = service;
     }
 }

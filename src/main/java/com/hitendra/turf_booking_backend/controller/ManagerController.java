@@ -189,7 +189,7 @@ public class ManagerController {
     }
 
     @PutMapping("/bookings/{bookingId}/complete")
-    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered. Requires venue payment collection details.")
+    @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered. Requires service payment collection details.")
     public ResponseEntity<BookingResponseDto> completeBooking(
             @PathVariable Long bookingId,
             @RequestBody @io.swagger.v3.oas.annotations.parameters.RequestBody(

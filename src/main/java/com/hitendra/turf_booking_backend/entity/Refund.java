@@ -121,6 +121,6 @@ public class Refund {
     private String currency = "INR";
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "venue_id")
-    private Service venue;
+    @JoinColumn(name = "service_id")
+    private Service service;
 }

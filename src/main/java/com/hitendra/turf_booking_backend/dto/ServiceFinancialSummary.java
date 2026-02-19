@@ -4,11 +4,10 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 @Data
 @Builder
-public class VenueFinancialSummary {
+public class ServiceFinancialSummary {
     private BigDecimal grossRevenue;
     private BigDecimal cancelledRevenue;
     private BigDecimal refundedRevenue;
@@ -21,8 +20,8 @@ public class VenueFinancialSummary {
     private BigDecimal netProfit;
 
     // Helper to ensure non-null values for easier frontend handling
-    public static VenueFinancialSummary zero() {
-        return VenueFinancialSummary.builder()
+    public static ServiceFinancialSummary zero() {
+        return ServiceFinancialSummary.builder()
                 .grossRevenue(BigDecimal.ZERO)
                 .cancelledRevenue(BigDecimal.ZERO)
                 .refundedRevenue(BigDecimal.ZERO)

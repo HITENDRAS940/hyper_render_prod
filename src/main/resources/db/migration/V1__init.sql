@@ -286,6 +286,7 @@ CREATE TABLE IF NOT EXISTS refunds (
     id BIGSERIAL PRIMARY KEY,
     booking_id BIGINT NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
     user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service_id BIGINT REFERENCES services(id) ON DELETE SET NULL,
     original_amount NUMERIC(19, 2) NOT NULL,
     refund_amount NUMERIC(19, 2) NOT NULL,
     refund_percent INTEGER NOT NULL,
@@ -306,6 +307,7 @@ CREATE INDEX IF NOT EXISTS idx_refund_booking ON refunds(booking_id);
 CREATE INDEX IF NOT EXISTS idx_refund_razorpay_id ON refunds(razorpay_refund_id);
 CREATE INDEX IF NOT EXISTS idx_refund_status ON refunds(status);
 CREATE INDEX IF NOT EXISTS idx_refund_user ON refunds(user_id);
+CREATE INDEX IF NOT EXISTS idx_refund_service ON refunds(service_id);
 
 -- ============================================================================
 -- PROCESSED PAYMENTS (Idempotency tracking)
@@ -346,7 +348,7 @@ CREATE INDEX IF NOT EXISTS idx_expense_category_admin ON expense_categories(admi
 
 CREATE TABLE IF NOT EXISTS expenses (
     id BIGSERIAL PRIMARY KEY,
-    venue_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
     category VARCHAR(255) NOT NULL,
     description VARCHAR(500) NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
@@ -357,7 +359,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_service_expense_date ON expenses(venue_id, expense_date);
+CREATE INDEX IF NOT EXISTS idx_service_expense_date ON expenses(service_id, expense_date);
 CREATE INDEX IF NOT EXISTS idx_expense_date ON expenses(expense_date);
 
 -- ============================================================================

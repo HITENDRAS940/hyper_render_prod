@@ -76,7 +76,7 @@ public class ExpenseService {
 
         // Create expense - it's automatically admin-specific because service belongs to admin
         Expense expense = Expense.builder()
-            .venue(service)
+            .service(service)
             .category(category.getName())
             .description(request.getDescription())
             .amount(java.math.BigDecimal.valueOf(request.getAmount()))

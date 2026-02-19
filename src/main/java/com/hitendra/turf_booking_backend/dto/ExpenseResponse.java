@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Builder
 public class ExpenseResponse {
     private Long id;
-    private Long venueId;
+    private Long serviceId;
     private String category;
     private BigDecimal amount;
     private PaymentMode paymentMode;
