@@ -350,6 +350,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     /**
      * Optimized overlap check - returns only IDs and essential fields.
      * Used for fast availability checking without loading full entities.
+     *
+     * A slot is BLOCKED if: status is AWAITING_CONFIRMATION/CONFIRMED/COMPLETED
+     * OR paymentStatusEnum is IN_PROGRESS/SUCCESS.
      */
     @Query("""
         SELECT b.id as id, b.resource.id as resourceId, b.bookingDate as bookingDate,
@@ -360,11 +363,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<SlotOverlapProjection> findOverlappingBookingsProjected(
@@ -376,6 +376,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Check if any overlapping booking exists (returns boolean for fast check).
+     *
+     * A slot is BLOCKED if: status is AWAITING_CONFIRMATION/CONFIRMED/COMPLETED
+     * OR paymentStatusEnum is IN_PROGRESS/SUCCESS.
      */
     @Query("""
         SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END
@@ -384,11 +387,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     boolean existsOverlappingBooking(
@@ -403,12 +403,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     java.util.Optional<Booking> findByReference(String reference);
 
     /**
-     * Find overlapping bookings for a resource on a date
+     * Find overlapping bookings for a resource on a date.
      * Overlap condition: (StartA < EndB) and (EndA > StartB)
      *
-     * IMPORTANT: Only considers a slot as "locked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
+     *
+     * Everything else (e.g. PENDING+NOT_STARTED, EXPIRED, CANCELLED) is considered free.
      */
     @Query("""
         SELECT b FROM Booking b 
@@ -416,11 +418,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<Booking> findOverlappingBookings(
@@ -458,9 +457,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     /**
      * Find overlapping bookings with pessimistic lock for double-booking prevention.
      *
-     * IMPORTANT: Only considers a slot as "locked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -469,11 +468,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<Booking> findOverlappingBookingsWithLock(
@@ -494,23 +490,17 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Find all active bookings for multiple resources on a specific date.
      * Used for aggregating availability across pooled resources.
      *
-     * IMPORTANT: Only considers a slot as "booked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
-     *
-     * Slots with payment_status = NOT_STARTED are NOT considered locked
-     * (allows other users to book abandoned slots)
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
      */
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.resource.id IN :resourceIds 
         AND b.bookingDate = :date 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<Booking> findActiveBookingsForResources(
@@ -521,11 +511,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Find overlapping bookings across multiple resources with lock.
      * Used during slot booking to find which resources are available.
      *
-     * IMPORTANT: Only considers a slot as "locked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
-     *
-     * Slots with payment_status = NOT_STARTED are NOT considered locked
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -534,11 +522,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<Booking> findOverlappingBookingsForResourcesWithLock(
@@ -550,9 +535,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     /**
      * Count overlapping bookings for a specific resource (for availability calculation).
      *
-     * IMPORTANT: Only counts a slot as "locked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
      */
     @Query("""
         SELECT COUNT(b) FROM Booking b 
@@ -560,11 +545,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.bookingDate = :date 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     int countOverlappingBookings(
@@ -583,9 +565,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * Find IDs of services that have bookings overlapping the given time range.
      * Used for fast availability filtering.
      *
-     * IMPORTANT: Only considers a slot as "locked" if:
-     * - status is CONFIRMED, or
-     * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
+     * A slot is considered BLOCKED (not bookable) if:
+     * - status is AWAITING_CONFIRMATION, CONFIRMED, or COMPLETED, OR
+     * - paymentStatusEnum is IN_PROGRESS or SUCCESS (regardless of status)
      */
     @Query("""
         SELECT DISTINCT b.service.id FROM Booking b 
@@ -593,10 +575,14 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND (:activityCode IS NULL OR b.activityCode = :activityCode) 
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND (
-            b.status = com.hitendra.turf_booking_backend.entity.BookingStatus.CONFIRMED 
-            OR (
-                b.status IN (com.hitendra.turf_booking_backend.entity.BookingStatus.PENDING, com.hitendra.turf_booking_backend.entity.BookingStatus.AWAITING_CONFIRMATION) 
-                AND b.paymentStatusEnum IN (com.hitendra.turf_booking_backend.entity.PaymentStatus.IN_PROGRESS, com.hitendra.turf_booking_backend.entity.PaymentStatus.SUCCESS)
+            b.status IN (
+                com.hitendra.turf_booking_backend.entity.BookingStatus.AWAITING_CONFIRMATION,
+                com.hitendra.turf_booking_backend.entity.BookingStatus.CONFIRMED,
+                com.hitendra.turf_booking_backend.entity.BookingStatus.COMPLETED
+            )
+            OR b.paymentStatusEnum IN (
+                com.hitendra.turf_booking_backend.entity.PaymentStatus.IN_PROGRESS,
+                com.hitendra.turf_booking_backend.entity.PaymentStatus.SUCCESS
             )
         )
         """)
@@ -740,10 +726,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     // ==================== PAYMENT CONFLICT DETECTION METHODS ====================
 
     /**
-     * Find overlapping bookings for a slot where payment is already IN_PROGRESS or SUCCESS.
+     * Find overlapping bookings for a slot where the slot is already locked.
      * Used during Razorpay order creation to prevent multiple users from paying for the same slot.
      *
-     * Returns bookings that are "locked" by payment - cannot allow another user to initiate payment.
+     * A slot is BLOCKED if: status is AWAITING_CONFIRMATION/CONFIRMED/COMPLETED
+     * OR paymentStatusEnum is IN_PROGRESS/SUCCESS.
      */
     @Query("""
         SELECT b FROM Booking b 
@@ -752,11 +739,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
         AND b.startTime < :endTime AND b.endTime > :startTime 
         AND b.id != :excludeBookingId
         AND (
-            b.status = 'CONFIRMED' 
-            OR (
-                b.status IN ('PENDING', 'AWAITING_CONFIRMATION') 
-                AND b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
-            )
+            b.status IN ('AWAITING_CONFIRMATION', 'CONFIRMED', 'COMPLETED')
+            OR b.paymentStatusEnum IN ('IN_PROGRESS', 'SUCCESS')
         )
         """)
     List<Booking> findConflictingPaymentLockedBookings(
