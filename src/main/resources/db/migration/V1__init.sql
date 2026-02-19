@@ -1,8 +1,9 @@
 -- ============================================================================
--- V1__init.sql - Initial Database Schema for Hyper Turf Booking Backend
+-- V1__init.sql - Complete Database Schema for Hyper Turf Booking Backend
 -- ============================================================================
--- This migration creates all tables, constraints, and indexes for the application.
+-- This migration creates ALL tables, constraints, and indexes for the application.
 -- Compatible with PostgreSQL.
+-- Generated: February 19, 2026
 -- ============================================================================
 
 -- ============================================================================
@@ -14,17 +15,22 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20) UNIQUE,
     email VARCHAR(255) NOT NULL UNIQUE,
     name VARCHAR(255),
+    address TEXT,
+    gstin VARCHAR(50),
     oauth_provider VARCHAR(20),
     oauth_provider_id VARCHAR(255),
     email_verified BOOLEAN NOT NULL DEFAULT FALSE,
     role VARCHAR(20) NOT NULL DEFAULT 'USER',
+    account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_account_status ON users(account_status);
 
 -- User Profiles
 CREATE TABLE IF NOT EXISTS user_profiles (
@@ -66,36 +72,15 @@ CREATE INDEX IF NOT EXISTS idx_otps_phone ON otps(phone);
 CREATE INDEX IF NOT EXISTS idx_otps_email ON otps(email);
 CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at);
 
--- ============================================================================
--- WALLETS & TRANSACTIONS
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS wallets (
+-- Admin Push Tokens (for notifications)
+CREATE TABLE IF NOT EXISTS admin_push_tokens (
     id BIGSERIAL PRIMARY KEY,
-    user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    balance NUMERIC(19, 2) NOT NULL DEFAULT 0.00,
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    admin_id BIGINT NOT NULL,
+    token VARCHAR(500) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_user_id ON wallets(user_id);
-
-CREATE TABLE IF NOT EXISTS wallet_transactions (
-    id BIGSERIAL PRIMARY KEY,
-    wallet_id BIGINT NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
-    amount NUMERIC(19, 2) NOT NULL,
-    type VARCHAR(10) NOT NULL,
-    source VARCHAR(20) NOT NULL,
-    reference_id VARCHAR(100),
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    description VARCHAR(500),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_wallet_tx_wallet_id ON wallet_transactions(wallet_id);
-CREATE INDEX IF NOT EXISTS idx_wallet_tx_reference ON wallet_transactions(reference_id);
-CREATE INDEX IF NOT EXISTS idx_wallet_tx_source_ref ON wallet_transactions(source, reference_id);
+CREATE INDEX IF NOT EXISTS idx_admin_push_tokens_admin_id ON admin_push_tokens(admin_id);
 
 -- ============================================================================
 -- ACTIVITIES (Sports/Games)
@@ -123,6 +108,8 @@ CREATE TABLE IF NOT EXISTS services (
     longitude DOUBLE PRECISION,
     description TEXT,
     contact_number VARCHAR(20),
+    gstin VARCHAR(50),
+    state VARCHAR(100),
     start_time TIME,
     end_time TIME,
     availability BOOLEAN NOT NULL DEFAULT TRUE,
@@ -154,39 +141,6 @@ CREATE TABLE IF NOT EXISTS service_activity (
     activity_id BIGINT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     PRIMARY KEY (service_id, activity_id)
 );
-
--- ============================================================================
--- SLOTS (Master slot definitions)
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS slots (
-    id BIGSERIAL PRIMARY KEY,
-    start_time TIME NOT NULL UNIQUE,
-    end_time TIME NOT NULL UNIQUE
-);
-
--- ============================================================================
--- SERVICE SLOTS (Slots available for a service)
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS service_slots (
-    id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    slot_id BIGINT NOT NULL REFERENCES slots(id) ON DELETE CASCADE,
-    price DOUBLE PRECISION NOT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_slots_service ON service_slots(service_id);
-CREATE INDEX IF NOT EXISTS idx_service_slots_slot ON service_slots(slot_id);
-
--- Service Slot Booked Dates (ElementCollection)
-CREATE TABLE IF NOT EXISTS service_slot_booked_dates (
-    service_slot_id BIGINT NOT NULL REFERENCES service_slots(id) ON DELETE CASCADE,
-    booked_date DATE NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_slot_booked_dates ON service_slot_booked_dates(service_slot_id);
 
 -- ============================================================================
 -- SERVICE RESOURCES (Individual Turfs/Courts within a Service)
@@ -243,6 +197,7 @@ CREATE TABLE IF NOT EXISTS resource_slots (
 
 CREATE INDEX IF NOT EXISTS idx_resource_slots_resource ON resource_slots(resource_id);
 
+-- Dynamic pricing rules for slots
 CREATE TABLE IF NOT EXISTS resource_price_rules (
     id BIGSERIAL PRIMARY KEY,
     resource_slot_config_id BIGINT NOT NULL REFERENCES resource_slot_configs(id) ON DELETE CASCADE,
@@ -305,10 +260,13 @@ CREATE TABLE IF NOT EXISTS bookings (
     payment_status VARCHAR(20) DEFAULT 'NOT_STARTED',
     payment_time TIMESTAMP WITH TIME ZONE,
     payment_initiated_at TIMESTAMP WITH TIME ZONE,
-    wallet_amount_used NUMERIC(19, 2),
     online_amount_paid NUMERIC(19, 2),
-    wallet_transaction_id BIGINT,
-    payment_method_type VARCHAR(30)
+    venue_amount_due NUMERIC(19, 2),
+    venue_amount_collected BOOLEAN DEFAULT FALSE,
+    venue_payment_collection_method VARCHAR(20),
+    advance_amount NUMERIC(19, 2),
+    remaining_amount NUMERIC(19, 2),
+    transfer_status VARCHAR(20) DEFAULT 'PENDING'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_idempotency_key ON bookings(idempotency_key);
@@ -373,10 +331,14 @@ CREATE INDEX IF NOT EXISTS idx_processed_payments_booking ON processed_payments(
 
 CREATE TABLE IF NOT EXISTS expense_categories (
     id BIGSERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
+    admin_profile_id BIGINT NOT NULL REFERENCES admin_profiles(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
     type VARCHAR(20) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uk_expense_category_admin_name UNIQUE (admin_profile_id, name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_expense_category_admin ON expense_categories(admin_profile_id);
 
 -- ============================================================================
 -- ACCOUNTING - EXPENSES
@@ -384,103 +346,19 @@ CREATE TABLE IF NOT EXISTS expense_categories (
 
 CREATE TABLE IF NOT EXISTS expenses (
     id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    category_id BIGINT NOT NULL REFERENCES expense_categories(id) ON DELETE RESTRICT,
+    venue_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    category VARCHAR(255) NOT NULL,
     description VARCHAR(500) NOT NULL,
-    amount DOUBLE PRECISION NOT NULL,
-    payment_mode VARCHAR(20) NOT NULL,
+    amount NUMERIC(15, 2) NOT NULL,
+    payment_mode VARCHAR(20),
     expense_date DATE NOT NULL,
-    reference_number VARCHAR(100),
-    created_by VARCHAR(100),
+    bill_url VARCHAR(500),
+    created_by BIGINT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_service_expense_date ON expenses(service_id, expense_date);
-CREATE INDEX IF NOT EXISTS idx_category ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_service_expense_date ON expenses(venue_id, expense_date);
 CREATE INDEX IF NOT EXISTS idx_expense_date ON expenses(expense_date);
-
--- ============================================================================
--- ACCOUNTING - INVENTORY ITEMS
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS inventory_items (
-    id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    cost_price DOUBLE PRECISION NOT NULL,
-    selling_price DOUBLE PRECISION NOT NULL,
-    stock_quantity INTEGER NOT NULL DEFAULT 0,
-    min_stock_level INTEGER,
-    unit VARCHAR(20) NOT NULL,
-    active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_inventory ON inventory_items(service_id);
-
--- ============================================================================
--- ACCOUNTING - INVENTORY PURCHASES
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS inventory_purchases (
-    id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    total_amount DOUBLE PRECISION NOT NULL,
-    supplier_name VARCHAR(255),
-    supplier_contact VARCHAR(100),
-    purchase_date DATE NOT NULL,
-    payment_mode VARCHAR(20) NOT NULL,
-    invoice_number VARCHAR(100),
-    notes TEXT,
-    created_by VARCHAR(100),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_purchase_date ON inventory_purchases(service_id, purchase_date);
-CREATE INDEX IF NOT EXISTS idx_purchase_date ON inventory_purchases(purchase_date);
-
-CREATE TABLE IF NOT EXISTS inventory_purchase_items (
-    id BIGSERIAL PRIMARY KEY,
-    purchase_id BIGINT NOT NULL REFERENCES inventory_purchases(id) ON DELETE CASCADE,
-    item_id BIGINT NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
-    quantity INTEGER NOT NULL,
-    cost_price DOUBLE PRECISION NOT NULL,
-    line_total DOUBLE PRECISION NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_purchase_item ON inventory_purchase_items(purchase_id, item_id);
-
--- ============================================================================
--- ACCOUNTING - INVENTORY SALES
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS inventory_sales (
-    id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    total_amount DOUBLE PRECISION NOT NULL,
-    payment_mode VARCHAR(20) NOT NULL,
-    sale_date DATE NOT NULL,
-    sold_by VARCHAR(100),
-    customer_name VARCHAR(255),
-    notes TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_service_sale_date ON inventory_sales(service_id, sale_date);
-CREATE INDEX IF NOT EXISTS idx_sale_date ON inventory_sales(sale_date);
-
-CREATE TABLE IF NOT EXISTS inventory_sale_items (
-    id BIGSERIAL PRIMARY KEY,
-    sale_id BIGINT NOT NULL REFERENCES inventory_sales(id) ON DELETE CASCADE,
-    item_id BIGINT NOT NULL REFERENCES inventory_items(id) ON DELETE RESTRICT,
-    quantity INTEGER NOT NULL,
-    selling_price DOUBLE PRECISION NOT NULL,
-    line_total DOUBLE PRECISION NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_sale_item ON inventory_sale_items(sale_id, item_id);
 
 -- ============================================================================
 -- ACCOUNTING - CASH LEDGER
@@ -505,5 +383,29 @@ CREATE INDEX IF NOT EXISTS idx_service_created ON cash_ledger(service_id, create
 CREATE INDEX IF NOT EXISTS idx_source_reference ON cash_ledger(source, reference_type, reference_id);
 
 -- ============================================================================
--- END OF INITIAL SCHEMA
+-- REFERENCE DATA - ACTIVITIES
 -- ============================================================================
+-- These activities match DataInitializer.java to ensure consistency
+-- ON CONFLICT DO NOTHING allows safe re-running and prevents duplicates
+
+INSERT INTO activities (code, name, enabled) VALUES
+('FOOTBALL', 'Football', true),
+('CRICKET', 'Cricket', true),
+('BOWLING', 'Bowling', true),
+('PADEL', 'Padel Ball', true),
+('BADMINTON', 'Badminton', true),
+('TENNIS', 'Tennis', true),
+('SWIMMING', 'Swimming', true),
+('BASKETBALL', 'Basketball', true),
+('ARCADE', 'Arcade', true),
+('GYM', 'Gym', true),
+('SPA', 'Spa', true),
+('STUDIO', 'Studio', true),
+('CONFERENCE', 'Conference', true),
+('PARTY_HALL', 'Party Hall', true)
+ON CONFLICT (code) DO NOTHING;
+
+-- ============================================================================
+-- END OF COMPREHENSIVE SCHEMA
+-- ============================================================================
+
