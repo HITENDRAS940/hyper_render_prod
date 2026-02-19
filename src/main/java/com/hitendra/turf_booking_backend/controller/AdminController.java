@@ -319,14 +319,6 @@ public class AdminController {
         return ResponseEntity.ok(booking);
     }
 
-    @PostMapping("/bookings")
-    @Operation(summary = "Create booking", description = "Create a booking on behalf of a walk-in customer (auto-confirmed)")
-    public ResponseEntity<BookingResponseDto> createAdminBooking(
-            @Valid @RequestBody AdminBookingRequestDTO request) {
-        BookingResponseDto booking = bookingService.createAdminBooking(request);
-        return ResponseEntity.ok(booking);
-    }
-
     @PutMapping("/bookings/{bookingId}/complete")
     @Operation(summary = "Complete booking", description = "Mark a confirmed booking as completed after service has been delivered. Requires venue payment collection details.")
     public ResponseEntity<BookingResponseDto> completeBooking(
