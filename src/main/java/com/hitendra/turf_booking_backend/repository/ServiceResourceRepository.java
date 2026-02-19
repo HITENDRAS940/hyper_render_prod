@@ -2,7 +2,9 @@ package com.hitendra.turf_booking_backend.repository;
 
 import com.hitendra.turf_booking_backend.entity.ServiceResource;
 import com.hitendra.turf_booking_backend.repository.projection.ResourceBasicProjection;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,16 +34,18 @@ public interface ServiceResourceRepository extends JpaRepository<ServiceResource
             @Param("activityCode") String activityCode);
 
     /**
-     * Find resource by ID (enabled only).
+     * Find resource by ID with pessimistic lock for booking.
+     * Prevents concurrent booking on the same resource.
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sr FROM ServiceResource sr WHERE sr.id = :id AND sr.enabled = true")
     Optional<ServiceResource> findByIdWithLock(@Param("id") Long id);
 
     /**
-     * Find all enabled resources for a service that support a specific activity.
-     * NOTE: Pessimistic lock removed. Concurrent booking safety is handled by
-     * READ_COMMITTED isolation + partial unique index on bookings table.
+     * Find all enabled resources for a service that support a specific activity,
+     * with pessimistic lock for concurrent booking prevention.
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT DISTINCT sr FROM ServiceResource sr " +
            "JOIN sr.activities a " +
            "WHERE sr.service.id = :serviceId " +

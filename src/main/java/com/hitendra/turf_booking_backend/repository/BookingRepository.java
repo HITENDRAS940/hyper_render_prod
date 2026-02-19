@@ -462,6 +462,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      * - status is CONFIRMED, or
      * - status is PENDING/AWAITING_CONFIRMATION AND payment_status is IN_PROGRESS or SUCCESS
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.resource.id = :resourceId 
@@ -517,12 +518,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("date") LocalDate date);
 
     /**
-     * Find overlapping bookings across multiple resources.
+     * Find overlapping bookings across multiple resources with lock.
      * Used during slot booking to find which resources are available.
-     *
-     * NOTE: No pessimistic lock needed. We rely on READ_COMMITTED isolation
-     * and a partial unique index on (resource_id, booking_date, start_time)
-     * for active bookings to prevent double-booking at the DB level.
      *
      * IMPORTANT: Only considers a slot as "locked" if:
      * - status is CONFIRMED, or
@@ -530,6 +527,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
      *
      * Slots with payment_status = NOT_STARTED are NOT considered locked
      */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
         SELECT b FROM Booking b 
         WHERE b.resource.id IN :resourceIds 

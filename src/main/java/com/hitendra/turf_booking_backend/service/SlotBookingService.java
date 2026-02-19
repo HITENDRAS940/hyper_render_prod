@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -424,7 +423,7 @@ public class SlotBookingService {
      * @param request The booking request with multiple slot keys
      * @return BookingResponseDto with merged booking details
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingResponseDto createSlotBooking(SlotBookingRequestDto request) {
 
         log.info("Processing slot booking request with {} slotKeys, paymentMethod={}",
@@ -562,30 +561,37 @@ public class SlotBookingService {
 
         User currentUser = authUtil.getCurrentUser();
 
-        // 1. Build PRIORITY-ORDERED candidate list of available resources
-        //    PRIORITY 1: Exclusive resources first (dedicated to this activity)
-        //    PRIORITY 2: Multi-activity resources as fallback
-        List<ServiceResource> candidateResources = new ArrayList<>();
+        // 1. Try Single Resource Allocation
+        ServiceResource availableResource = null;
+        String allocationReason = null;
 
+        // PRIORITY 1: Exclusive
         for (ServiceResource resource : exclusiveResources) {
             if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
-                candidateResources.add(resource);
+                availableResource = resource;
+                allocationReason = "EXCLUSIVE (supports only " + activityCode + ")";
+                break;
             }
         }
-        for (ServiceResource resource : multiActivityResources) {
-            if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
-                candidateResources.add(resource);
+
+        // PRIORITY 2: Multi-activity
+        if (availableResource == null) {
+            for (ServiceResource resource : multiActivityResources) {
+                if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
+                    availableResource = resource;
+                    allocationReason = "MULTI-ACTIVITY";
+                    break;
+                }
             }
         }
 
         // 2. Handle Allocation Result
-        if (!candidateResources.isEmpty()) {
-            log.info("Found {} candidate resource(s) for booking (activity={}, date={}, time={}-{})",
-                    candidateResources.size(), activityCode, bookingDate, startTime, endTime);
+        if (availableResource != null) {
+            // SINGLE RESOURCE FOUND - Create merged booking
+            log.info("Selected resource {} ({}) for booking - Allocation: {}",
+                    availableResource.getName(), availableResource.getId(), allocationReason);
 
-            // Pass full candidate list — createMergedBooking will try each in order,
-            // falling back to the next on concurrent-conflict (DataIntegrityViolationException).
-            return createMergedBooking(request, service, candidateResources, activityCode, bookingDate, startTime, endTime, payloads, pooledResources);
+            return createMergedBooking(request, service, availableResource, activityCode, bookingDate, startTime, endTime, payloads, pooledResources);
         } else {
             // SINGLE RESOURCE NOT FOUND - Check for split booking
             if (Boolean.TRUE.equals(request.getAllowSplit())) {
@@ -657,10 +663,10 @@ public class SlotBookingService {
     }
 
     private BookingResponseDto createMergedBooking(SlotBookingRequestDto request, com.hitendra.turf_booking_backend.entity.Service service,
-                                                   List<ServiceResource> candidateResources, String activityCode, LocalDate bookingDate,
+                                                   ServiceResource resource, String activityCode, LocalDate bookingDate,
                                                    LocalTime startTime, LocalTime endTime, List<SlotKeyPayload> payloads,
                                                    List<ServiceResource> pooledResources) {
-        // Calculate Price (same for all resources in the pool)
+        // Calculate Price
         ServiceResource pricingResource = pooledResources.get(0);
         ResourceSlotConfig config = slotConfigRepository.findByResourceId(pricingResource.getId())
                 .orElseThrow(() -> new BookingException("Slot configuration not found"));
@@ -680,56 +686,44 @@ public class SlotBookingService {
         Double totalAmount = totalSlotPrice + platformFee;
         totalAmount = Math.round(totalAmount * 100.0) / 100.0;
 
+        // Calculate online and venue amounts based on configurable percentage
         Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
         Double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
         User user = authUtil.getCurrentUser();
+        String reference = generateBookingReference();
+
+        // Determine booking status based on payment method
+        // All bookings start as PENDING and await payment via Razorpay
+        BookingStatus bookingStatus = BookingStatus.PENDING;
         String paymentMode = request.getPaymentMethod();
 
-        // Try each candidate resource in priority order.
-        // On DataIntegrityViolationException (concurrent conflict on a resource that has
-        // a PENDING+NOT_STARTED booking from another user), fall back to the next candidate.
-        for (ServiceResource resource : candidateResources) {
-            String reference = generateBookingReference();
+        log.info("Creating PENDING booking - awaiting payment via: {}", paymentMode);
 
-            Booking booking = Booking.builder()
-                    .user(user)
-                    .service(service)
-                    .resource(resource)
-                    .activityCode(activityCode)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .bookingDate(bookingDate)
-                    .amount(totalAmount)
-                    .onlineAmountPaid(java.math.BigDecimal.valueOf(onlineAmount))
-                    .venueAmountDue(java.math.BigDecimal.valueOf(venueAmount))
-                    .reference(reference)
-                    .status(BookingStatus.PENDING)
-                    .paymentMode(paymentMode)
-                    .createdAt(Instant.now())
-                    .paymentSource(PaymentSource.BY_USER)
-                    .idempotencyKey(request.getIdempotencyKey())
-                    .build();
+        Booking booking = Booking.builder()
+                .user(user)
+                .service(service)
+                .resource(resource)
+                .activityCode(activityCode)
+                .startTime(startTime)
+                .endTime(endTime)
+                .bookingDate(bookingDate)
+                .amount(totalAmount)
+                .onlineAmountPaid(java.math.BigDecimal.valueOf(onlineAmount))
+                .venueAmountDue(java.math.BigDecimal.valueOf(venueAmount))
+                .reference(reference)
+                .status(bookingStatus)
+                .paymentMode(paymentMode)
+                .createdAt(Instant.now())
+                .paymentSource(PaymentSource.BY_USER)
+                .idempotencyKey(request.getIdempotencyKey())
+                .build();
 
-            try {
-                log.info("Attempting booking on resource {} ({}) for {}-{} on {}",
-                        resource.getName(), resource.getId(), startTime, endTime, bookingDate);
-                Booking savedBooking = bookingRepository.save(booking);
-                BookingResponseDto response = convertToResponseDto(savedBooking);
-                response.setBookingType("SINGLE_RESOURCE");
-                return response;
-            } catch (DataIntegrityViolationException e) {
-                // This resource has a concurrent PENDING booking (payment in-progress by another user).
-                // Try the next candidate resource in the pool.
-                log.warn("Concurrent conflict on resource {} for {}-{} on {}. Trying next candidate...",
-                        resource.getId(), startTime, endTime, bookingDate);
-            }
-        }
+        Booking savedBooking = bookingRepository.save(booking);
 
-        // All candidates exhausted — every resource in the pool has an active or concurrent booking.
-        log.warn("All {} candidate resource(s) exhausted for activity={} on {} at {}-{}",
-                candidateResources.size(), activityCode, bookingDate, startTime, endTime);
-        throw new BookingException("No available resources for the selected time range. Please try another time.");
+        BookingResponseDto response = convertToResponseDto(savedBooking);
+        response.setBookingType("SINGLE_RESOURCE");
+        return response;
     }
 
     private List<BookingResponseDto> createSplitBookings(SlotBookingRequestDto request, com.hitendra.turf_booking_backend.entity.Service service,
@@ -802,14 +796,7 @@ public class SlotBookingService {
                     .idempotencyKey(idempotencyKey)
                     .build();
 
-            Booking savedBooking;
-            try {
-                savedBooking = bookingRepository.save(booking);
-            } catch (DataIntegrityViolationException e) {
-                log.warn("Concurrent booking conflict in split booking for resource {} at {}",
-                        assignedResource.getId(), payload.getStartTime());
-                throw new BookingException("A slot was just booked by someone else. Please refresh and try again.");
-            }
+            Booking savedBooking = bookingRepository.save(booking);
             responses.add(convertToResponseDto(savedBooking));
         }
         return responses;
@@ -1148,7 +1135,7 @@ public class SlotBookingService {
      * @param adminProfileId Admin profile ID who is creating the booking
      * @return BookingResponseDto with booking details
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingResponseDto createAdminManualBooking(AdminManualBookingRequestDto request, Long adminProfileId) {
 
         log.info("Processing admin manual booking request with {} slotKeys",
@@ -1249,22 +1236,36 @@ public class SlotBookingService {
                 .filter(r -> r.getActivities().size() > 1)
                 .toList();
 
-        // Build priority-ordered candidate list
-        List<ServiceResource> candidateResources = new ArrayList<>();
+        // Try to find available resource
+        ServiceResource availableResource = null;
+        String allocationReason = null;
+
+        // PRIORITY 1: Exclusive
         for (ServiceResource resource : exclusiveResources) {
             if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
-                candidateResources.add(resource);
-            }
-        }
-        for (ServiceResource resource : multiActivityResources) {
-            if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
-                candidateResources.add(resource);
+                availableResource = resource;
+                allocationReason = "EXCLUSIVE (supports only " + activityCode + ")";
+                break;
             }
         }
 
-        if (candidateResources.isEmpty()) {
+        // PRIORITY 2: Multi-activity
+        if (availableResource == null) {
+            for (ServiceResource resource : multiActivityResources) {
+                if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
+                    availableResource = resource;
+                    allocationReason = "MULTI-ACTIVITY";
+                    break;
+                }
+            }
+        }
+
+        if (availableResource == null) {
             throw new BookingException("No available resource found for the requested slots");
         }
+
+        log.info("Selected resource {} ({}) for admin manual booking - Allocation: {}",
+                availableResource.getName(), availableResource.getId(), allocationReason);
 
         // Calculate total amount using quoted prices from payloads
         double totalAmount = 0.0;
@@ -1286,57 +1287,38 @@ public class SlotBookingService {
         Boolean venueAmountCollected = request.getVenueAmountCollected() != null
                 && request.getVenueAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0;
 
-        // Try each candidate in priority order, retrying on concurrent conflict
-        Booking savedBooking = null;
-        ServiceResource chosenResource = null;
-        for (ServiceResource resource : candidateResources) {
-            String reference = generateBookingReference();
+        String reference = generateBookingReference();
 
-            Booking booking = Booking.builder()
-                    .user(null) // No user for admin manual bookings
-                    .adminProfile(adminProfile)
-                    .service(service)
-                    .resource(resource)
-                    .activityCode(activityCode)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .bookingDate(bookingDate)
-                    .amount(totalAmount)
-                    .onlineAmountPaid(onlineAmountPaid)
-                    .venueAmountDue(venueAmountDue)
-                    .venueAmountCollected(venueAmountCollected)
-                    .reference(reference)
-                    .status(BookingStatus.CONFIRMED)
-                    .paymentMode("MANUAL")
-                    .createdAt(Instant.now())
-                    .paymentSource(PaymentSource.BY_ADMIN)
-                    .idempotencyKey(idempotencyKey)
-                    .paymentStatusEnum(PaymentStatus.SUCCESS)
-                    .build();
+        // Create booking with CONFIRMED status
+        Booking booking = Booking.builder()
+                .user(null) // No user for admin manual bookings
+                .adminProfile(adminProfile) // Set admin who created this
+                .service(service)
+                .resource(availableResource)
+                .activityCode(activityCode)
+                .startTime(startTime)
+                .endTime(endTime)
+                .bookingDate(bookingDate)
+                .amount(totalAmount)
+                .onlineAmountPaid(onlineAmountPaid)
+                .venueAmountDue(venueAmountDue)
+                .venueAmountCollected(venueAmountCollected)
+                .reference(reference)
+                .status(BookingStatus.CONFIRMED) // Immediately confirmed
+                .paymentMode("MANUAL")
+                .createdAt(Instant.now())
+                .paymentSource(PaymentSource.BY_ADMIN) // Mark as admin-created
+                .idempotencyKey(idempotencyKey)
+                .paymentStatusEnum(PaymentStatus.SUCCESS) // Mark payment as complete
+                .build();
 
-            try {
-                log.info("Admin booking attempt on resource {} ({}) for {}-{} on {}",
-                        resource.getName(), resource.getId(), startTime, endTime, bookingDate);
-                savedBooking = bookingRepository.save(booking);
-                chosenResource = resource;
-                break;
-            } catch (DataIntegrityViolationException e) {
-                log.warn("Concurrent conflict on resource {} for admin booking {}-{} on {}. Trying next...",
-                        resource.getId(), startTime, endTime, bookingDate);
-            }
-        }
+        Booking savedBooking = bookingRepository.save(booking);
 
-        if (savedBooking == null) {
-            throw new BookingException("No available resource found for the requested slots");
-        }
-
-        log.info("Admin manual booking created: reference={}, adminId={}, resource={}",
-                savedBooking.getReference(), adminProfileId, chosenResource.getId());
+        log.info("Admin manual booking created: reference={}, adminId={}", reference, adminProfileId);
 
         // Record payments in ledger
         try {
             String recordedBy = adminProfile.getUser().getPhone();
-            String reference = savedBooking.getReference();
 
             // Record online payment if any
             if (onlineAmountPaid.compareTo(java.math.BigDecimal.ZERO) > 0) {
@@ -1392,7 +1374,7 @@ public class SlotBookingService {
      * @param reference Booking reference
      * @return Cancelled booking details
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingResponseDto cancelBookingByReference(String reference) {
         return cancelBooking(reference);
     }
@@ -1405,7 +1387,7 @@ public class SlotBookingService {
      * @param adminProfileId Admin profile ID who is creating the booking
      * @return BookingResponseDto with CONFIRMED status
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public BookingResponseDto createDirectManualBooking(DirectManualBookingRequestDto request, Long adminProfileId) {
 
         log.info("Processing direct manual booking - Service: {}, Resource: {}, Date: {}, Time: {} to {}",
@@ -1518,14 +1500,7 @@ public class SlotBookingService {
                 .reference(reference)
                 .build();
 
-        Booking savedBooking;
-        try {
-            savedBooking = bookingRepository.save(booking);
-        } catch (DataIntegrityViolationException e) {
-            log.warn("Concurrent booking conflict in direct manual booking for resource {} on {} at {}-{}",
-                    request.getResourceId(), request.getBookingDate(), request.getStartTime(), request.getEndTime());
-            throw new BookingException("This resource already has an active booking for the selected time. Please choose a different resource or time.");
-        }
+        Booking savedBooking = bookingRepository.save(booking);
 
         log.info("Direct manual booking created: reference={}, adminId={}, adminProfile set={}, resourceId={}, amount={}",
                 reference, adminProfileId, savedBooking.getAdminProfile() != null,
