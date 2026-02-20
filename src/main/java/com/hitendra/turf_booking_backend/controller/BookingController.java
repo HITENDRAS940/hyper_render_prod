@@ -1,10 +1,8 @@
 package com.hitendra.turf_booking_backend.controller;
 
-import com.hitendra.turf_booking_backend.dto.booking.BookingRequestDto;
-import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.CancellationResponseDto;
+import com.hitendra.turf_booking_backend.dto.booking.RefundHistoryDto;
 import com.hitendra.turf_booking_backend.dto.booking.RefundPreviewDto;
-import com.hitendra.turf_booking_backend.service.BookingService;
 import com.hitendra.turf_booking_backend.service.RefundService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -14,6 +12,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/bookings")
 @RequiredArgsConstructor
@@ -22,6 +22,22 @@ import org.springframework.web.bind.annotation.*;
 @PreAuthorize("hasRole('USER')")
 public class  BookingController {
     private final RefundService refundService;
+
+    /**
+     * Refund History API (Read-Only)
+     * Returns all refunds for the currently authenticated user, ordered by most recent first.
+     */
+    @GetMapping("/refund-history")
+    @Operation(
+        summary = "Get refund history for current user",
+        description = "Returns all refund records for the authenticated user, ordered by most recent first. " +
+                     "Includes refund status, amounts, booking details, and processing timestamps. " +
+                     "Read-only - no side effects."
+    )
+    public ResponseEntity<List<RefundHistoryDto>> getRefundHistory() {
+        List<RefundHistoryDto> history = refundService.getRefundHistory();
+        return ResponseEntity.ok(history);
+    }
 
     /**
      * Refund Preview API (Read-Only)

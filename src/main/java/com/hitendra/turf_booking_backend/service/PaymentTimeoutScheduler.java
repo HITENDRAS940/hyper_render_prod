@@ -25,6 +25,39 @@ public class PaymentTimeoutScheduler {
     private final BookingRepository bookingRepository;
 
     /**
+     * Auto-expire PENDING bookings that are older than 5 minutes.
+     * A PENDING booking that has not been confirmed/paid within 5 minutes is considered stale and expired.
+     * Runs every minute.
+     */
+    @Scheduled(fixedDelay = 60000, initialDelay = 60000) // Every 1 minute
+    @Transactional
+    public void expireStalePendingBookings() {
+        Instant threshold = Instant.now().minusSeconds(300); // 5 minutes ago
+
+        List<Booking> staleBookings = bookingRepository.findStalePendingBookings(threshold);
+
+        if (staleBookings.isEmpty()) {
+            log.debug("No stale PENDING bookings found");
+            return;
+        }
+
+        log.info("Found {} stale PENDING booking(s) to expire", staleBookings.size());
+
+        for (Booking booking : staleBookings) {
+            try {
+                booking.setStatus(BookingStatus.EXPIRED);
+                log.info("⏰ Expired stale PENDING booking: ID={}, Reference={}, CreatedAt={}",
+                        booking.getId(), booking.getReference(), booking.getCreatedAt());
+            } catch (Exception e) {
+                log.error("Failed to expire stale PENDING booking ID: {}", booking.getId(), e);
+            }
+        }
+
+        bookingRepository.saveAll(staleBookings);
+        log.info("Stale PENDING booking expiry completed. Expired {} booking(s)", staleBookings.size());
+    }
+
+    /**
      * Auto-cancel bookings stuck in AWAITING_CONFIRMATION state beyond timeout.
      * Runs every minute.
      *

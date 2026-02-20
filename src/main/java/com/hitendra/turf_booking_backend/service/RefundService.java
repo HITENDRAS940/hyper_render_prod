@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.service;
 
 import com.hitendra.turf_booking_backend.config.RefundConfig;
 import com.hitendra.turf_booking_backend.dto.booking.CancellationResponseDto;
+import com.hitendra.turf_booking_backend.dto.booking.RefundHistoryDto;
 import com.hitendra.turf_booking_backend.dto.booking.RefundPreviewDto;
 import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.exception.PaymentException;
@@ -24,6 +25,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Service for handling booking cancellations and refunds.
@@ -74,6 +77,66 @@ public class RefundService {
         }
 
         return calculateRefundPreview(booking);
+    }
+
+    /**
+     * Get full refund history for the currently authenticated user.
+     * Returns a list of all refunds (any status) ordered by most recent first.
+     *
+     * @return list of refund history items
+     */
+    @Transactional(readOnly = true)
+    public List<RefundHistoryDto> getRefundHistory() {
+        User currentUser = authUtil.getCurrentUser();
+        if (currentUser == null) {
+            throw new PaymentException("User not authenticated");
+        }
+
+        log.info("Fetching refund history for user ID: {}", currentUser.getId());
+
+        List<Refund> refunds = refundRepository.findByUserIdOrderByInitiatedAtDesc(currentUser.getId());
+
+        return refunds.stream()
+                .map(this::mapToRefundHistoryDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Map a Refund entity to a RefundHistoryDto.
+     */
+    private RefundHistoryDto mapToRefundHistoryDto(Refund refund) {
+        Booking booking = refund.getBooking();
+
+        String serviceName = (refund.getService() != null) ? refund.getService().getName()
+                : (booking.getService() != null ? booking.getService().getName() : null);
+
+        String bookingDate = (booking.getBookingDate() != null) ? booking.getBookingDate().toString() : null;
+
+        String slotTime = null;
+        if (booking.getStartTime() != null && booking.getEndTime() != null) {
+            slotTime = booking.getStartTime() + " - " + booking.getEndTime();
+        }
+
+        BigDecimal deduction = refund.getOriginalAmount().subtract(refund.getRefundAmount());
+
+        return RefundHistoryDto.builder()
+                .refundId(refund.getId())
+                .bookingId(booking.getId())
+                .bookingReference(booking.getReference())
+                .serviceName(serviceName)
+                .bookingDate(bookingDate)
+                .slotTime(slotTime)
+                .originalAmount(refund.getOriginalAmount())
+                .refundAmount(refund.getRefundAmount())
+                .refundPercent(refund.getRefundPercent())
+                .deductionAmount(deduction)
+                .currency(refund.getCurrency())
+                .refundType(refund.getRefundType())
+                .status(refund.getStatus())
+                .razorpayRefundId(refund.getRazorpayRefundId())
+                .initiatedAt(refund.getInitiatedAt())
+                .processedAt(refund.getProcessedAt())
+                .build();
     }
 
     /**

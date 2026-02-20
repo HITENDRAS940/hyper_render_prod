@@ -114,6 +114,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Get lightweight booking list for a user (projection-based).
+     * Excludes PENDING bookings so users only see actionable/completed bookings.
      */
     @Query("""
         SELECT b.id as id, b.reference as reference, CAST(b.status AS string) as status, b.bookingDate as bookingDate,
@@ -124,9 +125,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.resource.id as resourceId, b.resource.name as resourceName
         FROM Booking b
         WHERE b.user.id = :userId
+          AND b.status <> com.hitendra.turf_booking_backend.entity.BookingStatus.PENDING
         ORDER BY b.createdAt DESC
         """)
     List<UserBookingProjection> findUserBookingsProjected(@Param("userId") Long userId);
+
+    /**
+     * Find all stale PENDING bookings older than the given threshold time.
+     * Used by the scheduler to auto-expire PENDING bookings after 5 minutes.
+     */
+    @Query("""
+        SELECT b FROM Booking b
+        WHERE b.status = 'PENDING'
+        AND b.createdAt <= :threshold
+        """)
+    List<Booking> findStalePendingBookings(@Param("threshold") Instant threshold);
 
     /**
      * Get paginated lightweight booking list for a user (projection-based).

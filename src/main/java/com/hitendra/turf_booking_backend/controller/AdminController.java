@@ -461,22 +461,6 @@ public class AdminController {
         return ResponseEntity.status(201).body(booking);
     }
 
-    @GetMapping("/manual-bookings/{reference}")
-    @Operation(
-            summary = "Get manual booking details by reference",
-            description = """
-                Retrieve detailed information about a manual booking using its reference number.
-                """)
-    public ResponseEntity<BookingResponseDto> getManualBookingByReference(
-            @PathVariable String reference) {
-
-        log.info("Fetching manual booking details - Reference: {}", reference);
-
-        BookingResponseDto booking = bookingService.getBookingByReference(reference);
-
-        return ResponseEntity.ok(booking);
-    }
-
     // ==================== Slot Disabling Management ====================
 
     @PostMapping("/slots/disable")
