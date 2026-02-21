@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.controller;
 
+import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.service.ServiceDto;
 import com.hitendra.turf_booking_backend.service.*;
@@ -95,5 +96,11 @@ public class ServiceController {
     public ResponseEntity<BookingResponseDto> getBooking(@PathVariable Long bookingId) {
         BookingResponseDto booking = bookingService.getBookingById(bookingId);
         return ResponseEntity.ok(booking);
+    }
+
+    @GetMapping("/activity")
+    public ResponseEntity<List<GetActivityDto>> getActivity() {
+        List<GetActivityDto> activities = activityService.getAllActivities();
+        return ResponseEntity.ok(activities);
     }
 }
