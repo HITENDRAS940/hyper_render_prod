@@ -27,6 +27,7 @@ public class ServiceController {
     private final ServiceService serviceService;
     private final ActivityService activityService;
     private final BookingService bookingService;
+    private final ServiceResourceService serviceResourceService;
 
     @GetMapping("/{id}")
     @Operation(summary = "Get services details", description = "Get detailed information about a specific service by ID")
@@ -67,7 +68,14 @@ public class ServiceController {
 
     // ==================== Resource Endpoints ====================
 
-    @GetMapping("/activity/{activityId}")
+    @GetMapping("/{serviceId}/resources")
+    @Operation(summary = "Get service resources", description = "Get all enabled resources for a specific service")
+    public ResponseEntity<List<ServiceResourceDto>> getServiceResources(@PathVariable Long serviceId) {
+        List<ServiceResourceDto> resources = serviceResourceService.getEnabledResourcesByServiceId(serviceId);
+        return ResponseEntity.ok(resources);
+    }
+
+    @GetMapping("/{activityId}/activity")
     @Operation(summary = "Get services by activity and city", description = "Get all services for a specific activity in a specific city")
     public ResponseEntity<PaginatedResponse<ServiceCardDto>> getServiceActivityId(
             @PathVariable Long activityId,
