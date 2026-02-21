@@ -8,6 +8,7 @@ import com.hitendra.turf_booking_backend.dto.user.UpdateUserProfileRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserProfileDto;
 import com.hitendra.turf_booking_backend.security.service.UserDetailsImplementation;
 import com.hitendra.turf_booking_backend.service.BookingService;
+import com.hitendra.turf_booking_backend.service.InvoiceService;
 import com.hitendra.turf_booking_backend.service.UserProfileService;
 import com.hitendra.turf_booking_backend.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,6 +33,8 @@ public class UserController {
     private final BookingService bookingService;
 
     private final UserProfileService userProfileService;
+
+    private final InvoiceService invoiceService;
 
     @PutMapping("/basic-info")
     @Operation(summary = "Update user basic info",
@@ -65,6 +68,29 @@ public class UserController {
     public ResponseEntity<BookingResponseDto> getBooking(@PathVariable Long bookingId) {
         BookingResponseDto booking = bookingService.getBookingById(bookingId);
         return ResponseEntity.ok(booking);
+    }
+
+    @GetMapping("/booking/{bookingId}/invoice/exists")
+    @Operation(
+            summary = "Check if invoice exists",
+            description = "Check whether an invoice has been generated for the given booking ID. Returns true if it exists, false otherwise."
+    )
+    public ResponseEntity<Boolean> checkInvoiceExists(@PathVariable Long bookingId) {
+        boolean exists = invoiceService.checkInvoiceExists(bookingId);
+        return ResponseEntity.ok(exists);
+    }
+
+    @GetMapping("/booking/{bookingId}/invoice/url")
+    @Operation(
+            summary = "Get invoice download URL",
+            description = "Returns the invoice download URL for the given booking ID. Returns 404 if no invoice has been generated yet."
+    )
+    public ResponseEntity<String> getInvoiceUrl(@PathVariable Long bookingId) {
+        if (!invoiceService.checkInvoiceExists(bookingId)) {
+            return ResponseEntity.notFound().build();
+        }
+        String url = invoiceService.getInvoiceUrl(bookingId);
+        return ResponseEntity.ok(url);
     }
 
     @GetMapping("/profile")

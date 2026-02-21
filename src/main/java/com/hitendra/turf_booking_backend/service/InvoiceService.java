@@ -70,5 +70,28 @@ public class InvoiceService {
         invoiceRepository.save(invoice);
         log.info("✅ Invoice saved for booking ID: {}, URL: {}", bookingId, request.getInvoiceURL());
     }
+
+    /**
+     * Checks whether an invoice exists for the given booking ID.
+     *
+     * @param bookingId the booking ID to check
+     * @return true if an invoice exists, false otherwise
+     */
+    public boolean checkInvoiceExists(Long bookingId) {
+        return invoiceRepository.existsByBookingId(bookingId);
+    }
+
+    /**
+     * Returns the invoice download URL for the given booking ID.
+     * Throws a RuntimeException if no invoice is found.
+     *
+     * @param bookingId the booking ID whose invoice URL is requested
+     * @return the invoice URL string
+     */
+    public String getInvoiceUrl(Long bookingId) {
+        Invoice invoice = invoiceRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new RuntimeException("Invoice not found for booking ID: " + bookingId));
+        return invoice.getInvoiceUrl();
+    }
 }
 
