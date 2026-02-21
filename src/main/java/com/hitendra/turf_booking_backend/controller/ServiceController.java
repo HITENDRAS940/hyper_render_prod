@@ -66,7 +66,7 @@ public class ServiceController {
 
     // ==================== Resource Endpoints ====================
 
-    @GetMapping("/{activityId}/activity")
+    @GetMapping("/activity/{activityId}")
     @Operation(summary = "Get services by activity and city", description = "Get all services for a specific activity in a specific city")
     public ResponseEntity<PaginatedResponse<ServiceCardDto>> getServiceActivityId(
             @PathVariable Long activityId,
