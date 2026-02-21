@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.controller;
 
+import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
@@ -10,6 +11,7 @@ import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.CreateAdminRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
+import com.hitendra.turf_booking_backend.repository.ActivityRepository;
 import com.hitendra.turf_booking_backend.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -42,6 +44,7 @@ public class ManagerController {
     private final UserService userService;
     private final PricingService pricingService;
     private final RevenueService revenueService;
+    private final ActivityService activityService;
 
     @PostMapping("/admins")
     @Operation(summary = "Create admin", description = "Create a new admin user")
@@ -367,5 +370,11 @@ public class ManagerController {
     public ResponseEntity<ServiceRevenueDto> getServiceRevenueReport(@PathVariable Long serviceId) {
         ServiceRevenueDto report = revenueService.getServiceRevenueReport(serviceId);
         return ResponseEntity.ok(report);
+    }
+
+    @GetMapping("/activity")
+    public ResponseEntity<List<GetActivityDto>> getActivity() {
+        List<GetActivityDto> activities = activityService.getAllActivities();
+        return ResponseEntity.ok(activities);
     }
 }

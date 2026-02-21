@@ -18,10 +18,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
+import com.hitendra.turf_booking_backend.repository.projection.BookingListProjection;
+import com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection;
+import com.hitendra.turf_booking_backend.dto.booking.CompleteBookingRequestDto;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @org.springframework.stereotype.Service
@@ -120,7 +122,7 @@ public class BookingService {
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByService(Long serviceId, LocalDate date, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
+        Page<BookingListProjection> bookingPage;
 
         if (date != null) {
             // Filter by service and date
@@ -149,7 +151,7 @@ public class BookingService {
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByResourceAndDate(Long resourceId, LocalDate date, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
+        Page<BookingListProjection> bookingPage;
 
         if (date != null) {
             bookingPage = bookingRepository.findBookingsByResourceIdAndDateProjected(resourceId, date, pageable);
@@ -197,13 +199,13 @@ public class BookingService {
      * If date or status is null, that filter is not applied
      */
     public PaginatedResponse<BookingResponseDto> getBookingsByAdminIdWithFilters(
-            Long adminId, java.time.LocalDate date, BookingStatus status, int page, int size) {
+            Long adminId, LocalDate date, BookingStatus status, int page, int size) {
         log.info("Fetching bookings for adminId: {}, date: {}, status: {}, page: {}, size: {}",
                 adminId, date, status, page, size);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        Page<com.hitendra.turf_booking_backend.repository.projection.BookingListProjection> bookingPage;
+        Page<BookingListProjection> bookingPage;
         if (date != null && status != null) {
             log.info("Using query: findBookingsByAdminIdAndDateAndStatusProjected");
             bookingPage = bookingRepository.findBookingsByAdminIdAndDateAndStatusProjected(adminId, date, status, pageable);
@@ -226,7 +228,7 @@ public class BookingService {
                 bookingPage.getTotalPages());
 
         // Log each booking found
-        for (com.hitendra.turf_booking_backend.repository.projection.BookingListProjection projection : bookingPage.getContent()) {
+        for (BookingListProjection projection : bookingPage.getContent()) {
             log.info("  - Booking ID: {}, Ref: {}, Status: {}, Date: {}",
                     projection.getId(),
                     projection.getReference(),
@@ -256,32 +258,11 @@ public class BookingService {
     }
 
     /**
-     * Get pending bookings by admin ID (for services created by this admin)
-     */
-    public PaginatedResponse<PendingBookingDto> getPendingBookingsByAdminId(Long adminId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Booking> bookingPage = bookingRepository.findPendingByServiceCreatedById(adminId, pageable);
-
-        List<PendingBookingDto> content = bookingPage.getContent().stream()
-                .map(this::convertToPendingBookingDto)
-                .collect(Collectors.toList());
-
-        return new PaginatedResponse<>(
-                content,
-                bookingPage.getNumber(),
-                bookingPage.getSize(),
-                bookingPage.getTotalElements(),
-                bookingPage.getTotalPages(),
-                bookingPage.isLast()
-        );
-    }
-
-    /**
      * Get current user's bookings (optimized with projection query)
      */
     public List<UserBookingDto> getCurrentUserBookings() {
         User currentUser = authUtil.getCurrentUser();
-        List<com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection> projections =
+        List<UserBookingProjection> projections =
                 bookingRepository.findUserBookingsProjected(currentUser.getId());
 
         return projections.stream()
@@ -296,7 +277,7 @@ public class BookingService {
      */
     public UserBookingDto getLastUserBooking() {
         User currentUser = authUtil.getCurrentUser();
-        com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection projection =
+        UserBookingProjection projection =
                 bookingRepository.findLastUserBookingProjected(currentUser.getId());
 
         if (projection == null) {
@@ -307,7 +288,7 @@ public class BookingService {
     }
 
     private UserBookingDto convertProjectionToUserBookingDto(
-            com.hitendra.turf_booking_backend.repository.projection.UserBookingProjection projection) {
+            UserBookingProjection projection) {
         List<UserBookingDto.SlotTimeDto> slotTimes = List.of(UserBookingDto.SlotTimeDto.builder()
                 .startTime(projection.getStartTime().toString())
                 .endTime(projection.getEndTime().toString())
@@ -339,75 +320,6 @@ public class BookingService {
     }
 
     /**
-     * Create booking by admin
-     */
-    public BookingResponseDto createAdminBooking(AdminBookingRequestDTO request) {
-        AdminProfile adminProfile = authUtil.getCurrentAdminProfile();
-
-        // Validate time range
-        if (!request.getStartTime().isBefore(request.getEndTime())) {
-            throw new RuntimeException("Start time must be before end time");
-        }
-
-        // Fetch resource
-        ServiceResource resource = serviceResourceRepository.findById(request.getResourceId())
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
-
-        if (!resource.isEnabled()) {
-            throw new RuntimeException("Resource is not available for booking");
-        }
-
-        Service service = resource.getService();
-
-        if (request.getBookingDate().isBefore(LocalDate.now())) {
-            throw new RuntimeException("Cannot book slots for past dates");
-        }
-
-        // Check for overlapping bookings
-        List<Booking> overlappingBookings = bookingRepository.findOverlappingBookings(
-                request.getResourceId(),
-                request.getBookingDate(),
-                request.getStartTime(),
-                request.getEndTime()
-        );
-
-        if (!overlappingBookings.isEmpty()) {
-            throw new RuntimeException("Selected time range overlaps with an existing booking");
-        }
-
-        // Calculate total amount with taxes and fees using PricingService
-        PriceBreakdownDto priceBreakdown = pricingService.calculatePriceBreakdownForTimeRange(
-                request.getResourceId(),
-                request.getStartTime(),
-                request.getEndTime(),
-                request.getBookingDate()
-        );
-        double totalAmount = priceBreakdown.getTotalAmount();
-
-        Booking booking = Booking.builder()
-                .user(null)
-                .service(service)
-                .resource(resource)
-                .startTime(request.getStartTime())
-                .endTime(request.getEndTime())
-                .bookingDate(request.getBookingDate())
-                .amount(totalAmount)
-                .reference(generateBookingReference())
-                .status(BookingStatus.CONFIRMED)  // Admin bookings are auto-confirmed
-                .adminProfile(adminProfile)
-                .createdAt(java.time.Instant.now())
-                .paymentSource(PaymentSource.BY_ADMIN)
-                .build();
-
-        Booking saved = bookingRepository.save(booking);
-
-        log.info("Admin {} created booking {} from {} to {}",
-                adminProfile.getId(), saved.getReference(), request.getStartTime(), request.getEndTime());
-
-        return convertToResponseDto(saved);
-    }
-
-    /**
      * Manually approve a booking
      */
     public BookingResponseDto approveBooking(Long bookingId) {
@@ -433,7 +345,7 @@ public class BookingService {
      * Only the admin who owns the service can mark it as complete
      * Records venue payment collection details and updates ledger
      */
-    public BookingResponseDto completeBooking(Long bookingId, com.hitendra.turf_booking_backend.dto.booking.CompleteBookingRequestDto request) {
+    public BookingResponseDto completeBooking(Long bookingId, CompleteBookingRequestDto request) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + bookingId));
 
@@ -517,10 +429,6 @@ public class BookingService {
     }
 
     // ==================== Helper Methods ====================
-
-    private String generateBookingReference() {
-        return "BK" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
 
     private void sendBookingNotifications(Booking booking) {
         String slotDetails = booking.getStartTime() + " - " + booking.getEndTime();

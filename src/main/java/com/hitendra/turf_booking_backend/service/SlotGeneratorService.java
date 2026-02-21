@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
 
 /**
  * Service for generating slots dynamically from ResourceSlotConfig.
@@ -61,13 +62,12 @@ public class SlotGeneratorService {
             return slots;
         }
 
-        LocalTime currentStart = openingTime;
         int displayOrder = 0;
 
         // Calculate total open duration in minutes to avoid infinite loops
         long totalOpenMinutes;
         if (closingTime.isAfter(openingTime)) {
-            totalOpenMinutes = java.time.Duration.between(openingTime, closingTime).toMinutes();
+            totalOpenMinutes = Duration.between(openingTime, closingTime).toMinutes();
         } else {
             // Overnight or 24 hours (closing <= opening)
             // (24 * 60) - openingMinutes + closingMinutes
@@ -109,6 +109,4 @@ public class SlotGeneratorService {
 
         return slots;
     }
-
 }
-

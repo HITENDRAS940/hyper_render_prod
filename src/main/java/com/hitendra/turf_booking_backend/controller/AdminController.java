@@ -1,10 +1,7 @@
 package com.hitendra.turf_booking_backend.controller;
 
-import com.hitendra.turf_booking_backend.dto.booking.AdminBookingRequestDTO;
-import com.hitendra.turf_booking_backend.dto.booking.AdminManualBookingRequestDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.DirectManualBookingRequestDto;
-import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.booking.SlotAvailabilityResponseDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.dashboard.AdminDashboardStatsDto;
@@ -14,7 +11,6 @@ import com.hitendra.turf_booking_backend.dto.service.*;
 import com.hitendra.turf_booking_backend.dto.slot.DeleteDisabledSlotsRequest;
 import com.hitendra.turf_booking_backend.dto.slot.DisabledSlotDto;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
-import com.hitendra.turf_booking_backend.dto.user.DeleteProfileRequest;
 import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.Refund;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
@@ -27,16 +23,16 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto;
+import com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotRequestDto;
+import com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
 @RestController
@@ -70,26 +66,6 @@ public class AdminController {
         Long userId = getCurrentUserId();
         AdminProfileDto profile = adminProfileService.getAdminByUserId(userId);
         return ResponseEntity.ok(profile);
-    }
-
-    @DeleteMapping("/profile")
-    @Operation(summary = "Delete admin account",
-            description = "Permanently delete the admin's account. This action is IRREVERSIBLE. " +
-                    "All personal data (name, email, phone, business info) will be permanently removed. " +
-                    "Booking records will be preserved in anonymized form for business records. " +
-                    "Services will remain active but without admin PII. " +
-                    "User must confirm by sending confirmationText as 'DELETE MY ACCOUNT'.")
-    public ResponseEntity<String> deleteProfile(@RequestBody DeleteProfileRequest request) {
-        // Validate confirmation with explicit confirmation text
-        if (request.getConfirmationText() == null || !request.getConfirmationText().equals("DELETE MY ACCOUNT")) {
-            throw new RuntimeException("Please confirm deletion by setting confirmationText to 'DELETE MY ACCOUNT'");
-        }
-
-        Long userId = getCurrentUserId();
-        adminProfileService.permanentlyDeleteAdminAccount(userId);
-        return ResponseEntity.ok("Your account has been permanently deleted. " +
-                "All personal data has been removed. " +
-                "You will be logged out and cannot access this account again.");
     }
 
     // ==================== Dashboard Statistics ====================
@@ -267,17 +243,6 @@ public class AdminController {
         log.info("Returning {} bookings for adminProfileId: {}, page content size: {}",
                 bookings.getTotalElements(), adminProfile.getId(), bookings.getContent().size());
 
-        return ResponseEntity.ok(bookings);
-    }
-
-    @GetMapping("/bookings/pending")
-    @Operation(summary = "Get pending bookings", description = "Get all bookings with PENDING status for this admin's services")
-    public ResponseEntity<PaginatedResponse<PendingBookingDto>> getPendingBookings(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        Long userId = getCurrentUserId();
-        AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
-        PaginatedResponse<PendingBookingDto> bookings = bookingService.getPendingBookingsByAdminId(adminProfile.getId(), page, size);
         return ResponseEntity.ok(bookings);
     }
 
@@ -548,36 +513,16 @@ public class AdminController {
                 **Response:**
                 Returns total count, list of disabled slots, and a summary message.
                 """)
-    public ResponseEntity<com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto> disableSlots(
-            @Valid @RequestBody com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotRequestDto request) {
+    public ResponseEntity<UnifiedDisableSlotResponseDto> disableSlots(
+            @Valid @RequestBody UnifiedDisableSlotRequestDto request) {
 
         Long userId = getCurrentUserId();
         AdminProfileDto adminProfile = adminProfileService.getAdminByUserId(userId);
 
-        com.hitendra.turf_booking_backend.dto.slot.UnifiedDisableSlotResponseDto response =
+        UnifiedDisableSlotResponseDto response =
                 disabledSlotService.disableSlots(request, adminProfile.getId());
 
         return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/slots/disabled/{disabledSlotId}")
-    @Operation(summary = "Enable a disabled slot",
-            description = "Remove a slot from disabled state, making it available for booking again")
-    public ResponseEntity<String> enableSlot(@PathVariable Long disabledSlotId) {
-        disabledSlotService.enableSlot(disabledSlotId);
-        return ResponseEntity.ok("Slot enabled successfully");
-    }
-
-    @DeleteMapping("/slots/disabled/by-time")
-    @Operation(summary = "Enable slot by time",
-            description = "Enable a specific disabled slot by resource, date, and start time")
-    public ResponseEntity<String> enableSlotByTime(
-            @RequestParam Long resourceId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam @DateTimeFormat(pattern = "HH:mm") LocalTime startTime) {
-
-        disabledSlotService.enableSlotByTime(resourceId, date, startTime);
-        return ResponseEntity.ok("Slot enabled successfully");
     }
 
     @DeleteMapping("/resources/{resourceId}/slots/disabled/date/{date}")
@@ -713,9 +658,9 @@ public class AdminController {
                 - End-of-day cash reconciliation
                 - Payment settlement reports
                 """)
-    public ResponseEntity<com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto> getServiceTodayRevenueReport(
+    public ResponseEntity<ServiceTodayRevenueDto> getServiceTodayRevenueReport(
             @PathVariable Long serviceId) {
-        com.hitendra.turf_booking_backend.dto.revenue.ServiceTodayRevenueDto report =
+        ServiceTodayRevenueDto report =
                 revenueService.getServiceTodayRevenueReport(serviceId);
         return ResponseEntity.ok(report);
     }

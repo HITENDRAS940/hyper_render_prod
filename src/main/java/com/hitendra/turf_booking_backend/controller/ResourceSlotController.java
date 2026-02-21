@@ -25,7 +25,6 @@ public class ResourceSlotController {
     private final ResourceSlotService resourceSlotService;
     private final PricingService pricingService;
 
-
     @GetMapping("/{resourceId}/config")
     @Operation(summary = "Get slot configuration", description = "Get the slot configuration for a resource")
     public ResponseEntity<ResourceSlotConfigDto> getSlotConfig(@PathVariable Long resourceId) {

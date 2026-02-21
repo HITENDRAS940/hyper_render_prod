@@ -13,7 +13,6 @@ import com.hitendra.turf_booking_backend.service.accounting.LedgerService;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import com.hitendra.turf_booking_backend.util.CryptoUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -260,7 +259,7 @@ public class SlotBookingService {
         if (date.equals(todayIST)) {
             slots = slots.stream()
                     .filter(slot -> slot.getEndTime().isAfter(timeIST))
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         // ═══════════════════════════════════════════════════════════════════════════
@@ -772,8 +771,8 @@ public class SlotBookingService {
             totalAmount = Math.round(totalAmount * 100.0) / 100.0;
 
             // Calculate online and venue amounts based on configurable percentage
-            Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
-            Double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
+            double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
             String idempotencyKey = request.getIdempotencyKey() != null ? request.getIdempotencyKey() + "-" + i : null;
             String reference = generateBookingReference();

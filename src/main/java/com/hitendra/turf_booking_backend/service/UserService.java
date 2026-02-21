@@ -15,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import com.hitendra.turf_booking_backend.repository.projection.BookingCountProjection;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -64,7 +65,7 @@ public class UserService {
 
     private UserInfoDto convertToUserInfoDto(User user) {
         // Get booking statistics using optimized projection query
-        List<com.hitendra.turf_booking_backend.repository.projection.BookingCountProjection> bookingCounts =
+        List<BookingCountProjection> bookingCounts =
                 bookingRepository.getBookingCountsByStatusForUser(user.getId());
 
         long totalBookings = 0;
@@ -80,7 +81,8 @@ public class UserService {
             }
         }
 
-        UserInfoDto dto = UserInfoDto.builder()
+
+        return UserInfoDto.builder()
                 .id(user.getId())
                 .phone(user.getPhone())
                 .email(user.getEmail())
@@ -92,9 +94,6 @@ public class UserService {
                 .confirmedBookings(confirmedBookings)
                 .cancelledBookings(cancelledBookings)
                 .build();
-
-
-        return dto;
     }
 
     /**
@@ -124,7 +123,7 @@ public class UserService {
 
             loggedInUser.setPhone(updateDto.getPhone());
             updated = true;
-            if (message.length() > 0) {
+            if (!message.isEmpty()) {
                 message.append(" and phone number updated successfully");
             } else {
                 message.append("Phone number updated successfully");
