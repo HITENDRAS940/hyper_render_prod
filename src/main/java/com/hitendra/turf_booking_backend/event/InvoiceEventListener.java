@@ -1,7 +1,7 @@
 package com.hitendra.turf_booking_backend.event;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpEntity;
@@ -24,9 +24,12 @@ public class InvoiceEventListener {
     @Value("${invoice.generator.url}")
     private String invoiceApiUrl;
 
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 5_000;
+
     private final RestTemplate restTemplate;
 
-    public InvoiceEventListener(RestTemplate restTemplate) {
+    public InvoiceEventListener(@Qualifier("invoiceRestTemplate") RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
@@ -35,17 +38,30 @@ public class InvoiceEventListener {
     public void handleBookingConfirmed(BookingConfirmedEvent event) {
         Long bookingId = event.getBooking().getId();
         log.info("📄 Triggering async invoice generation for booking ID: {}", bookingId);
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
 
-            Map<String, Object> body = Map.of("bookingId", bookingId);
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        Map<String, Object> body = Map.of("bookingId", bookingId);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-            restTemplate.postForEntity(invoiceApiUrl, request, String.class);
-            log.info("✅ Invoice generation request sent successfully for booking ID: {}", bookingId);
-        } catch (Exception e) {
-            log.warn("⚠️ Invoice generation failed for booking ID: {} — Error: {}", bookingId, e.getMessage());
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                restTemplate.postForEntity(invoiceApiUrl, request, String.class);
+                log.info("✅ Invoice generation request sent successfully for booking ID: {} (attempt {})", bookingId, attempt);
+                return;
+            } catch (Exception e) {
+                log.warn("⚠️ Invoice generation attempt {}/{} failed for booking ID: {} — Error: {}", attempt, MAX_RETRIES, bookingId, e.getMessage());
+                if (attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        log.warn("⚠️ Retry interrupted for booking ID: {}", bookingId);
+                        return;
+                    }
+                }
+            }
         }
+        log.error("❌ Invoice generation failed after {} attempts for booking ID: {}", MAX_RETRIES, bookingId);
     }
 }
