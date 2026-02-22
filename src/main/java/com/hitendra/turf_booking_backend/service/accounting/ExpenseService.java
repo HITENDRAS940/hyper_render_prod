@@ -112,6 +112,7 @@ public class ExpenseService {
      * Get all expenses for a service (validates ownership).
      * Uses eager fetching to prevent LazyInitializationException.
      */
+    @Transactional(readOnly = true)
     public List<Expense> getExpensesByService(Long serviceId) {
         // Validate service ownership
         Service service = serviceRepository.findById(serviceId)
@@ -130,6 +131,7 @@ public class ExpenseService {
      * Get expenses for a service within a date range (validates ownership).
      * Uses eager fetching to prevent LazyInitializationException.
      */
+    @Transactional(readOnly = true)
     public List<Expense> getExpensesByServiceAndDateRange(
         Long serviceId, LocalDate startDate, LocalDate endDate) {
 
@@ -150,6 +152,7 @@ public class ExpenseService {
     /**
      * Get total expenses for a service in a date range (validates ownership).
      */
+    @Transactional(readOnly = true)
     public Double getTotalExpenses(Long serviceId, LocalDate startDate, LocalDate endDate) {
         // Validate service ownership
         Service service = serviceRepository.findById(serviceId)

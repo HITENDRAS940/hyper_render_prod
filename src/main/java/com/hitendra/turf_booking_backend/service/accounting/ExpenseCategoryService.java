@@ -60,6 +60,7 @@ public class ExpenseCategoryService {
     /**
      * Get all expense categories for current admin.
      */
+    @Transactional(readOnly = true)
     public List<ExpenseCategory> getAllCategories() {
         AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
         return categoryRepository.findByAdminProfileId(currentAdmin.getId());
@@ -68,6 +69,7 @@ public class ExpenseCategoryService {
     /**
      * Get categories by type for current admin.
      */
+    @Transactional(readOnly = true)
     public List<ExpenseCategory> getCategoriesByType(ExpenseType type) {
         AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
         return categoryRepository.findByAdminProfileIdAndType(currentAdmin.getId(), type);
@@ -77,10 +79,11 @@ public class ExpenseCategoryService {
      * Get category by ID.
      * Ensures the category belongs to current admin.
      */
+    @Transactional(readOnly = true)
     public ExpenseCategory getCategoryById(Long id) {
         AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
 
-        ExpenseCategory category = categoryRepository.findById(id)
+        ExpenseCategory category = categoryRepository.findByIdWithAdminProfile(id)
             .orElseThrow(() -> new BookingException("Expense category not found: " + id));
 
         // Verify ownership
@@ -94,6 +97,7 @@ public class ExpenseCategoryService {
     /**
      * Get category by name for current admin.
      */
+    @Transactional(readOnly = true)
     public ExpenseCategory getCategoryByName(String name) {
         AdminProfile currentAdmin = authUtil.getCurrentAdminProfile();
 

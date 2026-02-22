@@ -17,23 +17,36 @@ public interface ExpenseCategoryRepository extends JpaRepository<ExpenseCategory
 
     /**
      * Get all categories for a specific admin.
+     * Uses JOIN FETCH to avoid LazyInitializationException when open-in-view is disabled.
      */
-    List<ExpenseCategory> findByAdminProfileId(Long adminProfileId);
+    @Query("SELECT ec FROM ExpenseCategory ec JOIN FETCH ec.adminProfile WHERE ec.adminProfile.id = :adminProfileId")
+    List<ExpenseCategory> findByAdminProfileId(@Param("adminProfileId") Long adminProfileId);
 
     /**
      * Get categories by admin and type.
+     * Uses JOIN FETCH to avoid LazyInitializationException when open-in-view is disabled.
      */
-    List<ExpenseCategory> findByAdminProfileIdAndType(Long adminProfileId, ExpenseType type);
+    @Query("SELECT ec FROM ExpenseCategory ec JOIN FETCH ec.adminProfile WHERE ec.adminProfile.id = :adminProfileId AND ec.type = :type")
+    List<ExpenseCategory> findByAdminProfileIdAndType(@Param("adminProfileId") Long adminProfileId, @Param("type") ExpenseType type);
 
     /**
      * Find category by admin and name.
+     * Uses JOIN FETCH to avoid LazyInitializationException when open-in-view is disabled.
      */
-    Optional<ExpenseCategory> findByAdminProfileIdAndName(Long adminProfileId, String name);
+    @Query("SELECT ec FROM ExpenseCategory ec JOIN FETCH ec.adminProfile WHERE ec.adminProfile.id = :adminProfileId AND ec.name = :name")
+    Optional<ExpenseCategory> findByAdminProfileIdAndName(@Param("adminProfileId") Long adminProfileId, @Param("name") String name);
 
     /**
      * Check if category exists for admin with given name.
      */
     boolean existsByAdminProfileIdAndName(Long adminProfileId, String name);
+
+    /**
+     * Find category by ID with adminProfile eagerly loaded.
+     * Use this instead of findById to avoid LazyInitializationException when open-in-view is disabled.
+     */
+    @Query("SELECT ec FROM ExpenseCategory ec JOIN FETCH ec.adminProfile WHERE ec.id = :id")
+    Optional<ExpenseCategory> findByIdWithAdminProfile(@Param("id") Long id);
 
     // ==================== LEGACY METHODS (Deprecated - use admin-specific versions) ====================
 

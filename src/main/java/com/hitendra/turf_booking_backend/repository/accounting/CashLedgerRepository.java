@@ -31,14 +31,22 @@ public interface CashLedgerRepository extends JpaRepository<CashLedger, Long> {
 
     /**
      * Get ledger entries for a service ordered by time.
+     * Uses JOIN FETCH to avoid LazyInitializationException when open-in-view is disabled.
      */
-    List<CashLedger> findByServiceIdOrderByCreatedAtDesc(Long serviceId);
+    @Query("""
+        SELECT c FROM CashLedger c
+        JOIN FETCH c.service
+        WHERE c.service.id = :serviceId
+        ORDER BY c.createdAt DESC
+    """)
+    List<CashLedger> findByServiceIdOrderByCreatedAtDesc(@Param("serviceId") Long serviceId);
 
     /**
      * Get ledger entries for a service within a date range.
      */
     @Query("""
         SELECT c FROM CashLedger c
+        JOIN FETCH c.service
         WHERE c.service.id = :serviceId
         AND c.createdAt BETWEEN :startDate AND :endDate
         ORDER BY c.createdAt DESC
