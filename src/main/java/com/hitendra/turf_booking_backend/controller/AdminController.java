@@ -5,6 +5,7 @@ import com.hitendra.turf_booking_backend.dto.booking.DirectManualBookingRequestD
 import com.hitendra.turf_booking_backend.dto.booking.SlotAvailabilityResponseDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.dashboard.AdminDashboardStatsDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminFinancialOverviewDto;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
@@ -57,6 +58,7 @@ public class AdminController {
     private final RefundService refundService;
     private final BookingRepository bookingRepository;
     private final AdminPushTokenService adminPushTokenService;
+    private final AdminFinancialService adminFinancialService;
 
     // ==================== Profile Management ====================
 
@@ -689,6 +691,19 @@ public class AdminController {
             adminPushTokenService.removeTokenForAdmin(adminId, token);
         }
         return ResponseEntity.ok().build();
+    }
+
+    // ==================== Financial Overview ====================
+
+    @GetMapping("/ledger-summary")
+    @Operation(summary = "Get admin ledger summary",
+               description = "Returns the full financial overview for the currently authenticated admin: " +
+                       "cash balance, bank balance, pending online amount, and all lifetime totals.")
+    public ResponseEntity<AdminFinancialOverviewDto> getLedgerSummary() {
+        // Resolve the admin profile ID for the currently authenticated admin
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        AdminFinancialOverviewDto overview = adminFinancialService.getAdminFinancialOverview(adminProfileId);
+        return ResponseEntity.ok(overview);
     }
 
     // ==================== Helper Methods ====================

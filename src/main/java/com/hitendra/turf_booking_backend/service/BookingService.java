@@ -43,6 +43,7 @@ public class BookingService {
     private final LedgerService ledgerService;
     private final AuthUtil authUtil;
     private final PlatformConfig platformConfig;
+    private final AdminFinancialService adminFinancialService;
 
     @Value("${pricing.online-payment-percent:20}")
     private Double onlinePaymentPercent;
@@ -399,6 +400,22 @@ public class BookingService {
 
             log.info("Ledger entry created for venue payment collection: {} via {}",
                     request.getAmountCollected(), paymentMode);
+
+            // ── Admin Financial Tracking ──────────────────────────────────────────────
+            try {
+                Long adminId = savedBooking.getService().getCreatedBy().getId();
+                java.math.BigDecimal collected = request.getAmountCollected();
+
+                if (request.getCollectionMethod() == VenuePaymentCollectionMethod.CASH) {
+                    adminFinancialService.recordVenueCashPayment(adminId, collected, savedBooking.getId());
+                } else {
+                    // ONLINE at venue = direct to admin bank (NOT platform money)
+                    adminFinancialService.recordVenueBankPayment(adminId, collected, savedBooking.getId());
+                }
+            } catch (Exception e) {
+                log.error("Failed to record venue payment in admin financial tracker for booking {}: {}",
+                        bookingId, e.getMessage(), e);
+            }
         }
 
         log.info("Booking {} marked as completed by admin {}. Amount collected: {} via {}",

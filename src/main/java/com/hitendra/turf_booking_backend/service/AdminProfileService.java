@@ -18,6 +18,7 @@ import com.hitendra.turf_booking_backend.entity.AdminProfile;
 import com.hitendra.turf_booking_backend.dto.user.CreateAdminRequest;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
+import com.hitendra.turf_booking_backend.util.AuthUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -31,6 +32,15 @@ public class AdminProfileService {
     private final AdminProfileRepository adminProfileRepository;
     private final UserRepository userRepository;
     private final BookingRepository bookingRepository;
+    private final AuthUtil authUtil;
+
+    // ---------------------------------------------------------
+    // Get Current Admin Profile ID (for authenticated admin)
+    // ---------------------------------------------------------
+    public Long getCurrentAdminProfileId() {
+        AdminProfile admin = authUtil.getCurrentAdminProfile();
+        return admin.getId();
+    }
 
     // ---------------------------------------------------------
     // Create Admin

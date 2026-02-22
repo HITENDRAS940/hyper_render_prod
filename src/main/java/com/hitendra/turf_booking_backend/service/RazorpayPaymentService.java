@@ -44,6 +44,9 @@ public class RazorpayPaymentService {
     @Lazy
     private final RefundService refundService;
 
+    @Lazy
+    private final AdminFinancialService adminFinancialService;
+
     @Value("${razorpay.key-id}")
     private String keyId;
 
@@ -336,6 +339,19 @@ public class RazorpayPaymentService {
                     log.error("Failed to record online payment in ledger for booking {}: {}",
                             booking.getId(), e.getMessage(), e);
                     // Don't fail the booking confirmation if ledger recording fails
+                }
+
+                // ── Admin Financial Tracking: ADVANCE_ONLINE ──────────────────────────
+                try {
+                    Long adminId = booking.getService().getCreatedBy().getId();
+                    adminFinancialService.recordAdvanceOnlinePayment(
+                            adminId,
+                            booking.getOnlineAmountPaid(),
+                            booking.getId()
+                    );
+                } catch (Exception e) {
+                    log.error("Failed to record advance online payment in admin financial tracker " +
+                            "for booking {}: {}", booking.getId(), e.getMessage(), e);
                 }
             }
 

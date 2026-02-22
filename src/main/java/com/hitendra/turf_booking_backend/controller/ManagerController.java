@@ -4,6 +4,10 @@ import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
+import com.hitendra.turf_booking_backend.dto.financial.AdminDueSummaryDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminFinancialOverviewDto;
+import com.hitendra.turf_booking_backend.dto.financial.SettleRequest;
+import com.hitendra.turf_booking_backend.dto.financial.SettlementDto;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
@@ -45,6 +49,7 @@ public class ManagerController {
     private final PricingService pricingService;
     private final RevenueService revenueService;
     private final ActivityService activityService;
+    private final AdminFinancialService adminFinancialService;
 
     @PostMapping("/admins")
     @Operation(summary = "Create admin", description = "Create a new admin user")
@@ -376,5 +381,43 @@ public class ManagerController {
     public ResponseEntity<List<GetActivityDto>> getActivity() {
         List<GetActivityDto> activities = activityService.getAllActivities();
         return ResponseEntity.ok(activities);
+    }
+
+    // ==================== Financial Management ====================
+
+    @GetMapping("/admins/due-summary")
+    @Operation(summary = "Get all admin due summary",
+               description = "Returns a list of all admins with their pending online amounts (platform owes them) " +
+                       "and total settled amounts. Used by manager to decide who needs to be settled.")
+    public ResponseEntity<List<AdminDueSummaryDto>> getAllAdminDueSummary() {
+        List<AdminDueSummaryDto> summary = adminFinancialService.getAllAdminDueSummary();
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/admin/{id}/finance")
+    @Operation(summary = "Get admin financial overview",
+               description = "Returns the complete financial breakdown for a specific admin: " +
+                       "cash balance, bank balance, pending online amount, and all lifetime totals.")
+    public ResponseEntity<AdminFinancialOverviewDto> getAdminFinancialOverview(@PathVariable Long id) {
+        AdminFinancialOverviewDto overview = adminFinancialService.getAdminFinancialOverview(id);
+        return ResponseEntity.ok(overview);
+    }
+
+    @PostMapping("/admin/{id}/settle")
+    @Operation(summary = "Settle amount to admin",
+               description = "Transfer pending online amount to admin's bank. " +
+                       "Cannot exceed the admin's current pendingOnlineAmount. " +
+                       "Updates: pendingOnlineAmount--, bankBalance++, totalSettledAmount++. " +
+                       "Creates an immutable Settlement record and FinancialTransaction audit entry.")
+    public ResponseEntity<SettlementDto> settleAmount(
+            @PathVariable Long id,
+            @Valid @RequestBody SettleRequest request) {
+        SettlementDto settlement = adminFinancialService.settleAmount(
+                id,
+                request.getAmount(),
+                request.getPaymentMode(),
+                request.getSettlementReference()
+        );
+        return ResponseEntity.ok(settlement);
     }
 }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
@@ -17,10 +18,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * DataInitializer - Creates test data for local development
- * Enabled for local development - creates sample services and users
+ * DataInitializer - Creates test data for local development only.
+ * Restricted to the "dev" profile to prevent accidental seeding in prod/staging.
  */
 @Component
+@Profile("dev")
 @Lazy(false)  // Force eager initialization even with lazy-initialization=true
 @RequiredArgsConstructor
 @Slf4j
@@ -38,51 +40,48 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        log.info("🚀 DataInitializer started...");
+        log.info("🚀 DataInitializer started (dev profile)...");
 
+        // ── Step 1: Activities ─────────────────────────────────────────────────
         try {
-            // Initialize activities (required for system)
             if (activityRepository.count() == 0) {
                 log.info("📋 No activities found, initializing...");
                 initializeActivities();
             } else {
                 log.info("✅ Activities already initialized (count: {})", activityRepository.count());
             }
+        } catch (Exception e) {
+            log.error("❌ Failed to initialize activities: {}", e.getMessage(), e);
+        }
 
-            // NOTE: Expense categories are now admin-specific (after V12 migration)
-            // They will be created automatically when admins create their services/expenses
-            // Or they can be created via the expense category API endpoint
-
-            // Create manager user
+        // ── Step 2: Manager user ───────────────────────────────────────────────
+        // NOTE: Expense categories are now admin-specific (after V12 migration).
+        // They are created automatically when admins create services/expenses,
+        // or via the expense category API.
+        try {
             if (userRepository.findByEmail("gethyperadmin@gmail.com").isEmpty()) {
                 log.info("👤 Manager user not found, creating...");
                 initializeManagerUser();
             } else {
                 log.info("✅ Manager user already exists");
             }
+        } catch (Exception e) {
+            log.error("❌ Failed to initialize manager user: {}", e.getMessage(), e);
+        }
 
-            // Add minimal test service in Mumbai
+        // ── Step 3: Test services ──────────────────────────────────────────────
+        try {
             if (serviceRepository.count() == 0) {
                 log.info("🏟️ No services found, creating test services...");
                 initializeMinimalTestService();
             } else {
                 log.info("✅ Services already exist (count: {})", serviceRepository.count());
             }
-
-            log.info("🎉 DataInitializer completed successfully!");
-
-            // COMMENTED OUT: Full sample data initialization
-            // if (userRepository.count() == 0) {
-            //     initializeSampleData();
-            // }
-
-            // COMMENTED OUT: Weekend price rule
-            // addWeekendExtraPriceRuleForResource(1L, 150.0);
-
         } catch (Exception e) {
-            log.error("❌ FATAL ERROR in DataInitializer: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to initialize data", e);
+            log.error("❌ Failed to initialize test services: {}", e.getMessage(), e);
         }
+
+        log.info("🎉 DataInitializer completed.");
     }
 
     /**
