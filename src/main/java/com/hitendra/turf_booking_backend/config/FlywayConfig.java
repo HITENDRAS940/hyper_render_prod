@@ -37,9 +37,9 @@ public class FlywayConfig {
             //            history entries so Flyway re-runs those migrations ──────────
             try (Connection conn = dataSource.getConnection()) {
                 if (adminProfilesMissingFinancialColumns(conn)) {
-                    log.warn("⚠️  admin_profiles is missing financial columns — deleting V5/V6/V7 " +
+                    log.warn("⚠️  admin_profiles is missing financial columns — deleting V5/V6/V7/V8 " +
                              "from flyway_schema_history so they are re-applied...");
-                    deleteFlywayHistoryEntries(conn, "5", "6", "7");
+                    deleteFlywayHistoryEntries(conn, "5", "6", "7", "8");
                     log.info("✅ Flyway history entries deleted. Migrations will be re-applied.");
                 } else {
                     log.info("✅ admin_profiles financial columns are present — no history fix needed.");
@@ -66,18 +66,26 @@ public class FlywayConfig {
 
     /**
      * Returns true if the admin_profiles table exists but is missing bank_balance.
+     * Uses information_schema for reliable detection across all PostgreSQL setups.
      */
     private boolean adminProfilesMissingFinancialColumns(Connection conn) {
         try {
-            // Check if admin_profiles table exists at all
-            try (ResultSet tables = conn.getMetaData().getTables(null, null, "admin_profiles", new String[]{"TABLE"})) {
-                if (!tables.next()) {
-                    return false; // Table doesn't exist yet — fresh DB, migrations will create it
+            // Check if admin_profiles table exists
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = 'admin_profiles'")) {
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        return false; // Table doesn't exist yet — fresh DB, migrations will create it
+                    }
                 }
             }
-            // Check if bank_balance column exists
-            try (ResultSet cols = conn.getMetaData().getColumns(null, null, "admin_profiles", "bank_balance")) {
-                return !cols.next(); // Missing if no result
+            // Check if bank_balance column exists via information_schema
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT 1 FROM information_schema.columns " +
+                    "WHERE table_name = 'admin_profiles' AND column_name = 'bank_balance'")) {
+                try (ResultSet rs = ps.executeQuery()) {
+                    return !rs.next(); // Missing if no result
+                }
             }
         } catch (Exception e) {
             log.warn("Could not inspect admin_profiles columns: {}", e.getMessage());

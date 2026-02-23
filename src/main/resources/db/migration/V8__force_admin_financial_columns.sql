@@ -1,15 +1,16 @@
 -- ============================================================================
--- Migration V7: No-op (superseded by V5 and V6)
+-- Migration V8: No-op (superseded by V5 and V6)
 --
 -- V5 creates all financial columns, settlements, and financial_transactions.
 -- V6 re-applies NOT NULL + DEFAULT constraints.
--- All catch-up work is complete; this migration is intentionally empty
--- to avoid duplicate-relation/duplicate-column noise in logs.
+-- The PL/pgSQL DO block that was here previously is no longer needed since
+-- V5 is now clean and V6 handles constraint enforcement.
+-- This migration is intentionally empty.
 -- ============================================================================
 
 -- (intentionally empty)
 
 -- ============================================================================
--- END OF MIGRATION V7
+-- END OF MIGRATION V8
 -- ============================================================================
 

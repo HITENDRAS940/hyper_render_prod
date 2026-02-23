@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.controller;
 
+import com.hitendra.turf_booking_backend.dto.activity.CreateActivityDto;
 import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
@@ -15,7 +16,6 @@ import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.CreateAdminRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
-import com.hitendra.turf_booking_backend.repository.ActivityRepository;
 import com.hitendra.turf_booking_backend.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -377,10 +377,50 @@ public class ManagerController {
         return ResponseEntity.ok(report);
     }
 
-    @GetMapping("/activity")
-    public ResponseEntity<List<GetActivityDto>> getActivity() {
+    // ==================== Activity Management ====================
+
+    @GetMapping("/activities")
+    @Operation(summary = "Get all activities", description = "Get all activities (enabled and disabled)")
+    public ResponseEntity<List<GetActivityDto>> getActivities() {
         List<GetActivityDto> activities = activityService.getAllActivities();
         return ResponseEntity.ok(activities);
+    }
+
+    @PostMapping("/activities")
+    @Operation(summary = "Create activity", description = "Create a new activity (e.g., FOOTBALL, CRICKET). Code will be auto-uppercased.")
+    public ResponseEntity<GetActivityDto> createActivity(@Valid @RequestBody CreateActivityDto request) {
+        GetActivityDto activity = activityService.createActivity(request);
+        return ResponseEntity.ok(activity);
+    }
+
+    @PutMapping("/activities/{id}")
+    @Operation(summary = "Update activity", description = "Update an existing activity's code and name")
+    public ResponseEntity<GetActivityDto> updateActivity(
+            @PathVariable Long id,
+            @Valid @RequestBody CreateActivityDto request) {
+        GetActivityDto activity = activityService.updateActivity(id, request);
+        return ResponseEntity.ok(activity);
+    }
+
+    @DeleteMapping("/activities/{id}")
+    @Operation(summary = "Delete activity", description = "Permanently delete an activity")
+    public ResponseEntity<String> deleteActivity(@PathVariable Long id) {
+        activityService.deleteActivity(id);
+        return ResponseEntity.ok("Activity deleted successfully");
+    }
+
+    @PatchMapping("/activities/{id}/enable")
+    @Operation(summary = "Enable activity", description = "Enable a disabled activity")
+    public ResponseEntity<GetActivityDto> enableActivity(@PathVariable Long id) {
+        GetActivityDto activity = activityService.enableActivity(id);
+        return ResponseEntity.ok(activity);
+    }
+
+    @PatchMapping("/activities/{id}/disable")
+    @Operation(summary = "Disable activity", description = "Disable an activity without deleting it")
+    public ResponseEntity<GetActivityDto> disableActivity(@PathVariable Long id) {
+        GetActivityDto activity = activityService.disableActivity(id);
+        return ResponseEntity.ok(activity);
     }
 
     // ==================== Financial Management ====================

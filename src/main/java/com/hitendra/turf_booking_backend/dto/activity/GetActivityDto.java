@@ -6,5 +6,7 @@ import lombok.Data;
 @Data
 public class GetActivityDto {
     private Long id;
+    private String code;
     private String name;
+    private boolean enabled;
 }
