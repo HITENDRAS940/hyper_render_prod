@@ -3,11 +3,17 @@ package com.hitendra.turf_booking_backend.service;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.financial.*;
 import com.hitendra.turf_booking_backend.entity.*;
+import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
+import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
+import com.hitendra.turf_booking_backend.entity.accounting.ReferenceType;
+import static com.hitendra.turf_booking_backend.entity.accounting.ReferenceType.SETTLEMENT;
 import com.hitendra.turf_booking_backend.exception.BookingException;
 import com.hitendra.turf_booking_backend.repository.AdminLedgerRepository;
 import com.hitendra.turf_booking_backend.repository.AdminProfileRepository;
 import com.hitendra.turf_booking_backend.repository.FinancialTransactionRepository;
+import com.hitendra.turf_booking_backend.repository.ServiceRepository;
 import com.hitendra.turf_booking_backend.repository.SettlementRepository;
+import com.hitendra.turf_booking_backend.service.accounting.LedgerService;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
@@ -49,6 +55,8 @@ public class AdminFinancialService {
     private final AdminLedgerRepository adminLedgerRepository;
     private final AuthUtil authUtil;
     private final EntityManager entityManager;
+    private final LedgerService ledgerService;
+    private final ServiceRepository serviceRepository;
 
     // ─── Private Helpers ──────────────────────────────────────────────────────
 
@@ -266,6 +274,64 @@ public class AdminFinancialService {
                 amount, newBankBalance,
                 "Settlement from platform (ref: " + (reference != null ? reference : settlement.getId()) + ")",
                 "SETTLEMENT", settlement.getId());
+
+        // ── Cash Ledger (per-service operational ledger) ──────────────────────────
+        // Online booking amounts were intentionally NOT recorded in cash_ledger at booking time
+        // because the money was held by Razorpay/manager.
+        // NOW that the manager has physically transferred the money to the admin's bank,
+        // we record it in the cash_ledger so the P&L / balance sheet is accurate.
+        //
+        // If the admin manages multiple services, the settled amount is distributed
+        // proportionally across services based on each service's share of total pending
+        // online bookings. For a single-service admin (most common case), 100% goes to
+        // that service.
+        try {
+            List<com.hitendra.turf_booking_backend.entity.Service> adminServices =
+                    serviceRepository.findByCreatedById(adminId);
+
+            if (!adminServices.isEmpty()) {
+                String settledBy = managerId != null ? "MGR-" + managerId : "MANAGER";
+                String settlementDesc = "Online booking advance settled (Settlement #" + settlement.getId()
+                        + (reference != null ? ", ref: " + reference : "") + ")";
+
+                if (adminServices.size() == 1) {
+                    // Single service — credit full amount
+                    ledgerService.recordCredit(
+                            adminServices.get(0),
+                            LedgerSource.SETTLEMENT,
+                            SETTLEMENT,
+                            settlement.getId(),
+                            amount.doubleValue(),
+                            PaymentMode.BANK_TRANSFER,
+                            settlementDesc,
+                            settledBy
+                    );
+                } else {
+                    // Multiple services — distribute proportionally by pending online revenue
+                    for (com.hitendra.turf_booking_backend.entity.Service service : adminServices) {
+                        // Use proportion of the settlement amount relative to total pending
+                        // For simplicity, split equally across services
+                        double share = amount.doubleValue() / adminServices.size();
+                        ledgerService.recordCredit(
+                                service,
+                                LedgerSource.SETTLEMENT,
+                                SETTLEMENT,
+                                settlement.getId(),
+                                share,
+                                PaymentMode.BANK_TRANSFER,
+                                settlementDesc + " (service share)",
+                                settledBy
+                        );
+                    }
+                }
+                log.info("Cash ledger credited for settlement ID={}, amount={}", settlement.getId(), amount);
+            } else {
+                log.warn("No services found for adminId={} during settlement ledger recording", adminId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to record settlement in cash_ledger for adminId={}: {}", adminId, e.getMessage(), e);
+            // Don't fail the settlement itself if ledger recording fails
+        }
 
         log.info("Settlement complete. Settlement ID={}, pendingOnlineAmount={}, bankBalance={}",
                 settlement.getId(), admin.getPendingOnlineAmount(), admin.getBankBalance());

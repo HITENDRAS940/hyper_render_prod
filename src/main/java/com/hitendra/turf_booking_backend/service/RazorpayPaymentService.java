@@ -4,12 +4,8 @@ import com.hitendra.turf_booking_backend.dto.payment.*;
 import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
 import com.hitendra.turf_booking_backend.entity.PaymentStatus;
-import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
-import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
-import com.hitendra.turf_booking_backend.entity.accounting.ReferenceType;
 import com.hitendra.turf_booking_backend.exception.PaymentException;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
-import com.hitendra.turf_booking_backend.service.accounting.LedgerService;
 import com.razorpay.Order;
 import com.razorpay.Payment;
 import com.razorpay.RazorpayClient;
@@ -38,7 +34,6 @@ public class RazorpayPaymentService {
     private final BookingRepository bookingRepository;
     private final SmsService smsService;
     private final EmailService emailService;
-    private final LedgerService ledgerService;
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
 
     @Lazy
@@ -306,42 +301,11 @@ public class RazorpayPaymentService {
 
             bookingRepository.save(booking);
 
-            // Record online payment in ledger
+            // ── Admin Financial Tracking: ADVANCE_ONLINE ──────────────────────────
+            // NOTE: Online advance is NOT credited to cash_ledger here because the money
+            // is held by Razorpay/manager until the manager settles it to the admin's bank.
+            // The cash_ledger CREDIT will be recorded when the manager calls settleAmount().
             if (booking.getOnlineAmountPaid() != null && booking.getOnlineAmountPaid().doubleValue() > 0) {
-                try {
-                    // Map payment method to PaymentMode
-                    PaymentMode paymentMode = mapToPaymentMode(method);
-
-                    String description = String.format("Online payment for booking %s (%s-%s on %s)",
-                            booking.getReference(),
-                            booking.getStartTime(),
-                            booking.getEndTime(),
-                            booking.getBookingDate());
-
-                    String recordedBy = booking.getUser() != null
-                            ? booking.getUser().getPhone()
-                            : "SYSTEM";
-
-                    ledgerService.recordCredit(
-                            booking.getService(),
-                            LedgerSource.BOOKING,
-                            ReferenceType.BOOKING,
-                            booking.getId(),
-                            booking.getOnlineAmountPaid().doubleValue(),
-                            paymentMode,
-                            description,
-                            recordedBy
-                    );
-
-                    log.info("Ledger entry created for online payment: {} via {} for booking {}",
-                            booking.getOnlineAmountPaid(), method, booking.getId());
-                } catch (Exception e) {
-                    log.error("Failed to record online payment in ledger for booking {}: {}",
-                            booking.getId(), e.getMessage(), e);
-                    // Don't fail the booking confirmation if ledger recording fails
-                }
-
-                // ── Admin Financial Tracking: ADVANCE_ONLINE ──────────────────────────
                 try {
                     Long adminId = booking.getService().getCreatedBy().getId();
                     adminFinancialService.recordAdvanceOnlinePayment(
@@ -349,6 +313,8 @@ public class RazorpayPaymentService {
                             booking.getOnlineAmountPaid(),
                             booking.getId()
                     );
+                    log.info("Advance online payment tracked (pendingOnlineAmount): {} for booking {}",
+                            booking.getOnlineAmountPaid(), booking.getId());
                 } catch (Exception e) {
                     log.error("Failed to record advance online payment in admin financial tracker " +
                             "for booking {}: {}", booking.getId(), e.getMessage(), e);
@@ -665,21 +631,5 @@ public class RazorpayPaymentService {
         }
 
         log.info("Booking notifications sent for {}", booking.getReference());
-    }
-
-    /**
-     * Map Razorpay payment method to PaymentMode enum
-     */
-    private PaymentMode mapToPaymentMode(String razorpayMethod) {
-        if (razorpayMethod == null) {
-            return PaymentMode.ONLINE;
-        }
-
-        return switch (razorpayMethod.toLowerCase()) {
-            case "upi" -> PaymentMode.UPI;
-            case "card" -> PaymentMode.CARD;
-            case "netbanking" -> PaymentMode.BANK_TRANSFER;
-            default -> PaymentMode.ONLINE;
-        };
     }
 }

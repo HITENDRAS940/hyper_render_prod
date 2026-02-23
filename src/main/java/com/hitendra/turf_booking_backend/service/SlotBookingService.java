@@ -1319,26 +1319,12 @@ public class SlotBookingService {
         try {
             String recordedBy = adminProfile.getUser().getPhone();
 
-            // Record online payment if any
-            if (onlineAmountPaid.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                String onlineDescription = String.format("Admin manual booking (online) %s (%s-%s on %s)",
-                        reference, startTime, endTime, bookingDate);
+            // NOTE: Online amount is NOT recorded in cash_ledger here.
+            // Online payments go to Razorpay/manager first and are only credited
+            // to the ledger when the manager settles the amount to the admin's bank.
+            // (See AdminFinancialService.settleAmount())
 
-                ledgerService.recordCredit(
-                        service,
-                        LedgerSource.BOOKING,
-                        ReferenceType.BOOKING,
-                        savedBooking.getId(),
-                        onlineAmountPaid.doubleValue(),
-                        PaymentMode.ONLINE,
-                        onlineDescription,
-                        recordedBy
-                );
-
-                log.info("Ledger entry created for admin manual booking online payment: {}", onlineAmountPaid);
-            }
-
-            // Record venue payment if collected
+            // Record venue payment if collected (cash at venue goes directly to admin's pocket)
             if (request.getVenueAmountCollected() != null &&
                 request.getVenueAmountCollected().compareTo(java.math.BigDecimal.ZERO) > 0) {
 
@@ -1517,26 +1503,12 @@ public class SlotBookingService {
         try {
             String recordedBy = adminProfile.getUser().getPhone();
 
-            // Record online payment if any
-            if (onlineAmountPaid.compareTo(java.math.BigDecimal.ZERO) > 0) {
-                String onlineDescription = String.format("Direct manual booking (online) %s (%s-%s on %s)",
-                        reference, request.getStartTime(), request.getEndTime(), request.getBookingDate());
+            // NOTE: Online amount is NOT recorded in cash_ledger here.
+            // Online payments go to Razorpay/manager first and are only credited
+            // to the ledger when the manager settles the amount to the admin's bank.
+            // (See AdminFinancialService.settleAmount())
 
-                ledgerService.recordCredit(
-                        service,
-                        LedgerSource.BOOKING,
-                        ReferenceType.BOOKING,
-                        savedBooking.getId(),
-                        onlineAmountPaid.doubleValue(),
-                        PaymentMode.ONLINE,
-                        onlineDescription,
-                        recordedBy
-                );
-
-                log.info("Ledger entry created for direct manual booking online payment: {}", onlineAmountPaid);
-            }
-
-            // Record venue payment if collected
+            // Record venue payment if collected (cash at venue goes directly to admin's pocket)
             if (venueAmountCollected.compareTo(java.math.BigDecimal.ZERO) > 0) {
                 String venueDescription = String.format("Direct manual booking (venue) %s (%s-%s on %s)",
                         reference, request.getStartTime(), request.getEndTime(), request.getBookingDate());
