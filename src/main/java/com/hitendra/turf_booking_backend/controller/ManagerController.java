@@ -7,8 +7,11 @@ import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.financial.AdminDueSummaryDto;
 import com.hitendra.turf_booking_backend.dto.financial.AdminFinancialOverviewDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminLedgerEntryDto;
+import com.hitendra.turf_booking_backend.dto.financial.FinancialTransactionDto;
 import com.hitendra.turf_booking_backend.dto.financial.SettleRequest;
 import com.hitendra.turf_booking_backend.dto.financial.SettlementDto;
+import com.hitendra.turf_booking_backend.entity.AdminLedgerType;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
@@ -459,5 +462,49 @@ public class ManagerController {
                 request.getSettlementReference()
         );
         return ResponseEntity.ok(settlement);
+    }
+
+    @GetMapping("/admins/{adminId}/ledger/cash")
+    @Operation(summary = "Get admin cash ledger (manager view)",
+            description = "Manager can view a specific admin's CASH ledger history (credits and debits with running balance).")
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminCashLedger(
+            @PathVariable Long adminId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getLedgerHistory(adminId, AdminLedgerType.CASH, page, size));
+    }
+
+    @GetMapping("/admins/{adminId}/ledger/bank")
+    @Operation(summary = "Get admin bank ledger (manager view)",
+            description = "Manager can view a specific admin's BANK ledger history (credits and debits with running balance).")
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminBankLedger(
+            @PathVariable Long adminId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getLedgerHistory(adminId, AdminLedgerType.BANK, page, size));
+    }
+
+    @GetMapping("/admins/{adminId}/settlements")
+    @Operation(summary = "Get admin settlement history (manager view)",
+            description = "Manager can view the complete settlement history for a specific admin.")
+    public ResponseEntity<PaginatedResponse<SettlementDto>> getAdminSettlements(
+            @PathVariable Long adminId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getSettlementHistory(adminId, page, size));
+    }
+
+    @GetMapping("/admins/{adminId}/transactions")
+    @Operation(summary = "Get admin transaction history (manager view)",
+            description = "Manager can view the complete financial transaction audit log for a specific admin.")
+    public ResponseEntity<PaginatedResponse<FinancialTransactionDto>> getAdminTransactions(
+            @PathVariable Long adminId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getTransactionHistory(adminId, page, size));
     }
 }

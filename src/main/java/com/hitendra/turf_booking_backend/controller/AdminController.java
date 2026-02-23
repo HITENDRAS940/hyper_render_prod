@@ -6,6 +6,12 @@ import com.hitendra.turf_booking_backend.dto.booking.SlotAvailabilityResponseDto
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.dashboard.AdminDashboardStatsDto;
 import com.hitendra.turf_booking_backend.dto.financial.AdminFinancialOverviewDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminLedgerEntryDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminExpenseRequestDto;
+import com.hitendra.turf_booking_backend.dto.financial.AdminExpenseResponseDto;
+import com.hitendra.turf_booking_backend.dto.financial.FinancialTransactionDto;
+import com.hitendra.turf_booking_backend.dto.financial.SettlementDto;
+import com.hitendra.turf_booking_backend.entity.AdminLedgerType;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
@@ -704,6 +710,92 @@ public class AdminController {
         Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
         AdminFinancialOverviewDto overview = adminFinancialService.getAdminFinancialOverview(adminProfileId);
         return ResponseEntity.ok(overview);
+    }
+
+    // ==================== Admin Ledger Entries ====================
+
+    @GetMapping("/ledger/cash")
+    @Operation(summary = "Get admin cash ledger history",
+            description = """
+                Returns a paginated list of all CASH ledger entries for the current admin (newest first).
+                
+                Each entry is either:
+                - **CREDIT**: cash received at venue (booking payment)
+                - **DEBIT**: cash spent (expense e.g., salary, maintenance)
+                
+                The `balanceAfter` field shows the running cash balance after each transaction.
+                """)
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getCashLedger(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        return ResponseEntity.ok(
+                adminFinancialService.getLedgerHistory(adminProfileId, AdminLedgerType.CASH, page, size));
+    }
+
+    @GetMapping("/ledger/bank")
+    @Operation(summary = "Get admin bank ledger history",
+            description = """
+                Returns a paginated list of all BANK ledger entries for the current admin (newest first).
+                
+                Each entry is either:
+                - **CREDIT**: bank/UPI received at venue, or platform settlement
+                - **DEBIT**: bank payment made (expense e.g., online vendor payment)
+                
+                The `balanceAfter` field shows the running bank balance after each transaction.
+                """)
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getBankLedger(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        return ResponseEntity.ok(
+                adminFinancialService.getLedgerHistory(adminProfileId, AdminLedgerType.BANK, page, size));
+    }
+
+    @PostMapping("/expenses")
+    @Operation(summary = "Record admin expense",
+            description = """
+                Record a direct admin-level expense that deducts from cash or bank balance.
+                
+                **Examples:**
+                - Salary paid in cash: `{"paymentMode": "CASH", "amount": 2000, "description": "Salary - John Doe", "category": "SALARY"}`
+                - Electricity bill paid online: `{"paymentMode": "BANK", "amount": 5000, "description": "Electricity bill - March 2026", "category": "UTILITIES"}`
+                
+                **Rules:**
+                - `paymentMode` must be `CASH` or `BANK`
+                - Amount cannot exceed the current balance of the selected sub-ledger
+                
+                **Effect:**
+                - Deducts from admin's cash or bank balance
+                - Creates a DEBIT entry in the admin ledger (full audit trail)
+                """)
+    public ResponseEntity<AdminExpenseResponseDto> recordExpense(
+            @Valid @RequestBody AdminExpenseRequestDto request) {
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        AdminExpenseResponseDto response = adminFinancialService.recordAdminExpense(adminProfileId, request);
+        return ResponseEntity.status(201).body(response);
+    }
+
+    @GetMapping("/settlements")
+    @Operation(summary = "Get admin settlement history",
+            description = "Returns a paginated list of all settlements made by the platform manager to this admin (newest first).")
+    public ResponseEntity<PaginatedResponse<SettlementDto>> getSettlementHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        return ResponseEntity.ok(
+                adminFinancialService.getSettlementHistory(adminProfileId, page, size));
+    }
+
+    @GetMapping("/transactions")
+    @Operation(summary = "Get admin financial transaction history",
+            description = "Returns a paginated audit log of all financial events (ADVANCE_ONLINE, VENUE_CASH, VENUE_BANK, SETTLEMENT, ADMIN_EXPENSE) for the current admin.")
+    public ResponseEntity<PaginatedResponse<FinancialTransactionDto>> getTransactionHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long adminProfileId = adminProfileService.getCurrentAdminProfileId();
+        return ResponseEntity.ok(
+                adminFinancialService.getTransactionHistory(adminProfileId, page, size));
     }
 
     // ==================== Helper Methods ====================

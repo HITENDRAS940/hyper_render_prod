@@ -1,9 +1,10 @@
 -- ============================================================================
--- V1__init.sql - Complete Database Schema for Hyper Turf Booking Backend
+-- V1__init.sql - Complete Database Schema for Hyper Backend
 -- ============================================================================
--- This migration creates ALL tables, constraints, and indexes for the application.
+-- Single consolidated migration: schema + reference data.
+-- All previously separate V2–V8 migrations are merged here.
 -- Compatible with PostgreSQL.
--- Generated: February 19, 2026
+-- Last updated: February 23, 2026
 -- ============================================================================
 
 -- ============================================================================
@@ -46,14 +47,21 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
 
--- Admin Profiles
+-- Admin Profiles (includes financial tracking columns)
 CREATE TABLE IF NOT EXISTS admin_profiles (
     id BIGSERIAL PRIMARY KEY,
     user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     city VARCHAR(100),
     business_name VARCHAR(255),
     business_address TEXT,
-    gst_number VARCHAR(50)
+    gst_number VARCHAR(50),
+    total_cash_collected            NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    total_bank_collected            NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    total_platform_online_collected NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    total_settled_amount            NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    pending_online_amount           NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    cash_balance                    NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    bank_balance                    NUMERIC(19, 2) NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_profiles_user_id ON admin_profiles(user_id);
@@ -328,6 +336,37 @@ CREATE INDEX IF NOT EXISTS idx_processed_payments_order ON processed_payments(or
 CREATE INDEX IF NOT EXISTS idx_processed_payments_booking ON processed_payments(internal_booking_id);
 
 -- ============================================================================
+-- INVOICES
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id                          BIGSERIAL PRIMARY KEY,
+    booking_id                  BIGINT NOT NULL UNIQUE REFERENCES bookings(id),
+    invoice_url                 VARCHAR(1024) NOT NULL,
+    booking_reference           VARCHAR(255),
+    booking_date                DATE,
+    start_time                  TIME,
+    end_time                    TIME,
+    total_amount                DOUBLE PRECISION,
+    online_amount_paid          NUMERIC(19, 2),
+    venue_amount_due            NUMERIC(19, 2),
+    payment_method              VARCHAR(100),
+    payment_mode                VARCHAR(100),
+    razorpay_payment_id         VARCHAR(255),
+    service_id                  BIGINT,
+    service_name                VARCHAR(255),
+    resource_id                 BIGINT,
+    resource_name               VARCHAR(255),
+    user_id                     BIGINT,
+    user_name                   VARCHAR(255),
+    user_email                  VARCHAR(255),
+    user_phone                  VARCHAR(50),
+    created_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invoice_booking_id ON invoices(booking_id);
+
+-- ============================================================================
 -- ACCOUNTING - EXPENSE CATEGORIES
 -- ============================================================================
 
@@ -385,29 +424,87 @@ CREATE INDEX IF NOT EXISTS idx_service_created ON cash_ledger(service_id, create
 CREATE INDEX IF NOT EXISTS idx_source_reference ON cash_ledger(source, reference_type, reference_id);
 
 -- ============================================================================
+-- ACCOUNTING - SETTLEMENTS
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS settlements (
+    id                      BIGSERIAL PRIMARY KEY,
+    admin_id                BIGINT NOT NULL REFERENCES admin_profiles(id),
+    amount                  NUMERIC(19, 2) NOT NULL,
+    payment_mode            VARCHAR(50) NOT NULL,
+    status                  VARCHAR(50) NOT NULL DEFAULT 'INITIATED',
+    settled_by_manager_id   BIGINT,
+    settlement_reference    VARCHAR(255),
+    created_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_settlement_admin   ON settlements(admin_id);
+CREATE INDEX IF NOT EXISTS idx_settlement_created ON settlements(created_at);
+
+-- ============================================================================
+-- ACCOUNTING - FINANCIAL TRANSACTIONS (audit log)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS financial_transactions (
+    id           BIGSERIAL PRIMARY KEY,
+    admin_id     BIGINT NOT NULL REFERENCES admin_profiles(id),
+    type         VARCHAR(50) NOT NULL,
+    amount       NUMERIC(19, 2) NOT NULL,
+    reference_id BIGINT,
+    created_at   TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fin_tx_admin    ON financial_transactions(admin_id);
+CREATE INDEX IF NOT EXISTS idx_fin_tx_type_ref ON financial_transactions(type, reference_id);
+CREATE INDEX IF NOT EXISTS idx_fin_tx_created  ON financial_transactions(created_at);
+
+-- ============================================================================
 -- REFERENCE DATA - ACTIVITIES
 -- ============================================================================
--- These activities match DataInitializer.java to ensure consistency
--- ON CONFLICT DO NOTHING allows safe re-running and prevents duplicates
+-- ON CONFLICT DO NOTHING allows safe re-running.
 
 INSERT INTO activities (code, name, enabled) VALUES
-('FOOTBALL', 'Football', true),
-('CRICKET', 'Cricket', true),
-('BOWLING', 'Bowling', true),
-('PADEL', 'Padel Ball', true),
-('BADMINTON', 'Badminton', true),
-('TENNIS', 'Tennis', true),
-('SWIMMING', 'Swimming', true),
-('BASKETBALL', 'Basketball', true),
-('ARCADE', 'Arcade', true),
-('GYM', 'Gym', true),
-('SPA', 'Spa', true),
-('STUDIO', 'Studio', true),
-('CONFERENCE', 'Conference', true),
-('PARTY_HALL', 'Party Hall', true)
+('FOOTBALL',    'Football',    true),
+('CRICKET',     'Cricket',     true),
+('BOWLING',     'Bowling',     true),
+('PADEL',       'Padel Ball',  true),
+('BADMINTON',   'Badminton',   true),
+('TENNIS',      'Tennis',      true),
+('SWIMMING',    'Swimming',    true),
+('BASKETBALL',  'Basketball',  true),
+('ARCADE',      'Arcade',      true),
+('GYM',         'Gym',         true),
+('SPA',         'Spa',         true),
+('STUDIO',      'Studio',      true),
+('CONFERENCE',  'Conference',  true),
+('PARTY_HALL',  'Party Hall',  true)
 ON CONFLICT (code) DO NOTHING;
 
 -- ============================================================================
--- END OF COMPREHENSIVE SCHEMA
+-- ACCOUNTING - ADMIN LEDGER (Cash & Bank sub-ledgers per admin)
+-- ============================================================================
+-- Append-only ledger tracking every credit/debit to an admin's CASH or BANK
+-- sub-ledger with a running balance after each entry.
+-- Sources: venue bookings, platform settlements, admin expenses.
+
+CREATE TABLE IF NOT EXISTS admin_ledger (
+    id                  BIGSERIAL PRIMARY KEY,
+    admin_profile_id    BIGINT NOT NULL REFERENCES admin_profiles(id) ON DELETE CASCADE,
+    ledger_type         VARCHAR(10) NOT NULL,   -- CASH | BANK
+    entry_type          VARCHAR(10) NOT NULL,   -- CREDIT | DEBIT
+    amount              NUMERIC(19, 2) NOT NULL,
+    balance_after       NUMERIC(19, 2) NOT NULL,
+    description         VARCHAR(500),
+    reference_type      VARCHAR(50),            -- BOOKING, SETTLEMENT, EXPENSE, ADJUSTMENT
+    reference_id        BIGINT,                 -- ID of the source record
+    created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_ledger_admin_type    ON admin_ledger(admin_profile_id, ledger_type);
+CREATE INDEX IF NOT EXISTS idx_admin_ledger_admin_created ON admin_ledger(admin_profile_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_ledger_ref           ON admin_ledger(reference_type, reference_id);
+
+-- ============================================================================
+-- END OF SCHEMA
 -- ============================================================================
 
