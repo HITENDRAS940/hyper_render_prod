@@ -387,7 +387,7 @@ CREATE INDEX IF NOT EXISTS idx_expense_category_admin ON expense_categories(admi
 
 CREATE TABLE IF NOT EXISTS expenses (
     id BIGSERIAL PRIMARY KEY,
-    service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    admin_profile_id BIGINT NOT NULL REFERENCES admin_profiles(id) ON DELETE CASCADE,
     category VARCHAR(255) NOT NULL,
     description VARCHAR(500) NOT NULL,
     amount NUMERIC(15, 2) NOT NULL,
@@ -398,7 +398,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_service_expense_date ON expenses(service_id, expense_date);
+CREATE INDEX IF NOT EXISTS idx_admin_expense_date ON expenses(admin_profile_id, expense_date);
 CREATE INDEX IF NOT EXISTS idx_expense_date ON expenses(expense_date);
 
 -- ============================================================================

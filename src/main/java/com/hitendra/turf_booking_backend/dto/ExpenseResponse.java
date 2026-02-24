@@ -1,6 +1,6 @@
 package com.hitendra.turf_booking_backend.dto;
 
-import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
+import com.hitendra.turf_booking_backend.entity.accounting.ExpensePaymentMode;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,7 +15,7 @@ public class ExpenseResponse {
     private Long serviceId;
     private String category;
     private BigDecimal amount;
-    private PaymentMode paymentMode;
+    private ExpensePaymentMode paymentMode;
     private String description;
     private LocalDate expenseDate;
     private String billUrl;

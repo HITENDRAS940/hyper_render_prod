@@ -1,6 +1,6 @@
 package com.hitendra.turf_booking_backend.entity.accounting;
 
-import com.hitendra.turf_booking_backend.entity.Service;
+import com.hitendra.turf_booking_backend.entity.AdminProfile;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -16,8 +16,7 @@ import java.time.LocalDate;
  */
 @Entity
 @Table(name = "expenses", indexes = {
-    @Index(name = "idx_service_expense_date", columnList = "service_id, expense_date"),
-    @Index(name = "idx_category", columnList = "category_id"),
+    @Index(name = "idx_admin_expense_date", columnList = "admin_profile_id, expense_date"),
     @Index(name = "idx_expense_date", columnList = "expense_date")
 })
 @Getter
@@ -32,8 +31,8 @@ public class Expense {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "service_id", nullable = false)
-    private Service service;
+    @JoinColumn(name = "admin_profile_id", nullable = false)
+    private AdminProfile adminProfile;
 
     @Column(nullable = false)
     private String category;
@@ -44,9 +43,9 @@ public class Expense {
     @Column(nullable = false, precision = 15, scale = 2)
     private java.math.BigDecimal amount;
 
-    @Column(name = "payment_mode")
+    @Column(name = "payment_mode", nullable = false)
     @Enumerated(EnumType.STRING)
-    private PaymentMode paymentMode; // CASH, BANK
+    private ExpensePaymentMode paymentMode; // CASH or BANK only
 
     @Column(nullable = false)
     private LocalDate expenseDate;

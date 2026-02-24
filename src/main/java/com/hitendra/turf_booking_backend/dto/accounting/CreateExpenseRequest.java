@@ -1,6 +1,6 @@
 package com.hitendra.turf_booking_backend.dto.accounting;
 
-import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
+import com.hitendra.turf_booking_backend.entity.accounting.ExpensePaymentMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -17,8 +17,6 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class CreateExpenseRequest {
 
-    @NotNull(message = "Service ID is required")
-    private Long serviceId;
 
     @NotNull(message = "Category ID is required")
     private Long categoryId;
@@ -30,8 +28,8 @@ public class CreateExpenseRequest {
     @Positive(message = "Amount must be positive")
     private Double amount;
 
-    @NotNull(message = "Payment mode is required")
-    private PaymentMode paymentMode;
+    @NotNull(message = "Payment mode is required. Must be CASH or BANK")
+    private ExpensePaymentMode paymentMode;
 
     @NotNull(message = "Expense date is required")
     private LocalDate expenseDate;

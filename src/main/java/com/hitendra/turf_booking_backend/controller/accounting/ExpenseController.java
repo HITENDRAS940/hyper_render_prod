@@ -31,63 +31,60 @@ public class ExpenseController {
     @PostMapping
     @Operation(summary = "Record an expense",
                description = """
-                   Create a new expense record for your service and debit from cash ledger.
-                   - Service must belong to current admin
+                   Create a new expense record for the current admin and debit from ledger.
                    - Category must belong to current admin
-                   - Automatically records in ledger
+                   - Expense is linked directly to admin, not to a specific service
+                   - Automatically records in admin ledger
                    """)
     public ResponseEntity<ExpenseDto> createExpense(@Valid @RequestBody CreateExpenseRequest request) {
         Expense expense = expenseService.createExpense(request);
         return ResponseEntity.ok(mapToDto(expense));
     }
 
-    @GetMapping("/service/{serviceId}")
-    @Operation(summary = "Get expenses by service",
-               description = "Get all expenses for your service. Only shows expenses for services you own.")
-    public ResponseEntity<List<ExpenseDto>> getExpensesByService(@PathVariable Long serviceId) {
-        List<Expense> expenses = expenseService.getExpensesByService(serviceId);
+    @GetMapping
+    @Operation(summary = "Get my expenses",
+               description = "Get all expenses for the current admin.")
+    public ResponseEntity<List<ExpenseDto>> getMyExpenses() {
+        List<Expense> expenses = expenseService.getExpensesForCurrentAdmin();
         return ResponseEntity.ok(expenses.stream().map(this::mapToDto).collect(Collectors.toList()));
     }
 
-    @GetMapping("/service/{serviceId}/range")
+    @GetMapping("/range")
     @Operation(summary = "Get expenses by date range",
-               description = "Get expenses for your service within a date range. Only shows expenses for services you own.")
+               description = "Get expenses for the current admin within a date range.")
     public ResponseEntity<List<ExpenseDto>> getExpensesByDateRange(
-        @PathVariable Long serviceId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        List<Expense> expenses = expenseService.getExpensesByServiceAndDateRange(serviceId, startDate, endDate);
+        List<Expense> expenses = expenseService.getExpensesByDateRange(startDate, endDate);
         return ResponseEntity.ok(expenses.stream().map(this::mapToDto).collect(Collectors.toList()));
     }
 
-    @GetMapping("/service/{serviceId}/total")
+    @GetMapping("/total")
     @Operation(summary = "Get total expenses",
-               description = "Get total expense amount for your service in a date range. Only accessible for services you own.")
+               description = "Get total expense amount for the current admin in a date range.")
     public ResponseEntity<Map<String, Double>> getTotalExpenses(
-        @PathVariable Long serviceId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        Double total = expenseService.getTotalExpenses(serviceId, startDate, endDate);
+        Double total = expenseService.getTotalExpenses(startDate, endDate);
         Map<String, Double> response = new HashMap<>();
         response.put("totalExpenses", total);
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/service/{serviceId}/breakdown")
+    @GetMapping("/breakdown")
     @Operation(summary = "Get expense breakdown",
-               description = "Get expense breakdown by category for your service. Shows how much was spent in each category.")
+               description = "Get expense breakdown by category for the current admin.")
     public ResponseEntity<Map<String, Double>> getExpenseBreakdown(
-        @PathVariable Long serviceId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        List<Object[]> breakdownData = expenseService.getExpenseBreakdown(serviceId, startDate, endDate);
+        List<Object[]> breakdownData = expenseService.getExpenseBreakdown(startDate, endDate);
         Map<String, Double> breakdown = new HashMap<>();
         for (Object[] row : breakdownData) {
             String category = (String) row[0];
-            Double amount = (Double) row[1];
+            Double amount = ((Number) row[1]).doubleValue();
             breakdown.put(category, amount);
         }
         return ResponseEntity.ok(breakdown);
@@ -96,19 +93,22 @@ public class ExpenseController {
     private ExpenseDto mapToDto(Expense expense) {
         return ExpenseDto.builder()
             .id(expense.getId())
-            .serviceId(expense.getService().getId())
-            .serviceName(expense.getService().getName())
-            .categoryId(null) // Category is now just a string
+            .adminId(expense.getAdminProfile().getId())
+            .adminName(expense.getAdminProfile().getBusinessName() != null
+                ? expense.getAdminProfile().getBusinessName()
+                : expense.getAdminProfile().getUser() != null
+                    ? expense.getAdminProfile().getUser().getName()
+                    : null)
+            .categoryId(null)
             .categoryName(expense.getCategory())
-            .categoryType("EXPENSE") // Default generic type
+            .categoryType("EXPENSE")
             .description(expense.getDescription())
             .amount(expense.getAmount() != null ? expense.getAmount().doubleValue() : 0.0)
             .paymentMode(expense.getPaymentMode())
             .expenseDate(expense.getExpenseDate())
-            .referenceNumber(expense.getBillUrl()) // Map billUrl to referenceNumber
+            .referenceNumber(expense.getBillUrl())
             .createdBy(String.valueOf(expense.getCreatedBy()))
             .createdAt(expense.getCreatedAt())
             .build();
     }
 }
-

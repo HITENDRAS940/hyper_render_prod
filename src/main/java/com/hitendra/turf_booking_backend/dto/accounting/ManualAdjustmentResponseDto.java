@@ -1,6 +1,5 @@
 package com.hitendra.turf_booking_backend.dto.accounting;
 
-import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,11 +17,10 @@ import java.time.Instant;
 public class ManualAdjustmentResponseDto {
 
     private Long ledgerId;
-    private Long serviceId;
-    private String serviceName;
-    private String adjustmentType; // CREDIT or DEBIT
+    private Long adminId;
+    private String adjustmentType;  // CREDIT or DEBIT
+    private String paymentMode;     // CASH or BANK
     private Double amount;
-    private PaymentMode paymentMode;
     private String description;
     private String referenceNumber;
     private Double previousBalance;
@@ -30,4 +28,3 @@ public class ManualAdjustmentResponseDto {
     private String recordedBy;
     private Instant recordedAt;
 }
-

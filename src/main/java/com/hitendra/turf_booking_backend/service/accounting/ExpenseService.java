@@ -1,28 +1,30 @@
 package com.hitendra.turf_booking_backend.service.accounting;
 
 import com.hitendra.turf_booking_backend.dto.accounting.CreateExpenseRequest;
-import com.hitendra.turf_booking_backend.entity.Service;
+import com.hitendra.turf_booking_backend.entity.AdminProfile;
 import com.hitendra.turf_booking_backend.entity.accounting.*;
 import com.hitendra.turf_booking_backend.exception.BookingException;
-import com.hitendra.turf_booking_backend.repository.ServiceRepository;
 import com.hitendra.turf_booking_backend.repository.accounting.ExpenseCategoryRepository;
 import com.hitendra.turf_booking_backend.repository.accounting.ExpenseRepository;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Service for managing expenses (outgoing money).
+ * Service for managing expenses (outgoing money) at the admin level.
  *
  * FLOW:
- * 1. Create expense record
- * 2. Record in cash ledger (debit)
- *
- * Examples: Electricity bill, maintenance, salaries
+ * 1. Validate paymentMode is CASH or BANK
+ * 2. Check admin's balance (cash or bank) >= expense amount
+ * 3. Deduct the amount from the corresponding balance
+ * 4. Save expense record
  */
 @org.springframework.stereotype.Service
 @RequiredArgsConstructor
@@ -31,146 +33,127 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final ExpenseCategoryRepository categoryRepository;
-    private final ServiceRepository serviceRepository;
-    private final LedgerService ledgerService;
     private final AuthUtil authUtil;
+    private final EntityManager entityManager;
 
-    /**
-     * Create a new expense and record in ledger.
-     *
-     * TRANSACTION FLOW:
-     * 1. Validate service belongs to current admin
-     * 2. Validate category exists (can be from any admin - sharing allowed)
-     * 3. Create expense record for the service
-     * 4. Record debit in cash ledger
-     *
-     * NOTE: Expenses are service-specific, so they're automatically admin-specific
-     * through the service relationship. Categories can be used across admins.
-     *
-     * @param request Expense details
-     * @return Created expense
-     */
     @Transactional
     public Expense createExpense(CreateExpenseRequest request) {
-        log.info("Creating expense for service {}: {} - {}",
-            request.getServiceId(), request.getAmount(), request.getDescription());
-
-        // Get current admin
-        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
-
-        // Validate service
-        Service service = serviceRepository.findById(request.getServiceId())
-            .orElseThrow(() -> new BookingException("Service not found: " + request.getServiceId()));
-
-        // Verify service belongs to current admin
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
-        }
-
-        // Validate category exists (category can be from any admin)
-        ExpenseCategory category = categoryRepository.findById(request.getCategoryId())
-            .orElseThrow(() -> new BookingException("Expense category not found: " + request.getCategoryId()));
-
-        // Get current user
-        String currentUser = authUtil.getCurrentUser().getPhone();
-
-        // Create expense - it's automatically admin-specific because service belongs to admin
-        Expense expense = Expense.builder()
-            .service(service)
-            .category(category.getName())
-            .description(request.getDescription())
-            .amount(java.math.BigDecimal.valueOf(request.getAmount()))
-            .paymentMode(request.getPaymentMode())
-            .expenseDate(request.getExpenseDate())
-            .billUrl(request.getReferenceNumber()) // Mapping reference number to billUrl as fallback
-            .createdBy(authUtil.getCurrentUserId())
-            .build();
-
-        Expense savedExpense = expenseRepository.save(expense);
-
-        log.info("Expense created with ID: {} for service {} (admin {})",
-                 savedExpense.getId(), service.getId(), currentAdminId);
-
-        // Record in ledger (DEBIT)
-        ledgerService.recordDebit(
-            service,
-            LedgerSource.EXPENSE,
-            ReferenceType.EXPENSE,
-            savedExpense.getId(),
-            savedExpense.getAmount().doubleValue(),
-            savedExpense.getPaymentMode(),
-            "Expense: " + category.getName() + " - " + savedExpense.getDescription(),
-            currentUser
+        // Lock the admin row to prevent concurrent balance issues
+        AdminProfile currentAdmin = entityManager.find(
+                AdminProfile.class,
+                authUtil.getCurrentAdminProfile().getId(),
+                LockModeType.PESSIMISTIC_WRITE
         );
 
-        log.info("Expense recorded in ledger successfully");
+        BigDecimal amount = BigDecimal.valueOf(request.getAmount());
+        ExpensePaymentMode mode = request.getPaymentMode();
 
-        return savedExpense;
+        log.info("Creating {} expense for admin {}: amount={}, desc={}",
+                mode, currentAdmin.getId(), amount, request.getDescription());
+
+        // ── Balance check ────────────────────────────────────────────────────
+        if (mode == ExpensePaymentMode.CASH) {
+            BigDecimal cashBal = currentAdmin.getCashBalance() != null
+                    ? currentAdmin.getCashBalance() : BigDecimal.ZERO;
+            if (cashBal.compareTo(amount) < 0) {
+                throw new BookingException(
+                        String.format("Insufficient cash balance. Available: ₹%s, Required: ₹%s",
+                                cashBal, amount));
+            }
+            currentAdmin.setCashBalance(cashBal.subtract(amount));
+        } else { // BANK
+            BigDecimal bankBal = currentAdmin.getBankBalance() != null
+                    ? currentAdmin.getBankBalance() : BigDecimal.ZERO;
+            if (bankBal.compareTo(amount) < 0) {
+                throw new BookingException(
+                        String.format("Insufficient bank balance. Available: ₹%s, Required: ₹%s",
+                                bankBal, amount));
+            }
+            currentAdmin.setBankBalance(bankBal.subtract(amount));
+        }
+
+        // Balance update will be flushed automatically — currentAdmin is a managed entity
+
+        // ── Validate category ────────────────────────────────────────────────
+        ExpenseCategory category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new BookingException("Expense category not found: " + request.getCategoryId()));
+
+        if (!category.getAdminProfile().getId().equals(currentAdmin.getId())) {
+            throw new BookingException("Access denied: This category belongs to another admin");
+        }
+
+        // ── Save expense record ──────────────────────────────────────────────
+        Expense expense = Expense.builder()
+                .adminProfile(currentAdmin)
+                .category(category.getName())
+                .description(request.getDescription())
+                .amount(amount)
+                .paymentMode(mode)
+                .expenseDate(request.getExpenseDate())
+                .billUrl(request.getReferenceNumber())
+                .createdBy(authUtil.getCurrentUserId())
+                .build();
+
+        Expense saved = expenseRepository.save(expense);
+        log.info("Expense ID={} recorded. {} balance deducted by ₹{}. New {} balance: ₹{}",
+                saved.getId(), mode, amount, mode,
+                mode == ExpensePaymentMode.CASH
+                        ? currentAdmin.getCashBalance()
+                        : currentAdmin.getBankBalance());
+        return saved;
     }
 
     /**
-     * Get all expenses for a service (validates ownership).
-     * Uses eager fetching to prevent LazyInitializationException.
+     * Get all expenses for the current admin.
      */
+    @Transactional(readOnly = true)
+    public List<Expense> getExpensesForCurrentAdmin() {
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        return expenseRepository.findByAdminProfileIdWithRelationships(currentAdminId);
+    }
+
+    /**
+     * Get expenses for the current admin within a date range.
+     */
+    @Transactional(readOnly = true)
+    public List<Expense> getExpensesByDateRange(LocalDate startDate, LocalDate endDate) {
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        return expenseRepository.findByAdminProfileIdAndDateRangeWithRelationships(
+            currentAdminId, startDate, endDate);
+    }
+
+    /**
+     * Get total expenses for the current admin in a date range.
+     */
+    @Transactional(readOnly = true)
+    public Double getTotalExpenses(LocalDate startDate, LocalDate endDate) {
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        return expenseRepository.getTotalExpensesByAdminProfileIdAndDateRange(currentAdminId, startDate, endDate);
+    }
+
+    /**
+     * Get expense breakdown by category for the current admin.
+     */
+    @Transactional(readOnly = true)
+    public List<Object[]> getExpenseBreakdown(LocalDate startDate, LocalDate endDate) {
+        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        return expenseRepository.getExpenseBreakdownByCategory(currentAdminId, startDate, endDate);
+    }
+
+    // ==================== LEGACY SERVICE-BASED METHODS ====================
+
+    /** @deprecated Use getExpensesForCurrentAdmin() instead. */
     @Transactional(readOnly = true)
     public List<Expense> getExpensesByService(Long serviceId) {
-        // Validate service ownership
-        Service service = serviceRepository.findById(serviceId)
-            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
-
         Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
-        }
-
-        // Use eager fetch query to load service and category relationships
-        return expenseRepository.findByServiceIdWithRelationships(serviceId);
+        return expenseRepository.findByAdminProfileIdWithRelationships(currentAdminId);
     }
 
-    /**
-     * Get expenses for a service within a date range (validates ownership).
-     * Uses eager fetching to prevent LazyInitializationException.
-     */
+    /** @deprecated Use getExpensesByDateRange() instead. */
     @Transactional(readOnly = true)
-    public List<Expense> getExpensesByServiceAndDateRange(
-        Long serviceId, LocalDate startDate, LocalDate endDate) {
-
-        // Validate service ownership
-        Service service = serviceRepository.findById(serviceId)
-            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
-
+    public List<Expense> getExpensesByServiceAndDateRange(Long serviceId, LocalDate startDate, LocalDate endDate) {
         Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
-        }
-
-        // Use eager fetch query to load service and category relationships
-        return expenseRepository.findByServiceIdAndDateRangeWithRelationships(
-            serviceId, startDate, endDate);
-    }
-
-    /**
-     * Get total expenses for a service in a date range (validates ownership).
-     */
-    @Transactional(readOnly = true)
-    public Double getTotalExpenses(Long serviceId, LocalDate startDate, LocalDate endDate) {
-        // Validate service ownership
-        Service service = serviceRepository.findById(serviceId)
-            .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
-
-        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
-        }
-
-        return expenseRepository.getTotalExpensesByServiceAndDateRange(serviceId, startDate, endDate);
-    }
-
-    /**
-     * Get expense breakdown by category.
-     */
-    public List<Object[]> getExpenseBreakdown(Long serviceId, LocalDate startDate, LocalDate endDate) {
-        return expenseRepository.getExpenseBreakdownByCategory(serviceId, startDate, endDate);
+        return expenseRepository.findByAdminProfileIdAndDateRangeWithRelationships(currentAdminId, startDate, endDate);
     }
 }
 

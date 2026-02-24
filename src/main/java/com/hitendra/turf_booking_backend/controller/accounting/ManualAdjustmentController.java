@@ -12,9 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
  * Controller for manual cash and bank adjustments by admins.
  *
@@ -28,7 +25,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/accounting/adjustments")
 @RequiredArgsConstructor
-@Tag(name = "Manual Adjustments", description = "Manual cash/bank adjustments for admins")
+@Tag(name = "Manual Adjustments", description = "Manual cash/bank adjustments on admin balance")
 @SecurityRequirement(name = "Bearer Authentication")
 @PreAuthorize("hasRole('ADMIN')")
 public class ManualAdjustmentController {
@@ -36,53 +33,50 @@ public class ManualAdjustmentController {
     private final ManualAdjustmentService adjustmentService;
 
     /**
-     * Record a manual adjustment (credit or debit) for a service.
+     * Record a manual adjustment (credit or debit) for admin's cash or bank balance.
      *
      * Use cases:
      * - Cash deposit to bank: DEBIT with CASH mode, description "Deposited to bank"
      * - Opening balance: CREDIT with CASH mode, description "Opening balance"
      * - Correction: CREDIT or DEBIT with appropriate mode and description
      *
-     * @param serviceId The service ID
      * @param request The adjustment details
      * @return Response with ledger entry details
      */
-    @PostMapping("/service/{serviceId}")
+    @PostMapping
     @Operation(
             summary = "Record manual adjustment",
-            description = "Record a manual credit (money in) or debit (money out) adjustment for a service. " +
-                    "Use for cash deposits, corrections, or initial balance setup. " +
-                    "Only the service owner can make adjustments."
+            description = """
+                Record a manual CREDIT (money in) or DEBIT (money out) on the admin's cash or bank balance.
+                
+                **paymentMode** must be `CASH` or `BANK`.
+                
+                **Examples:**
+                - Opening cash balance: `{"type":"CREDIT","paymentMode":"CASH","amount":5000,"description":"Opening balance"}`
+                - Cash deposit to bank: Two entries — DEBIT CASH + CREDIT BANK for the same amount
+                - Correction debit: `{"type":"DEBIT","paymentMode":"BANK","amount":200,"description":"Bank charge correction"}`
+                
+                **Rules:**
+                - DEBIT requires sufficient balance (balance >= amount)
+                - All adjustments are recorded in the admin ledger for full audit trail
+                """
     )
     public ResponseEntity<ManualAdjustmentResponseDto> recordAdjustment(
-            @PathVariable Long serviceId,
             @Valid @RequestBody ManualAdjustmentRequestDto request) {
-
-        ManualAdjustmentResponseDto response = adjustmentService.recordManualAdjustment(serviceId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(adjustmentService.recordManualAdjustment(request));
     }
 
     /**
-     * Get current balance for a service.
+     * Get current cash and bank balances for the admin.
      *
-     * @param serviceId The service ID
-     * @return Current balance
+     * @return Current cash and bank balances
      */
-    @GetMapping("/service/{serviceId}/balance")
+    @GetMapping("/balance")
     @Operation(
-            summary = "Get current balance",
-            description = "Get the current ledger balance for a service. " +
-                    "Only the service owner can view the balance."
+            summary = "Get current cash & bank balances",
+            description = "Returns the current cash balance (previousBalance) and bank balance (newBalance) for the current admin."
     )
-    public ResponseEntity<Map<String, Object>> getCurrentBalance(@PathVariable Long serviceId) {
-        Double balance = adjustmentService.getCurrentBalance(serviceId);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("serviceId", serviceId);
-        response.put("currentBalance", balance);
-        response.put("currency", "INR");
-
-        return ResponseEntity.ok(response);
+    public ResponseEntity<ManualAdjustmentResponseDto> getCurrentBalance() {
+        return ResponseEntity.ok(adjustmentService.getCurrentBalances());
     }
 }
-

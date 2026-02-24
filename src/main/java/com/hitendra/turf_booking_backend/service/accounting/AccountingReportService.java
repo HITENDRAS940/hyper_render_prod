@@ -82,6 +82,9 @@ public class AccountingReportService {
         Service service = serviceRepository.findById(serviceId)
             .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
 
+        // Resolve admin profile ID from service owner
+        Long adminProfileId = service.getCreatedBy().getId();
+
         // Convert dates to Instant for ledger queries
         Instant startInstant = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant();
         Instant endInstant = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
@@ -104,14 +107,14 @@ public class AccountingReportService {
         // STEP 2: CALCULATE EXPENSES
         // ═══════════════════════════════════════════════════════════════════════
 
-        // Total Expenses
-        Double totalExpenses = expenseRepository.getTotalExpensesByServiceAndDateRange(
-            serviceId, startDate, endDate);
+        // Total Expenses (now at admin level)
+        Double totalExpenses = expenseRepository.getTotalExpensesByAdminProfileIdAndDateRange(
+            adminProfileId, startDate, endDate);
         if (totalExpenses == null) totalExpenses = 0.0;
 
         // Expense Breakdown by Category
         List<Object[]> breakdownData = expenseRepository.getExpenseBreakdownByCategory(
-            serviceId, startDate, endDate);
+            adminProfileId, startDate, endDate);
 
         Map<String, Double> expenseBreakdown = new HashMap<>();
         for (Object[] row : breakdownData) {

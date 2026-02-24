@@ -1,140 +1,160 @@
 package com.hitendra.turf_booking_backend.service.accounting;
 
 import com.hitendra.turf_booking_backend.dto.accounting.ManualAdjustmentRequestDto;
+import com.hitendra.turf_booking_backend.dto.accounting.ManualAdjustmentRequestDto.AdjustmentType;
+import com.hitendra.turf_booking_backend.dto.accounting.ManualAdjustmentRequestDto.AdjustmentMode;
 import com.hitendra.turf_booking_backend.dto.accounting.ManualAdjustmentResponseDto;
-import com.hitendra.turf_booking_backend.entity.Service;
-import com.hitendra.turf_booking_backend.entity.accounting.CashLedger;
-import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
-import com.hitendra.turf_booking_backend.entity.accounting.ReferenceType;
+import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.exception.BookingException;
-import com.hitendra.turf_booking_backend.repository.ServiceRepository;
+import com.hitendra.turf_booking_backend.repository.AdminLedgerRepository;
 import com.hitendra.turf_booking_backend.util.AuthUtil;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 /**
- * Service for handling manual cash/bank adjustments by admins.
+ * Service for handling manual cash/bank adjustments directly on admin balances.
  *
  * Use cases:
- * 1. Cash deposit to bank - Record money movement from cash to bank
- * 2. Manual corrections - Fix errors or missing entries
- * 3. Initial balance setup - Set starting balance for a service
- * 4. Reconciliation - Adjust for discrepancies
+ * 1. Cash deposit to bank  – move money from cashBalance → bankBalance
+ * 2. Opening / correction  – CREDIT or DEBIT on cash or bank
+ * 3. Reconciliation        – fix any discrepancy on admin balances
+ *
+ * All adjustments are recorded in admin_ledger for a full audit trail.
  */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class ManualAdjustmentService {
 
-    private final LedgerService ledgerService;
-    private final ServiceRepository serviceRepository;
+    private final AdminLedgerRepository adminLedgerRepository;
     private final AuthUtil authUtil;
+    private final EntityManager entityManager;
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private AdminProfile loadWithLock(Long adminId) {
+        AdminProfile admin = entityManager.find(AdminProfile.class, adminId, LockModeType.PESSIMISTIC_WRITE);
+        if (admin == null) throw new BookingException("Admin profile not found: " + adminId);
+        return admin;
+    }
+
+    private BigDecimal safe(BigDecimal v) { return v != null ? v : BigDecimal.ZERO; }
+
+    // ─── Main Method ─────────────────────────────────────────────────────────
 
     /**
-     * Record a manual adjustment (credit or debit) in the ledger.
+     * Record a manual CREDIT or DEBIT adjustment on the admin's cash or bank balance.
      *
-     * @param serviceId The service ID to adjust
-     * @param request The adjustment details
-     * @return Response with ledger entry details
+     * CREDIT → adds to balance (e.g. opening balance, correction inflow)
+     * DEBIT  → subtracts from balance (e.g. correction outflow) — balance must be >= amount
+     *
+     * paymentMode must be CASH or BANK.
      */
     @Transactional
-    public ManualAdjustmentResponseDto recordManualAdjustment(Long serviceId, ManualAdjustmentRequestDto request) {
-        log.info("Recording manual {} adjustment for service {}: {} via {}",
-                request.getType(), serviceId, request.getAmount(), request.getPaymentMode());
+    public ManualAdjustmentResponseDto recordManualAdjustment(ManualAdjustmentRequestDto request) {
+        AdminProfile admin = loadWithLock(authUtil.getCurrentAdminProfile().getId());
 
-        // Get current admin
-        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
+        BigDecimal amount = BigDecimal.valueOf(request.getAmount());
+        AdjustmentType type = request.getType();
+        AdjustmentMode mode = request.getPaymentMode();
 
-        // Validate service exists and belongs to current admin
-        Service service = serviceRepository.findById(serviceId)
-                .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
+        log.info("Manual {} adjustment for admin {}: ₹{} via {}",
+                type, admin.getId(), amount, mode);
 
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
+        BigDecimal previousBalance;
+        BigDecimal newBalance;
+        AdminLedgerType ledgerType;
+
+        if (mode == AdjustmentMode.CASH) {
+            ledgerType = AdminLedgerType.CASH;
+            previousBalance = safe(admin.getCashBalance());
+
+            if (type == AdjustmentType.DEBIT && previousBalance.compareTo(amount) < 0) {
+                throw new BookingException(
+                        String.format("Insufficient cash balance. Available: ₹%s, Required: ₹%s",
+                                previousBalance, amount));
+            }
+
+            newBalance = type == AdjustmentType.CREDIT
+                    ? previousBalance.add(amount)
+                    : previousBalance.subtract(amount);
+            admin.setCashBalance(newBalance);
+
+        } else { // BANK
+            ledgerType = AdminLedgerType.BANK;
+            previousBalance = safe(admin.getBankBalance());
+
+            if (type == AdjustmentType.DEBIT && previousBalance.compareTo(amount) < 0) {
+                throw new BookingException(
+                        String.format("Insufficient bank balance. Available: ₹%s, Required: ₹%s",
+                                previousBalance, amount));
+            }
+
+            newBalance = type == AdjustmentType.CREDIT
+                    ? previousBalance.add(amount)
+                    : previousBalance.subtract(amount);
+            admin.setBankBalance(newBalance);
         }
 
-        // Get previous balance
-        Double previousBalance = ledgerService.getCurrentBalance(serviceId);
-
-        // Prepare description with reference number if provided
+        // Prepare description
         String fullDescription = request.getDescription();
         if (request.getReferenceNumber() != null && !request.getReferenceNumber().trim().isEmpty()) {
             fullDescription += " [Ref: " + request.getReferenceNumber() + "]";
         }
 
-        // Get recorded by
-        String recordedBy = authUtil.getCurrentUser().getPhone();
+        // Append to admin_ledger
+        AdminLedgerEntryType entryType = type == AdjustmentType.CREDIT
+                ? AdminLedgerEntryType.CREDIT
+                : AdminLedgerEntryType.DEBIT;
 
-        // Use a unique reference ID for adjustments (negative to avoid conflicts)
-        Long referenceId = System.currentTimeMillis();
+        AdminLedger ledgerEntry = adminLedgerRepository.save(AdminLedger.builder()
+                .admin(admin)
+                .ledgerType(ledgerType)
+                .entryType(entryType)
+                .amount(amount)
+                .balanceAfter(newBalance)
+                .description(fullDescription)
+                .referenceType("MANUAL_ADJUSTMENT")
+                .referenceId(null)
+                .build());
 
-        CashLedger ledgerEntry;
+        // AdminProfile balance updated — managed entity, auto-flushed on commit
 
-        // Record credit or debit based on type
-        if (request.getType() == ManualAdjustmentRequestDto.AdjustmentType.CREDIT) {
-            ledgerEntry = ledgerService.recordCredit(
-                    service,
-                    LedgerSource.ADJUSTMENT,
-                    ReferenceType.ADJUSTMENT,
-                    referenceId,
-                    request.getAmount(),
-                    request.getPaymentMode(),
-                    fullDescription,
-                    recordedBy
-            );
-            log.info("Manual CREDIT adjustment recorded: ID={}, Amount={}, New Balance={}",
-                    ledgerEntry.getId(), request.getAmount(), ledgerEntry.getBalanceAfter());
-        } else {
-            ledgerEntry = ledgerService.recordDebit(
-                    service,
-                    LedgerSource.ADJUSTMENT,
-                    ReferenceType.ADJUSTMENT,
-                    referenceId,
-                    request.getAmount(),
-                    request.getPaymentMode(),
-                    fullDescription,
-                    recordedBy
-            );
-            log.info("Manual DEBIT adjustment recorded: ID={}, Amount={}, New Balance={}",
-                    ledgerEntry.getId(), request.getAmount(), ledgerEntry.getBalanceAfter());
-        }
+        log.info("Manual {} {} adjustment recorded. ledgerEntryId={}, newBalance={}",
+                type, mode, ledgerEntry.getId(), newBalance);
 
-        // Build response
         return ManualAdjustmentResponseDto.builder()
                 .ledgerId(ledgerEntry.getId())
-                .serviceId(service.getId())
-                .serviceName(service.getName())
-                .adjustmentType(request.getType().name())
+                .adminId(admin.getId())
+                .adjustmentType(type.name())
+                .paymentMode(mode.name())
                 .amount(request.getAmount())
-                .paymentMode(request.getPaymentMode())
                 .description(request.getDescription())
                 .referenceNumber(request.getReferenceNumber())
-                .previousBalance(previousBalance)
-                .newBalance(ledgerEntry.getBalanceAfter())
-                .recordedBy(recordedBy)
+                .previousBalance(previousBalance.doubleValue())
+                .newBalance(newBalance.doubleValue())
+                .recordedBy(authUtil.getCurrentUser().getPhone())
                 .recordedAt(ledgerEntry.getCreatedAt())
                 .build();
     }
 
     /**
-     * Get current balance for a service.
-     *
-     * @param serviceId The service ID
-     * @return Current balance
+     * Get current cash and bank balances for the current admin.
      */
-    public Double getCurrentBalance(Long serviceId) {
-        // Validate service exists and belongs to current admin
-        Service service = serviceRepository.findById(serviceId)
-                .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
-
-        Long currentAdminId = authUtil.getCurrentAdminProfile().getId();
-        if (!service.getCreatedBy().getId().equals(currentAdminId)) {
-            throw new BookingException("Access denied: This service belongs to another admin");
-        }
-
-        return ledgerService.getCurrentBalance(serviceId);
+    @Transactional(readOnly = true)
+    public ManualAdjustmentResponseDto getCurrentBalances() {
+        AdminProfile admin = authUtil.getCurrentAdminProfile();
+        return ManualAdjustmentResponseDto.builder()
+                .adminId(admin.getId())
+                .previousBalance(safe(admin.getCashBalance()).doubleValue()) // reused as cashBalance
+                .newBalance(safe(admin.getBankBalance()).doubleValue())       // reused as bankBalance
+                .build();
     }
 }
 
