@@ -392,6 +392,41 @@ public class ServiceService {
         serviceRepository.deleteById(id);
     }
 
+    /**
+     * Force-delete a service and ALL its associated data (manager only).
+     *
+     * What gets deleted:
+     *  - All service images (from Cloudinary)
+     *  - All resources (cascade CascadeType.ALL on Service.resources)
+     *  - All slot configs (cascade on ServiceResource.slotConfig)
+     *  - All price rules (cascade via ServiceResource)
+     *  - Bookings are preserved but their service_id is set to NULL (ON DELETE SET NULL in DB)
+     *
+     * No booking-count check — this is a hard delete for manager use only.
+     */
+    @Transactional
+    public void forceDeleteService(Long id) {
+        com.hitendra.turf_booking_backend.entity.Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service not found: " + id));
+
+        log.info("FORCE DELETE initiated for service {} '{}' by manager", id, service.getName());
+
+        // 1. Delete all Cloudinary images
+        if (service.getImages() != null && !service.getImages().isEmpty()) {
+            try {
+                cloudinaryService.deleteImages(service.getImages());
+                log.info("Deleted {} Cloudinary images for service {}", service.getImages().size(), id);
+            } catch (Exception e) {
+                log.warn("Failed to delete some Cloudinary images for service {}: {}", id, e.getMessage());
+            }
+        }
+
+        // 2. Delete service — cascade handles resources, slot configs, price rules
+        serviceRepository.delete(service);
+
+        log.info("FORCE DELETE completed for service {} — resources, slot configs removed; bookings preserved with service_id=NULL", id);
+    }
+
     private ServiceDto convertToDto(Service service) {
         ServiceDto dto = new ServiceDto();
         dto.setId(service.getId());

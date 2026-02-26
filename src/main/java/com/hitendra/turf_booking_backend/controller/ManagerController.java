@@ -84,6 +84,23 @@ public class ManagerController {
         return ResponseEntity.ok("Admin deleted successfully");
     }
 
+    @DeleteMapping("/services/{serviceId}")
+    @Operation(summary = "Force delete a service",
+               description = """
+                   Permanently delete a service and ALL its associated data:
+                   - All resources (turfs, courts, lanes, etc.)
+                   - All slot configurations and price rules
+                   - All service images (deleted from Cloudinary)
+                   
+                   **Bookings are preserved** but their `service_id` is set to NULL (audit trail intact).
+                   
+                   ⚠️ This is irreversible. Use only when you are sure the service must be removed entirely.
+                   """)
+    public ResponseEntity<String> forceDeleteService(@PathVariable Long serviceId) {
+        serviceService.forceDeleteService(serviceId);
+        return ResponseEntity.ok("Service " + serviceId + " and all its resources have been permanently deleted.");
+    }
+
     @GetMapping("/services")
     @Operation(summary = "Get all the services", description = "Manager can access all the services on the app")
     public ResponseEntity<PaginatedResponse<ServiceCardDto>> getAllServices(
