@@ -27,5 +27,8 @@ public class SettleRequest {
     private SettlementPaymentMode paymentMode;
 
     private String settlementReference;
+
+    /** Optional notes or remarks for this settlement. */
+    private String notes;
 }
 

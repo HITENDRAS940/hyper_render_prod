@@ -20,5 +20,11 @@ public class ServiceResourceDto {
     private String description;
     private boolean enabled;
     private List<Activity> activities;
+
+    /** "PER_SLOT" or "PER_PERSON" */
+    private String pricingType;
+
+    /** Max persons per booking; null means no limit. Only relevant for PER_PERSON. */
+    private Integer maxPersonAllowed;
 }
 

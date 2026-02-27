@@ -61,6 +61,25 @@ public class Service {
     @Builder.Default
     private boolean availability = true;
 
+    /**
+     * Whether cancellation (and refund) is allowed for bookings under this service.
+     * When false, any user-initiated cancellation request is rejected immediately.
+     * Defaults to true so existing services continue to honour cancellations.
+     */
+    @Column(name = "refund_allowed", nullable = false)
+    @Builder.Default
+    private boolean refundAllowed = true;
+
+    // Google Places API fields
+    @Column(name = "google_place_id")
+    private String googlePlaceId;
+
+    @Column(name = "google_rating")
+    private Double googleRating;
+
+    @Column(name = "google_review_count")
+    private Integer googleReviewCount;
+
     // Track which admin created this service
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_admin_id")

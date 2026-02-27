@@ -2,9 +2,9 @@
 -- V1__init.sql - Complete Database Schema for Hyper Backend
 -- ============================================================================
 -- Single consolidated migration: schema + reference data.
--- All previously separate V2–V8 migrations are merged here.
+-- All previously separate V2–V5 migrations are merged here.
 -- Compatible with PostgreSQL.
--- Last updated: February 23, 2026
+-- Last updated: February 28, 2026
 -- ============================================================================
 
 -- ============================================================================
@@ -121,6 +121,10 @@ CREATE TABLE IF NOT EXISTS services (
     start_time TIME,
     end_time TIME,
     availability BOOLEAN NOT NULL DEFAULT TRUE,
+    refund_allowed BOOLEAN NOT NULL DEFAULT TRUE,
+    google_place_id VARCHAR(255),
+    google_rating DOUBLE PRECISION,
+    google_review_count INTEGER,
     created_by_admin_id BIGINT REFERENCES admin_profiles(id) ON DELETE SET NULL
 );
 
@@ -159,7 +163,9 @@ CREATE TABLE IF NOT EXISTS service_resources (
     service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    pricing_type VARCHAR(20) NOT NULL DEFAULT 'PER_SLOT',
+    max_person_allowed INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_service_resources_service ON service_resources(service_id);
@@ -274,7 +280,9 @@ CREATE TABLE IF NOT EXISTS bookings (
     venue_payment_collection_method VARCHAR(20),
     advance_amount NUMERIC(19, 2),
     remaining_amount NUMERIC(19, 2),
-    transfer_status VARCHAR(20) DEFAULT 'PENDING'
+    transfer_status VARCHAR(20) DEFAULT 'PENDING',
+    pricing_type VARCHAR(20),
+    number_of_persons INTEGER
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_idempotency_key ON bookings(idempotency_key);
@@ -428,14 +436,16 @@ CREATE INDEX IF NOT EXISTS idx_source_reference ON cash_ledger(source, reference
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS settlements (
-    id                      BIGSERIAL PRIMARY KEY,
-    admin_id                BIGINT NOT NULL REFERENCES admin_profiles(id),
-    amount                  NUMERIC(19, 2) NOT NULL,
-    payment_mode            VARCHAR(50) NOT NULL,
-    status                  VARCHAR(50) NOT NULL DEFAULT 'INITIATED',
-    settled_by_manager_id   BIGINT,
-    settlement_reference    VARCHAR(255),
-    created_at              TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    id                          BIGSERIAL PRIMARY KEY,
+    admin_id                    BIGINT NOT NULL REFERENCES admin_profiles(id),
+    amount                      NUMERIC(19, 2) NOT NULL,
+    payment_mode                VARCHAR(50) NOT NULL,
+    status                      VARCHAR(50) NOT NULL DEFAULT 'INITIATED',
+    settled_by_manager_id       BIGINT,
+    settlement_reference        VARCHAR(255),
+    notes                       VARCHAR(1000),
+    pending_after_settlement    NUMERIC(19, 2),
+    created_at                  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_settlement_admin   ON settlements(admin_id);
@@ -503,6 +513,23 @@ CREATE TABLE IF NOT EXISTS admin_ledger (
 CREATE INDEX IF NOT EXISTS idx_admin_ledger_admin_type    ON admin_ledger(admin_profile_id, ledger_type);
 CREATE INDEX IF NOT EXISTS idx_admin_ledger_admin_created ON admin_ledger(admin_profile_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_admin_ledger_ref           ON admin_ledger(reference_type, reference_id);
+
+-- ============================================================================
+-- SEED DATA: Default Manager User
+-- ============================================================================
+
+-- Insert default manager user for system administration
+INSERT INTO users (phone, email, name, role, enabled, email_verified, account_status, created_at)
+VALUES (
+    '+919999999999',
+    'gethyperindia@gmail.com',
+    'System Manager',
+    'MANAGER',
+    true,
+    true,
+    'ACTIVE',
+    CURRENT_TIMESTAMP
+) ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- END OF SCHEMA

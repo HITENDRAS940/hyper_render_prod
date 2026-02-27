@@ -14,7 +14,12 @@ public class ServiceDto {
     private String description;
     private String contactNumber; // Need to be removed in production
     private boolean availability;
+    private boolean refundAllowed;
     private  List<String> amenities;
     private List<String> images;
     private List<String> activities;
+
+    // Google Places rating (cached, updated daily)
+    private Double googleRating;
+    private Integer googleReviewCount;
 }

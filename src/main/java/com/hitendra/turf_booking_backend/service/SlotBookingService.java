@@ -402,6 +402,10 @@ public class SlotBookingService {
         // ═══════════════════════════════════════════════════════════════════════════
 
         return SlotAvailabilityResponseDto.builder()
+                .pricingType(primaryResource.getPricingType() != null
+                        ? primaryResource.getPricingType().name()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                .maxPersonAllowed(primaryResource.getMaxPersonAllowed())
                 .slots(aggregatedSlots)
                 .build();
     }
@@ -665,13 +669,19 @@ public class SlotBookingService {
                                                    ServiceResource resource, String activityCode, LocalDate bookingDate,
                                                    LocalTime startTime, LocalTime endTime, List<SlotKeyPayload> payloads,
                                                    List<ServiceResource> pooledResources) {
-        // Calculate Price
-        ServiceResource pricingResource = pooledResources.get(0);
-        ResourceSlotConfig config = slotConfigRepository.findByResourceId(pricingResource.getId())
+        // Always use the ALLOCATED resource as the source of truth for:
+        //   - slot config (base price, duration)
+        //   - price rules
+        //   - pricingType (PER_SLOT vs PER_PERSON)
+        //   - maxPersonAllowed
+        // This avoids subtle bugs where pooledResources.get(0) is a different object
+        // than the resource that was actually assigned.
+        ResourceSlotConfig config = slotConfigRepository.findByResourceId(resource.getId())
                 .orElseThrow(() -> new BookingException("Slot configuration not found"));
-        List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(pricingResource.getId());
+        List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(resource.getId());
         boolean isWeekend = isWeekend(bookingDate);
 
+        // Sum up the base slot prices for all selected slots
         double totalSlotPrice = 0.0;
         for (SlotKeyPayload payload : payloads) {
              GeneratedSlot tempSlot = GeneratedSlot.builder()
@@ -681,13 +691,37 @@ public class SlotBookingService {
              totalSlotPrice += calculateDynamicSlotPrice(tempSlot, priceRules, isWeekend, config);
         }
 
-        Double platformFee = Math.round(totalSlotPrice * platformFeeRate) / 100.0;
-        Double totalAmount = totalSlotPrice + platformFee;
-        totalAmount = Math.round(totalAmount * 100.0) / 100.0;
+        // ── PER_PERSON: validate and multiply by headcount ──────────────────────
+        com.hitendra.turf_booking_backend.entity.PricingType pricingType =
+                resource.getPricingType() != null
+                        ? resource.getPricingType()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT;
+
+        int persons = 1;
+        if (pricingType == com.hitendra.turf_booking_backend.entity.PricingType.PER_PERSON) {
+            if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
+                throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
+            }
+            if (resource.getMaxPersonAllowed() != null
+                    && request.getNumberOfPersons() > resource.getMaxPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") exceeds the allowed limit of " + resource.getMaxPersonAllowed());
+            }
+            persons = request.getNumberOfPersons();
+        }
+        totalSlotPrice = totalSlotPrice * persons;
+
+        log.info("Price calculation: pricePerUnit={}, persons={}, totalSlotPrice={}, pricingType={}",
+                totalSlotPrice / persons, persons, totalSlotPrice, pricingType);
+        // ────────────────────────────────────────────────────────────────────────
+
+        double platformFee = Math.round(totalSlotPrice * platformFeeRate) / 100.0;
+        double totalAmount = Math.round((totalSlotPrice + platformFee) * 100.0) / 100.0;
 
         // Calculate online and venue amounts based on configurable percentage
-        Double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
-        Double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
+        double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+        double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
         User user = authUtil.getCurrentUser();
         String reference = generateBookingReference();
@@ -716,6 +750,8 @@ public class SlotBookingService {
                 .createdAt(Instant.now())
                 .paymentSource(PaymentSource.BY_USER)
                 .idempotencyKey(request.getIdempotencyKey())
+                .pricingType(pricingType)
+                .numberOfPersons(persons)
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);
@@ -731,12 +767,30 @@ public class SlotBookingService {
         List<BookingResponseDto> responses = new ArrayList<>();
         User user = authUtil.getCurrentUser();
 
-        // Pricing setup
-        ServiceResource pricingResource = resources.get(0);
-        ResourceSlotConfig config = slotConfigRepository.findByResourceId(pricingResource.getId())
-                .orElseThrow(() -> new BookingException("Slot configuration not found"));
-        List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(pricingResource.getId());
         boolean isWeekend = isWeekend(bookingDate);
+
+        // ── PER_PERSON: validate numberOfPersons once using the first resource ──
+        // All resources in a pool share the same pricingType (same activity, same price).
+        ServiceResource firstResource = resources.get(0);
+        com.hitendra.turf_booking_backend.entity.PricingType poolPricingType =
+                firstResource.getPricingType() != null
+                        ? firstResource.getPricingType()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT;
+
+        int persons = 1;
+        if (poolPricingType == com.hitendra.turf_booking_backend.entity.PricingType.PER_PERSON) {
+            if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
+                throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
+            }
+            if (firstResource.getMaxPersonAllowed() != null
+                    && request.getNumberOfPersons() > firstResource.getMaxPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") exceeds the allowed limit of " + firstResource.getMaxPersonAllowed());
+            }
+            persons = request.getNumberOfPersons();
+        }
+        // ────────────────────────────────────────────────────────────────────────
 
         for (int i = 0; i < payloads.size(); i++) {
             SlotKeyPayload payload = payloads.get(i);
@@ -754,21 +808,29 @@ public class SlotBookingService {
                 throw new BookingException("Resource unavailable for slot: " + payload.getStartTime());
             }
 
-            // Calculate price for this slot
+            // Use the assigned resource's own config and price rules
+            final ServiceResource finalAssignedResource = assignedResource;
+            ResourceSlotConfig config = slotConfigRepository.findByResourceId(finalAssignedResource.getId())
+                    .orElseThrow(() -> new BookingException("Slot configuration not found for resource: " + finalAssignedResource.getId()));
+            List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(finalAssignedResource.getId());
+
+            com.hitendra.turf_booking_backend.entity.PricingType pricingType =
+                    assignedResource.getPricingType() != null
+                            ? assignedResource.getPricingType()
+                            : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT;
+
+            // Calculate price for this slot using the assigned resource
             GeneratedSlot tempSlot = GeneratedSlot.builder()
                 .startTime(payload.getStartTime())
                 .endTime(payload.getEndTime())
                 .build();
-            Double slotPrice = calculateDynamicSlotPrice(tempSlot, priceRules, isWeekend, config);
+            double slotPrice = calculateDynamicSlotPrice(tempSlot, priceRules, isWeekend, config);
 
-            // Add fee per slot for split booking? Or total?
-            // Usually fee is on total. But here we create separate bookings.
-            // Let's apply fee proportionally or per booking.
-            // If we create separate bookings, each is a transaction.
-            // Let's apply fee per booking for simplicity and correctness of each record.
-            Double platformFee = Math.round(slotPrice * platformFeeRate) / 100.0;
-            Double totalAmount = slotPrice + platformFee;
-            totalAmount = Math.round(totalAmount * 100.0) / 100.0;
+            // Apply PER_PERSON multiplier
+            slotPrice = slotPrice * persons;
+
+            double platformFee = Math.round(slotPrice * platformFeeRate) / 100.0;
+            double totalAmount = Math.round((slotPrice + platformFee) * 100.0) / 100.0;
 
             // Calculate online and venue amounts based on configurable percentage
             double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
@@ -793,6 +855,8 @@ public class SlotBookingService {
                     .createdAt(Instant.now())
                     .paymentSource(PaymentSource.BY_USER)
                     .idempotencyKey(idempotencyKey)
+                    .pricingType(pricingType)
+                    .numberOfPersons(persons)
                     .build();
 
             Booking savedBooking = bookingRepository.save(booking);
@@ -1062,15 +1126,19 @@ public class SlotBookingService {
         // Calculate price breakdown
         double totalAmount = booking.getAmount();
 
-        // Reverse calculate subtotal from total amount (assuming total = subtotal * 1.02)
+        // Reverse calculate subtotal (slotSubtotal already includes persons multiplier)
+        // total = subtotal * (1 + platformFeeRate/100)
         double slotSubtotal = totalAmount / (1 + platformFeeRate / 100);
-
-        // Round subtotal to 2 decimal places
         slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
 
         // Calculate fee as difference to ensure sum matches total
         double platformFee = totalAmount - slotSubtotal;
         platformFee = Math.round(platformFee * 100.0) / 100.0;
+
+        // Derive per-person price from subtotal and number of persons
+        int numberOfPersons = (booking.getNumberOfPersons() != null && booking.getNumberOfPersons() > 0)
+                ? booking.getNumberOfPersons() : 1;
+        double pricePerPerson = Math.round((slotSubtotal / numberOfPersons) * 100.0) / 100.0;
 
         // Calculate online and venue amounts
         double onlineAmount;
@@ -1092,7 +1160,13 @@ public class SlotBookingService {
         String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
                 ? booking.getVenuePaymentCollectionMethod().name() : null;
 
+        String pricingTypeName = booking.getPricingType() != null
+                ? booking.getPricingType().name()
+                : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name();
+
         BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
+                .pricePerPerson(pricePerPerson)
+                .numberOfPersons(numberOfPersons)
                 .slotSubtotal(slotSubtotal)
                 .platformFeePercent(platformFeeRate)
                 .platformFee(platformFee)
@@ -1115,6 +1189,8 @@ public class SlotBookingService {
                 .bookingDate(booking.getBookingDate())
                 .createdAt(booking.getCreatedAt())
                 .amountBreakdown(amountBreakdown)
+                .pricingType(pricingTypeName)
+                .numberOfPersons(numberOfPersons)
                 .status(booking.getStatus().name())
                 .build();
     }
@@ -1266,11 +1342,34 @@ public class SlotBookingService {
         log.info("Selected resource {} ({}) for admin manual booking - Allocation: {}",
                 availableResource.getName(), availableResource.getId(), allocationReason);
 
+        // ── PER_PERSON: validate numberOfPersons ────────────────────────────────
+        com.hitendra.turf_booking_backend.entity.PricingType pricingType =
+                availableResource.getPricingType() != null
+                        ? availableResource.getPricingType()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT;
+
+        int persons = 1;
+        if (pricingType == com.hitendra.turf_booking_backend.entity.PricingType.PER_PERSON) {
+            if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
+                throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
+            }
+            if (availableResource.getMaxPersonAllowed() != null
+                    && request.getNumberOfPersons() > availableResource.getMaxPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") exceeds the allowed limit of " + availableResource.getMaxPersonAllowed());
+            }
+            persons = request.getNumberOfPersons();
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
         // Calculate total amount using quoted prices from payloads
+        // For PER_PERSON: quotedPrice is the unit price (person count unknown at browse time)
+        // so we multiply by persons here
         double totalAmount = 0.0;
         for (SlotKeyPayload payload : payloads) {
             double slotPrice = payload.getQuotedPrice() != null ? payload.getQuotedPrice() : 0.0;
-            totalAmount += slotPrice;
+            totalAmount += slotPrice * persons;
         }
 
         // Round to 2 decimal places
@@ -1309,6 +1408,8 @@ public class SlotBookingService {
                 .paymentSource(PaymentSource.BY_ADMIN) // Mark as admin-created
                 .idempotencyKey(idempotencyKey)
                 .paymentStatusEnum(PaymentStatus.SUCCESS) // Mark payment as complete
+                .pricingType(pricingType)
+                .numberOfPersons(persons)
                 .build();
 
         Booking savedBooking = bookingRepository.save(booking);

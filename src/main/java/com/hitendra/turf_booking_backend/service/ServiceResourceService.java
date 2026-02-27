@@ -1,6 +1,9 @@
 package com.hitendra.turf_booking_backend.service;
 
 import com.hitendra.turf_booking_backend.dto.service.CreateServiceResourceRequest;
+import com.hitendra.turf_booking_backend.dto.service.ResourceDetailDto;
+import com.hitendra.turf_booking_backend.dto.service.ResourcePriceRuleDto;
+import com.hitendra.turf_booking_backend.dto.service.ResourceSlotConfigDto;
 import com.hitendra.turf_booking_backend.dto.service.ServiceResourceDto;
 import com.hitendra.turf_booking_backend.dto.service.UpdateServiceResourceRequest;
 import com.hitendra.turf_booking_backend.entity.*;
@@ -22,6 +25,7 @@ public class ServiceResourceService {
     private final ServiceRepository serviceRepository;
     private final ResourceSlotConfigRepository resourceSlotConfigRepository;
     private final ActivityRepository activityRepository;
+    private final ResourcePriceRuleRepository priceRuleRepository;
 
     /**
      * Get all resources for a service
@@ -80,6 +84,10 @@ public class ServiceResourceService {
                 .name(request.getName())
                 .description(request.getDescription())
                 .enabled(request.getEnabled() != null ? request.getEnabled() : true)
+                .pricingType(request.getPricingType() != null
+                        ? request.getPricingType()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT)
+                .maxPersonAllowed(request.getMaxPersonAllowed())
                 .activities(new ArrayList<>())
                 .build();
 
@@ -148,6 +156,14 @@ public class ServiceResourceService {
             resource.setEnabled(request.getEnabled());
         }
 
+        if (request.getPricingType() != null) {
+            resource.setPricingType(request.getPricingType());
+        }
+
+        if (request.getMaxPersonAllowed() != null) {
+            resource.setMaxPersonAllowed(request.getMaxPersonAllowed());
+        }
+
         ServiceResource saved = serviceResourceRepository.save(resource);
         log.info("Updated resource {}", saved.getId());
         return convertToDto(saved);
@@ -202,6 +218,79 @@ public class ServiceResourceService {
                 .description(resource.getDescription())
                 .enabled(resource.isEnabled())
                 .activities(resource.getActivities())
+                .pricingType(resource.getPricingType() != null ? resource.getPricingType().name() : "PER_SLOT")
+                .maxPersonAllowed(resource.getMaxPersonAllowed())
+                .build();
+    }
+
+    /**
+     * Get the complete detail of a single resource — manager only.
+     * Includes slot configuration and ALL price rules (enabled + disabled).
+     */
+    @Transactional(readOnly = true)
+    public ResourceDetailDto getResourceDetail(Long resourceId) {
+        ServiceResource resource = serviceResourceRepository.findById(resourceId)
+                .orElseThrow(() -> new RuntimeException("Resource not found with id: " + resourceId));
+        return convertToDetailDto(resource);
+    }
+
+    /**
+     * Build a ResourceDetailDto for a resource entity.
+     * Used both by getResourceDetail and when embedding inside ServiceDetailDto.
+     */
+    public ResourceDetailDto convertToDetailDto(ServiceResource resource) {
+        // Slot config (may be null if not yet configured)
+        ResourceSlotConfigDto slotConfigDto = null;
+        if (resource.getSlotConfig() != null) {
+            ResourceSlotConfig cfg = resource.getSlotConfig();
+            int totalSlots = cfg.getSlotDurationMinutes() > 0
+                    ? (int) (java.time.Duration.between(cfg.getOpeningTime(), cfg.getClosingTime()).toMinutes()
+                             / cfg.getSlotDurationMinutes())
+                    : 0;
+            slotConfigDto = ResourceSlotConfigDto.builder()
+                    .id(cfg.getId())
+                    .resourceId(resource.getId())
+                    .resourceName(resource.getName())
+                    .openingTime(cfg.getOpeningTime())
+                    .closingTime(cfg.getClosingTime())
+                    .slotDurationMinutes(cfg.getSlotDurationMinutes())
+                    .basePrice(cfg.getBasePrice())
+                    .enabled(cfg.isEnabled())
+                    .totalSlots(totalSlots)
+                    .build();
+        }
+
+        // All price rules (enabled + disabled), ordered by priority desc
+        List<ResourcePriceRuleDto> priceRuleDtos = priceRuleRepository
+                .findByResourceSlotConfig_Resource_IdOrderByPriorityDesc(resource.getId())
+                .stream()
+                .map(rule -> ResourcePriceRuleDto.builder()
+                        .id(rule.getId())
+                        .resourceId(resource.getId())
+                        .resourceName(resource.getName())
+                        .dayType(rule.getDayType())
+                        .startTime(rule.getStartTime())
+                        .endTime(rule.getEndTime())
+                        .basePrice(rule.getBasePrice())
+                        .extraCharge(rule.getExtraCharge())
+                        .reason(rule.getReason())
+                        .priority(rule.getPriority())
+                        .enabled(rule.isEnabled())
+                        .build())
+                .collect(Collectors.toList());
+
+        return ResourceDetailDto.builder()
+                .id(resource.getId())
+                .serviceId(resource.getService().getId())
+                .serviceName(resource.getService().getName())
+                .name(resource.getName())
+                .description(resource.getDescription())
+                .enabled(resource.isEnabled())
+                .pricingType(resource.getPricingType() != null ? resource.getPricingType().name() : "PER_SLOT")
+                .maxPersonAllowed(resource.getMaxPersonAllowed())
+                .activities(resource.getActivities())
+                .slotConfig(slotConfigDto)
+                .priceRules(priceRuleDtos)
                 .build();
     }
 }

@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -227,7 +228,7 @@ public class AdminFinancialService {
      */
     @Transactional
     public SettlementDto settleAmount(Long adminId, BigDecimal amount,
-                                      SettlementPaymentMode paymentMode, String reference) {
+                                      SettlementPaymentMode paymentMode, String reference, String notes) {
         log.info("Settling amount for adminId={}: amount={}, mode={}", adminId, amount, paymentMode);
 
         AdminProfile admin = loadWithLock(adminId);
@@ -261,6 +262,8 @@ public class AdminFinancialService {
                 .status(SettlementStatus.SUCCESS)
                 .settledByManagerId(managerId)
                 .settlementReference(reference)
+                .notes(notes)
+                .pendingAfterSettlement(admin.getPendingOnlineAmount())
                 .build());
 
         financialTransactionRepository.save(FinancialTransaction.builder()
@@ -502,6 +505,178 @@ public class AdminFinancialService {
                 .collect(Collectors.toList());
     }
 
+    // ─── Combined Ledger (CASH + BANK) ────────────────────────────────────────
+
+    /**
+     * Returns a combined (CASH + BANK) paginated ledger for a specific admin.
+     * Optionally filtered by date range.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminLedgerEntryDto> getAdminCombinedLedger(
+            Long adminId, Instant from, Instant to, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AdminLedger> ledgerPage;
+        if (from != null && to != null) {
+            ledgerPage = adminLedgerRepository.findByAdminIdAndDateRange(adminId, from, to, pageable);
+        } else {
+            ledgerPage = adminLedgerRepository.findByAdminIdOrderByCreatedAtDesc(adminId, pageable);
+        }
+        return new PaginatedResponse<>(
+                ledgerPage.getContent().stream().map(this::mapToLedgerEntryDto).collect(Collectors.toList()),
+                ledgerPage.getNumber(), ledgerPage.getSize(),
+                ledgerPage.getTotalElements(), ledgerPage.getTotalPages(), ledgerPage.isLast());
+    }
+
+    /**
+     * Returns filtered (by type) paginated ledger for a specific admin, with optional date range.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<AdminLedgerEntryDto> getAdminLedgerWithDateRange(
+            Long adminId, AdminLedgerType ledgerType, Instant from, Instant to, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<AdminLedger> ledgerPage;
+        if (from != null && to != null) {
+            ledgerPage = adminLedgerRepository.findByAdminIdAndLedgerTypeAndDateRange(adminId, ledgerType, from, to, pageable);
+        } else {
+            ledgerPage = adminLedgerRepository.findByAdminIdAndLedgerTypeOrderByCreatedAtDesc(adminId, ledgerType, pageable);
+        }
+        return new PaginatedResponse<>(
+                ledgerPage.getContent().stream().map(this::mapToLedgerEntryDto).collect(Collectors.toList()),
+                ledgerPage.getNumber(), ledgerPage.getSize(),
+                ledgerPage.getTotalElements(), ledgerPage.getTotalPages(), ledgerPage.isLast());
+    }
+
+    // ─── Manager Global Summary ───────────────────────────────────────────────
+
+    /**
+     * Aggregated financial summary across ALL admins — manager global dashboard.
+     */
+    @Transactional(readOnly = true)
+    public ManagerGlobalFinancialSummaryDto getManagerGlobalSummary() {
+        List<AdminProfile> admins = adminProfileRepository.findAll();
+
+        BigDecimal totalPending = BigDecimal.ZERO;
+        BigDecimal totalSettled = BigDecimal.ZERO;
+        BigDecimal totalCash = BigDecimal.ZERO;
+        BigDecimal totalBank = BigDecimal.ZERO;
+        BigDecimal totalPlatformOnline = BigDecimal.ZERO;
+        BigDecimal totalCashCollected = BigDecimal.ZERO;
+        BigDecimal totalBankCollected = BigDecimal.ZERO;
+        long adminsWithPending = 0;
+
+        for (AdminProfile admin : admins) {
+            BigDecimal pending = safe(admin.getPendingOnlineAmount());
+            if (pending.compareTo(BigDecimal.ZERO) > 0) adminsWithPending++;
+            totalPending = totalPending.add(pending);
+            totalSettled = totalSettled.add(safe(admin.getTotalSettledAmount()));
+            totalCash = totalCash.add(safe(admin.getCashBalance()));
+            totalBank = totalBank.add(safe(admin.getBankBalance()));
+            totalPlatformOnline = totalPlatformOnline.add(safe(admin.getTotalPlatformOnlineCollected()));
+            totalCashCollected = totalCashCollected.add(safe(admin.getTotalCashCollected()));
+            totalBankCollected = totalBankCollected.add(safe(admin.getTotalBankCollected()));
+        }
+
+        return ManagerGlobalFinancialSummaryDto.builder()
+                .adminsWithPendingBalance(adminsWithPending)
+                .totalPendingOnlineAmount(totalPending)
+                .totalSettledAmount(totalSettled)
+                .totalCashBalance(totalCash)
+                .totalBankBalance(totalBank)
+                .totalPlatformOnlineCollected(totalPlatformOnline)
+                .totalCashCollected(totalCashCollected)
+                .totalBankCollected(totalBankCollected)
+                .build();
+    }
+
+    // ─── Manager Global Settlement Ledger ─────────────────────────────────────
+
+    /**
+     * Paginated settlement ledger across ALL admins — manager's complete settlement history.
+     * Optionally filtered by date range.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<ManagerSettlementLedgerEntryDto> getManagerSettlementLedger(
+            Instant from, Instant to, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Settlement> settlementPage;
+        if (from != null && to != null) {
+            settlementPage = settlementRepository.findAllByDateRange(from, to, pageable);
+        } else {
+            settlementPage = settlementRepository.findAllOrderByCreatedAtDesc(pageable);
+        }
+        return new PaginatedResponse<>(
+                settlementPage.getContent().stream()
+                        .map(this::mapToManagerSettlementLedgerEntry)
+                        .collect(Collectors.toList()),
+                settlementPage.getNumber(), settlementPage.getSize(),
+                settlementPage.getTotalElements(), settlementPage.getTotalPages(), settlementPage.isLast());
+    }
+
+    /**
+     * Paginated settlement ledger for a SINGLE admin, with optional date range.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponse<ManagerSettlementLedgerEntryDto> getAdminSettlementLedger(
+            Long adminId, Instant from, Instant to, int page, int size) {
+        if (!adminProfileRepository.existsById(adminId)) {
+            throw new BookingException("Admin not found: " + adminId);
+        }
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Settlement> settlementPage;
+        if (from != null && to != null) {
+            settlementPage = settlementRepository.findByAdminIdAndDateRange(adminId, from, to, pageable);
+        } else {
+            settlementPage = settlementRepository.findByAdminIdOrderByCreatedAtDesc(adminId, pageable);
+        }
+        return new PaginatedResponse<>(
+                settlementPage.getContent().stream()
+                        .map(this::mapToManagerSettlementLedgerEntry)
+                        .collect(Collectors.toList()),
+                settlementPage.getNumber(), settlementPage.getSize(),
+                settlementPage.getTotalElements(), settlementPage.getTotalPages(), settlementPage.isLast());
+    }
+
+    /**
+     * Update notes/remarks on an existing settlement record.
+     */
+    @Transactional
+    public SettlementDto updateSettlementNotes(Long settlementId, String notes) {
+        Settlement settlement = settlementRepository.findById(settlementId)
+                .orElseThrow(() -> new BookingException("Settlement not found: " + settlementId));
+        settlement.setNotes(notes);
+        settlementRepository.save(settlement);
+        AdminProfile admin = settlement.getAdmin();
+        return mapToSettlementDto(settlement, admin);
+    }
+
+    /**
+     * Get a single settlement by ID.
+     */
+    @Transactional(readOnly = true)
+    public SettlementDto getSettlementById(Long settlementId) {
+        Settlement settlement = settlementRepository.findById(settlementId)
+                .orElseThrow(() -> new BookingException("Settlement not found: " + settlementId));
+        return mapToSettlementDto(settlement, settlement.getAdmin());
+    }
+
+    // ─── Pending Balance Management ──────────────────────────────────────────
+
+    /**
+     * Enhanced due summary with business name and full breakdown.
+     */
+    @Transactional(readOnly = true)
+    public List<AdminDueSummaryDto> getAllAdminDueSummaryEnhanced() {
+        return adminProfileRepository.findAll().stream()
+                .map(admin -> AdminDueSummaryDto.builder()
+                        .adminId(admin.getId())
+                        .adminName(admin.getUser() != null ? admin.getUser().getName() : "Unknown")
+                        .pendingOnlineAmount(safe(admin.getPendingOnlineAmount()))
+                        .totalSettled(safe(admin.getTotalSettledAmount()))
+                        .build())
+                .filter(dto -> dto.getPendingOnlineAmount().compareTo(BigDecimal.ZERO) > 0)
+                .collect(Collectors.toList());
+    }
+
     // ─── Mapping Helpers ──────────────────────────────────────────────────────
 
     private AdminFinancialOverviewDto mapToOverviewDto(AdminProfile admin) {
@@ -531,6 +706,8 @@ public class AdminFinancialService {
                 .status(s.getStatus())
                 .settledByManagerId(s.getSettledByManagerId())
                 .settlementReference(s.getSettlementReference())
+                .notes(s.getNotes())
+                .pendingAfterSettlement(s.getPendingAfterSettlement())
                 .createdAt(s.getCreatedAt())
                 .build();
     }
@@ -546,6 +723,24 @@ public class AdminFinancialService {
                 .referenceType(entry.getReferenceType())
                 .referenceId(entry.getReferenceId())
                 .createdAt(entry.getCreatedAt())
+                .build();
+    }
+
+    private ManagerSettlementLedgerEntryDto mapToManagerSettlementLedgerEntry(Settlement s) {
+        AdminProfile admin = s.getAdmin();
+        return ManagerSettlementLedgerEntryDto.builder()
+                .settlementId(s.getId())
+                .adminId(admin.getId())
+                .adminName(admin.getUser() != null ? admin.getUser().getName() : "Unknown")
+                .adminBusinessName(admin.getBusinessName())
+                .amount(s.getAmount())
+                .pendingAfter(s.getPendingAfterSettlement())
+                .paymentMode(s.getPaymentMode())
+                .status(s.getStatus())
+                .settledByManagerId(s.getSettledByManagerId())
+                .settlementReference(s.getSettlementReference())
+                .notes(s.getNotes())
+                .createdAt(s.getCreatedAt())
                 .build();
     }
 }

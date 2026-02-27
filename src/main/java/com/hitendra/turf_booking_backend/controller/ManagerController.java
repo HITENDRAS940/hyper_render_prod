@@ -9,6 +9,8 @@ import com.hitendra.turf_booking_backend.dto.financial.AdminDueSummaryDto;
 import com.hitendra.turf_booking_backend.dto.financial.AdminFinancialOverviewDto;
 import com.hitendra.turf_booking_backend.dto.financial.AdminLedgerEntryDto;
 import com.hitendra.turf_booking_backend.dto.financial.FinancialTransactionDto;
+import com.hitendra.turf_booking_backend.dto.financial.ManagerGlobalFinancialSummaryDto;
+import com.hitendra.turf_booking_backend.dto.financial.ManagerSettlementLedgerEntryDto;
 import com.hitendra.turf_booking_backend.dto.financial.SettleRequest;
 import com.hitendra.turf_booking_backend.dto.financial.SettlementDto;
 import com.hitendra.turf_booking_backend.entity.AdminLedgerType;
@@ -32,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -108,6 +111,25 @@ public class ManagerController {
             @RequestParam(defaultValue = "10") int size) {
         PaginatedResponse<ServiceCardDto> services = serviceService.getAllServicesCard(page, size);
         return ResponseEntity.ok(services);
+    }
+
+    @GetMapping("/services/{serviceId}/detail")
+    @Operation(
+        summary = "Get complete service detail",
+        description = "Returns every field of the service including all resources, " +
+                      "each resource's slot configuration, and ALL price rules (enabled + disabled). " +
+                      "Manager-only endpoint.")
+    public ResponseEntity<ServiceDetailDto> getServiceDetail(@PathVariable Long serviceId) {
+        return ResponseEntity.ok(serviceService.getServiceDetail(serviceId));
+    }
+
+    @GetMapping("/resources/{resourceId}/detail")
+    @Operation(
+        summary = "Get complete resource detail",
+        description = "Returns every field of a resource including its slot configuration " +
+                      "and ALL price rules (enabled + disabled). Manager-only endpoint.")
+    public ResponseEntity<ResourceDetailDto> getResourceDetail(@PathVariable Long resourceId) {
+        return ResponseEntity.ok(serviceResourceService.getResourceDetail(resourceId));
     }
 
     @GetMapping("/admins/{adminProfileId}/services")
@@ -445,6 +467,15 @@ public class ManagerController {
 
     // ==================== Financial Management ====================
 
+    @GetMapping("/finance/summary")
+    @Operation(summary = "Global financial summary (all admins)",
+               description = "Returns aggregate financial totals across ALL admins: total pending, total settled, " +
+                       "total cash/bank balances, total platform-collected online amounts. " +
+                       "Use as the manager's top-level financial dashboard widget.")
+    public ResponseEntity<ManagerGlobalFinancialSummaryDto> getManagerGlobalFinancialSummary() {
+        return ResponseEntity.ok(adminFinancialService.getManagerGlobalSummary());
+    }
+
     @GetMapping("/admins/due-summary")
     @Operation(summary = "Get all admin due summary",
                description = "Returns a list of all admins with their pending online amounts (platform owes them) " +
@@ -452,6 +483,14 @@ public class ManagerController {
     public ResponseEntity<List<AdminDueSummaryDto>> getAllAdminDueSummary() {
         List<AdminDueSummaryDto> summary = adminFinancialService.getAllAdminDueSummary();
         return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/admins/pending-due-summary")
+    @Operation(summary = "Get admins with pending balance only",
+               description = "Returns only admins that currently have a non-zero pendingOnlineAmount. " +
+                       "Useful to quickly identify which admins need to be settled.")
+    public ResponseEntity<List<AdminDueSummaryDto>> getAdminsWithPendingBalance() {
+        return ResponseEntity.ok(adminFinancialService.getAllAdminDueSummaryEnhanced());
     }
 
     @GetMapping("/admin/{id}/finance")
@@ -468,7 +507,8 @@ public class ManagerController {
                description = "Transfer pending online amount to admin's bank. " +
                        "Cannot exceed the admin's current pendingOnlineAmount. " +
                        "Updates: pendingOnlineAmount--, bankBalance++, totalSettledAmount++. " +
-                       "Creates an immutable Settlement record and FinancialTransaction audit entry.")
+                       "Creates an immutable Settlement record and FinancialTransaction audit entry. " +
+                       "Accepts optional notes/remarks for the settlement record.")
     public ResponseEntity<SettlementDto> settleAmount(
             @PathVariable Long id,
             @Valid @RequestBody SettleRequest request) {
@@ -476,31 +516,102 @@ public class ManagerController {
                 id,
                 request.getAmount(),
                 request.getPaymentMode(),
-                request.getSettlementReference()
+                request.getSettlementReference(),
+                request.getNotes()
         );
         return ResponseEntity.ok(settlement);
     }
 
-    @GetMapping("/admins/{adminId}/ledger/cash")
-    @Operation(summary = "Get admin cash ledger (manager view)",
-            description = "Manager can view a specific admin's CASH ledger history (credits and debits with running balance).")
-    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminCashLedger(
-            @PathVariable Long adminId,
+    @GetMapping("/settlements/{settlementId}")
+    @Operation(summary = "Get settlement by ID",
+               description = "Fetch a specific settlement record by its ID.")
+    public ResponseEntity<SettlementDto> getSettlementById(@PathVariable Long settlementId) {
+        return ResponseEntity.ok(adminFinancialService.getSettlementById(settlementId));
+    }
+
+    @PatchMapping("/settlements/{settlementId}/notes")
+    @Operation(summary = "Update settlement notes",
+               description = "Add or update the notes/remarks on an existing settlement record. " +
+                       "Useful for recording the UTR, bank reference, or any follow-up remarks.")
+    public ResponseEntity<SettlementDto> updateSettlementNotes(
+            @PathVariable Long settlementId,
+            @RequestParam String notes) {
+        return ResponseEntity.ok(adminFinancialService.updateSettlementNotes(settlementId, notes));
+    }
+
+    // ─── Manager Settlement Ledger ────────────────────────────────────────────
+
+    @GetMapping("/finance/settlement-ledger")
+    @Operation(summary = "Manager global settlement ledger",
+               description = "Complete paginated ledger of ALL settlements across ALL admins, newest first. " +
+                       "Optionally filter by date range using `from` and `to` ISO-8601 timestamps. " +
+                       "Example: ?from=2025-01-01T00:00:00Z&to=2025-12-31T23:59:59Z")
+    public ResponseEntity<PaginatedResponse<ManagerSettlementLedgerEntryDto>> getManagerSettlementLedger(
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
-                adminFinancialService.getLedgerHistory(adminId, AdminLedgerType.CASH, page, size));
+                adminFinancialService.getManagerSettlementLedger(from, to, page, size));
+    }
+
+    @GetMapping("/admins/{adminId}/settlement-ledger")
+    @Operation(summary = "Admin settlement ledger (manager view)",
+               description = "Complete paginated settlement history for a specific admin as a rich ledger entry " +
+                       "(includes pendingAfter snapshot and notes). " +
+                       "Optionally filter by date range using `from` and `to` ISO-8601 timestamps.")
+    public ResponseEntity<PaginatedResponse<ManagerSettlementLedgerEntryDto>> getAdminSettlementLedger(
+            @PathVariable Long adminId,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getAdminSettlementLedger(adminId, from, to, page, size));
+    }
+
+    // ─── Admin Ledger Endpoints ───────────────────────────────────────────────
+
+    @GetMapping("/admins/{adminId}/ledger")
+    @Operation(summary = "Get admin combined ledger (CASH + BANK) - manager view",
+               description = "Returns a unified paginated ledger combining both CASH and BANK entries for a specific admin, " +
+                       "ordered newest first. Optionally filter by date range using ISO-8601 `from`/`to` timestamps.")
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminCombinedLedger(
+            @PathVariable Long adminId,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getAdminCombinedLedger(adminId, from, to, page, size));
+    }
+
+    @GetMapping("/admins/{adminId}/ledger/cash")
+    @Operation(summary = "Get admin cash ledger (manager view)",
+            description = "Manager can view a specific admin's CASH ledger history (credits and debits with running balance). " +
+                    "Optionally filter by date range using ISO-8601 `from`/`to` timestamps.")
+    public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminCashLedger(
+            @PathVariable Long adminId,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+                adminFinancialService.getAdminLedgerWithDateRange(adminId, AdminLedgerType.CASH, from, to, page, size));
     }
 
     @GetMapping("/admins/{adminId}/ledger/bank")
     @Operation(summary = "Get admin bank ledger (manager view)",
-            description = "Manager can view a specific admin's BANK ledger history (credits and debits with running balance).")
+            description = "Manager can view a specific admin's BANK ledger history (credits and debits with running balance). " +
+                    "Optionally filter by date range using ISO-8601 `from`/`to` timestamps.")
     public ResponseEntity<PaginatedResponse<AdminLedgerEntryDto>> getAdminBankLedger(
             @PathVariable Long adminId,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
-                adminFinancialService.getLedgerHistory(adminId, AdminLedgerType.BANK, page, size));
+                adminFinancialService.getAdminLedgerWithDateRange(adminId, AdminLedgerType.BANK, from, to, page, size));
     }
 
     @GetMapping("/admins/{adminId}/settlements")

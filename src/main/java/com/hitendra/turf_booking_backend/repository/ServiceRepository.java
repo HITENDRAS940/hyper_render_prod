@@ -194,4 +194,10 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
      */
     @Query("SELECT s.createdBy.user.id FROM Service s WHERE s.id = :serviceId")
     List<Long> findAdminIdsByServiceId(@Param("serviceId") Long serviceId);
+
+    /**
+     * Find all services that have a Google Place ID configured (for scheduled rating sync).
+     */
+    @Query("SELECT s FROM Service s WHERE s.googlePlaceId IS NOT NULL AND s.googlePlaceId != ''")
+    List<Service> findAllWithGooglePlaceId();
 }

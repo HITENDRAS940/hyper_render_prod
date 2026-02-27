@@ -38,6 +38,25 @@ public class ServiceResource {
     @Builder.Default
     private boolean enabled = true;
 
+    /**
+     * Pricing strategy for this resource.
+     * PER_SLOT  - flat rate per slot (e.g. Turf).
+     * PER_PERSON - price multiplied by number of persons (e.g. Bowling, PS5).
+     * Defaults to PER_SLOT for backward compatibility.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricing_type", nullable = false)
+    @Builder.Default
+    private PricingType pricingType = PricingType.PER_SLOT;
+
+    /**
+     * Maximum number of persons allowed per booking.
+     * Only meaningful when pricingType = PER_PERSON.
+     * Null means no upper limit (only @Min(1) is enforced on input).
+     */
+    @Column(name = "max_person_allowed")
+    private Integer maxPersonAllowed;
+
     // Slot configuration for this resource (slots generated dynamically)
     @OneToOne(mappedBy = "resource", cascade = CascadeType.ALL, orphanRemoval = true)
     private ResourceSlotConfig slotConfig;

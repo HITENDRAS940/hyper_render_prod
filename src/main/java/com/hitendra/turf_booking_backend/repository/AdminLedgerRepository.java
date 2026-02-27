@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
+import java.time.Instant;
 
 @Repository
 public interface AdminLedgerRepository extends JpaRepository<AdminLedger, Long> {
@@ -19,6 +19,37 @@ public interface AdminLedgerRepository extends JpaRepository<AdminLedger, Long> 
      */
     Page<AdminLedger> findByAdminIdAndLedgerTypeOrderByCreatedAtDesc(
             Long adminId, AdminLedgerType ledgerType, Pageable pageable);
+
+    /**
+     * Paginated ledger entries for a specific admin (both CASH + BANK combined, newest first).
+     */
+    Page<AdminLedger> findByAdminIdOrderByCreatedAtDesc(Long adminId, Pageable pageable);
+
+    /**
+     * Paginated ledger entries for a specific admin + ledger type within a date range (newest first).
+     */
+    @Query("SELECT al FROM AdminLedger al WHERE al.admin.id = :adminId " +
+           "AND al.ledgerType = :ledgerType " +
+           "AND al.createdAt >= :from AND al.createdAt <= :to " +
+           "ORDER BY al.createdAt DESC, al.id DESC")
+    Page<AdminLedger> findByAdminIdAndLedgerTypeAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("ledgerType") AdminLedgerType ledgerType,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            Pageable pageable);
+
+    /**
+     * Paginated combined (CASH + BANK) ledger entries for a specific admin within a date range.
+     */
+    @Query("SELECT al FROM AdminLedger al WHERE al.admin.id = :adminId " +
+           "AND al.createdAt >= :from AND al.createdAt <= :to " +
+           "ORDER BY al.createdAt DESC, al.id DESC")
+    Page<AdminLedger> findByAdminIdAndDateRange(
+            @Param("adminId") Long adminId,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            Pageable pageable);
 
     /**
      * Latest entry for a specific admin + ledger type — used for running balance.

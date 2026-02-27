@@ -58,6 +58,14 @@ public class Settlement {
     @Column(name = "settlement_reference")
     private String settlementReference;
 
+    /** Optional notes or remarks added by the manager for this settlement. */
+    @Column(name = "notes", length = 1000)
+    private String notes;
+
+    /** Admin's pending online amount AFTER this settlement was applied (snapshot). */
+    @Column(name = "pending_after_settlement", precision = 19, scale = 2)
+    private BigDecimal pendingAfterSettlement;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant createdAt = Instant.now();

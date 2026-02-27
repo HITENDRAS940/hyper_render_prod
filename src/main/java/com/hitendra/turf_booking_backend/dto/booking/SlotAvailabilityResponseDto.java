@@ -21,6 +21,21 @@ import java.util.List;
 public class SlotAvailabilityResponseDto {
 
     /**
+     * Pricing strategy of the resource pool for this activity.
+     * "PER_SLOT"   — price is flat per slot; numberOfPersons is not required.
+     * "PER_PERSON" — price is multiplied by numberOfPersons; frontend should
+     *                prompt the user to enter headcount before booking.
+     */
+    private String pricingType;
+
+    /**
+     * Maximum number of persons allowed per booking.
+     * Only populated when pricingType = "PER_PERSON".
+     * Null means no upper limit.
+     */
+    private Integer maxPersonAllowed;
+
+    /**
      * List of aggregated slots with availability counts
      */
     private List<SlotDto> slots;

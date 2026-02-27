@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -57,5 +58,13 @@ public class AdminManualBookingRequestDto {
      * Notes/remarks for this booking
      */
     private String remarks;
+
+    /**
+     * Number of persons for PER_PERSON pricing resources (e.g. PS5, Bowling).
+     * Required when the resource's pricingType = PER_PERSON.
+     * Ignored (treated as 1) for PER_SLOT resources.
+     */
+    @Min(value = 1, message = "Number of persons must be at least 1")
+    private Integer numberOfPersons;
 }
 

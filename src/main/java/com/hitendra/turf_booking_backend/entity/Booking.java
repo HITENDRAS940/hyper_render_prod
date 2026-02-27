@@ -165,4 +165,20 @@ public class Booking {
     @Column(name = "transfer_status")
     @Builder.Default
     private TransferStatus transferStatus = TransferStatus.PENDING;
+
+    /**
+     * Snapshot of the resource's pricing type at booking creation time.
+     * Stored so historical bookings remain correct even if the resource
+     * pricing type is changed later.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pricing_type")
+    private com.hitendra.turf_booking_backend.entity.PricingType pricingType;
+
+    /**
+     * Number of persons for this booking.
+     * Populated only for PER_PERSON bookings; null / 1 for PER_SLOT bookings.
+     */
+    @Column(name = "number_of_persons")
+    private Integer numberOfPersons;
 }

@@ -174,6 +174,20 @@ public class RefundService {
                     .build();
         }
 
+        // Check if the service allows cancellations / refunds
+        if (booking.getService() != null && !booking.getService().isRefundAllowed()) {
+            return RefundPreviewDto.builder()
+                    .canCancel(false)
+                    .bookingId(bookingId)
+                    .bookingReference(reference)
+                    .originalAmount(originalAmount)
+                    .refundAmount(BigDecimal.ZERO)
+                    .refundPercent(0)
+                    .deductionAmount(originalAmount)
+                    .reasonNotAllowed("Cancellation is not allowed for this service")
+                    .build();
+        }
+
         // Check booking status - only CONFIRMED bookings can be cancelled for refund
         if (booking.getStatus() != BookingStatus.CONFIRMED) {
             String reason = getStatusReasonMessage(booking.getStatus());

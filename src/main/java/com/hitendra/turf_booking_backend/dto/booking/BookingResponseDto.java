@@ -27,6 +27,11 @@ public class BookingResponseDto {
     // Price breakdown details
     private AmountBreakdown amountBreakdown;
 
+    /** Pricing model: PER_SLOT or PER_PERSON */
+    private String pricingType;
+
+    /** Number of persons included in this booking (≥1; relevant for PER_PERSON pricing) */
+    private Integer numberOfPersons;
 
     private String bookingType; // SINGLE_RESOURCE or MULTI_RESOURCE
     private String message;     // For PARTIAL_AVAILABLE or error messages
@@ -51,7 +56,9 @@ public class BookingResponseDto {
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class AmountBreakdown {
-        private Double slotSubtotal;       // Base price of slots (without any fees)
+        private Double pricePerPerson;     // Base price per person / per slot (before person multiplier)
+        private Integer numberOfPersons;   // Number of persons (1 for PER_SLOT bookings)
+        private Double slotSubtotal;       // Base price of slots × numberOfPersons (without platform fee)
         private Double platformFeePercent; // Platform fee percentage (2%)
         private Double platformFee;        // Platform fee amount (2% of subtotal)
         private Double totalAmount;        // Final amount to pay (slotSubtotal + platformFee)

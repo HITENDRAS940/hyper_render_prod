@@ -11,28 +11,33 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Response DTO for a settlement record.
+ * A single settlement record as viewed in the manager's settlement ledger.
+ * Includes admin context for cross-admin ledger views.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SettlementDto {
+public class ManagerSettlementLedgerEntryDto {
 
-    private Long id;
+    private Long settlementId;
+
     private Long adminId;
     private String adminName;
+    private String adminBusinessName;
+
     private BigDecimal amount;
+
+    /** Remaining pending amount for this admin AFTER this settlement. */
+    private BigDecimal pendingAfter;
+
     private SettlementPaymentMode paymentMode;
     private SettlementStatus status;
     private Long settledByManagerId;
     private String settlementReference;
 
-    /** Optional manager notes for this settlement. */
+    /** Optional notes/remarks added by the manager. */
     private String notes;
-
-    /** Admin's pending amount remaining after this settlement. */
-    private BigDecimal pendingAfterSettlement;
 
     private Instant createdAt;
 }

@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.dto.booking;
 
+import jakarta.validation.constraints.Min;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,6 +40,14 @@ public class SlotBookingRequestDto {
      * All booking details (serviceId, activityCode, date, time) are decoded from slotKeys.
      */
     private String paymentMethod;
+
+    /**
+     * Number of persons for PER_PERSON pricing resources (e.g. PS5, Bowling).
+     * Required when the resource's pricingType = PER_PERSON.
+     * Ignored (treated as 1) for PER_SLOT resources.
+     */
+    @Min(value = 1, message = "Number of persons must be at least 1")
+    private Integer numberOfPersons;
 }
 
 

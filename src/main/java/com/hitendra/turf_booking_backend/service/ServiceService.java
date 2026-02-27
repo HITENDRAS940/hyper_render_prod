@@ -37,6 +37,8 @@ public class ServiceService {
     private final ServiceResourceRepository serviceResourceRepository;
     private final ResourceSlotConfigRepository resourceSlotConfigRepository;
     private final ActivityRepository activityRepository;
+    private final GooglePlacesService googlePlacesService;
+    private final ServiceResourceService serviceResourceService;
 
     /**
      * Get all services without pagination.
@@ -132,6 +134,61 @@ public class ServiceService {
     }
 
     /**
+     * Get the complete detail of a service — manager only.
+     * Includes every service field plus each resource's slot config and all price rules.
+     */
+    @Transactional(readOnly = true)
+    public ServiceDetailDto getServiceDetail(Long id) {
+        Service service = serviceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Service not found with id: " + id));
+
+        // Build resource detail list
+        List<ResourceDetailDto> resourceDetails = service.getResources().stream()
+                .map(serviceResourceService::convertToDetailDto)
+                .collect(Collectors.toList());
+
+        // Resolve admin info
+        Long createdByAdminId = null;
+        String createdByAdminName = null;
+        if (service.getCreatedBy() != null) {
+            createdByAdminId = service.getCreatedBy().getId();
+            if (service.getCreatedBy().getUser() != null) {
+                createdByAdminName = service.getCreatedBy().getUser().getName();
+            }
+        }
+
+        return ServiceDetailDto.builder()
+                .id(service.getId())
+                .name(service.getName())
+                .location(service.getLocation())
+                .city(service.getCity())
+                .state(service.getState())
+                .latitude(service.getLatitude())
+                .longitude(service.getLongitude())
+                .description(service.getDescription())
+                .contactNumber(service.getContactNumber())
+                .gstin(service.getGstin())
+                .startTime(service.getStartTime())
+                .endTime(service.getEndTime())
+                .availability(service.isAvailability())
+                .refundAllowed(service.isRefundAllowed())
+                .amenities(service.getAmenities())
+                .images(service.getImages())
+                .activities(service.getActivities() != null
+                        ? service.getActivities().stream()
+                                .map(Activity::getName)
+                                .collect(Collectors.toList())
+                        : List.of())
+                .googlePlaceId(service.getGooglePlaceId())
+                .googleRating(service.getGoogleRating())
+                .googleReviewCount(service.getGoogleReviewCount())
+                .createdByAdminId(createdByAdminId)
+                .createdByAdminName(createdByAdminName)
+                .resources(resourceDetails)
+                .build();
+    }
+
+    /**
      * Create service with basic details AND activities AND amenities
      * Associates specified activities with the service and sets amenities
      */
@@ -150,6 +207,8 @@ public class ServiceService {
                 .description(request.getDescription())
                 .contactNumber(request.getContactNumber())
                 .createdBy(adminProfile)
+                .refundAllowed(request.getRefundAllowed() != null ? request.getRefundAllowed() : true)
+                .googlePlaceId(request.getGooglePlaceId())
                 .images(new ArrayList<>())
                 .activities(new ArrayList<>())  // Initialize activities list
                 .amenities(new ArrayList<>())   // Initialize amenities list
@@ -162,6 +221,42 @@ public class ServiceService {
 
         // Save service first
         Service savedService = serviceRepository.save(service);
+
+        // Auto-discover Google Place and fetch rating using service name + city
+        try {
+            String placeId = request.getGooglePlaceId();
+
+            if (placeId != null && !placeId.isBlank()) {
+                // If placeId was explicitly provided, fetch rating directly
+                var ratingResponse = googlePlacesService.fetchRating(placeId);
+                if (ratingResponse != null) {
+                    savedService.setGoogleRating(ratingResponse.getRating());
+                    savedService.setGoogleReviewCount(ratingResponse.getUserRatingCount());
+                    savedService = serviceRepository.save(savedService);
+                    log.info("Google rating fetched for new service '{}' (explicit placeId): rating={}, reviews={}",
+                            savedService.getName(), ratingResponse.getRating(), ratingResponse.getUserRatingCount());
+                }
+            } else {
+                // Search by name + city to auto-discover placeId and rating
+                var searchResult = googlePlacesService.searchAndFetchRating(request.getName(), request.getCity());
+                if (searchResult != null) {
+                    savedService.setGooglePlaceId(searchResult.placeId());
+                    savedService.setGoogleRating(searchResult.rating());
+                    savedService.setGoogleReviewCount(searchResult.userRatingCount());
+                    savedService = serviceRepository.save(savedService);
+                    log.info("Google Place auto-discovered for new service '{}': placeId={}, rating={}, reviews={}",
+                            savedService.getName(), searchResult.placeId(),
+                            searchResult.rating(), searchResult.userRatingCount());
+                } else {
+                    log.info("No Google Place found for service '{}' in city '{}'",
+                            request.getName(), request.getCity());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to fetch Google rating for new service '{}': {}",
+                    savedService.getName(), e.getMessage());
+            // Don't fail service creation if rating fetch fails
+        }
 
         // Associate activities if provided
         if (request.getActivityCodes() != null && !request.getActivityCodes().isEmpty()) {
@@ -225,6 +320,36 @@ public class ServiceService {
         service.setLongitude(serviceDto.getLongitude());
         service.setDescription(serviceDto.getDescription());
         service.setContactNumber(serviceDto.getContactNumber());
+        if (serviceDto.getRefundAllowed() != null) {
+            service.setRefundAllowed(serviceDto.getRefundAllowed());
+        }
+
+        // Update Google Place ID and fetch initial rating if changed
+        if (serviceDto.getGooglePlaceId() != null) {
+            String oldPlaceId = service.getGooglePlaceId();
+            service.setGooglePlaceId(serviceDto.getGooglePlaceId());
+
+            // Fetch rating immediately if placeId is new or changed
+            if (!serviceDto.getGooglePlaceId().isBlank()
+                    && !serviceDto.getGooglePlaceId().equals(oldPlaceId)) {
+                try {
+                    var ratingResponse = googlePlacesService.fetchRating(serviceDto.getGooglePlaceId());
+                    if (ratingResponse != null) {
+                        service.setGoogleRating(ratingResponse.getRating());
+                        service.setGoogleReviewCount(ratingResponse.getUserRatingCount());
+                        log.info("Google rating updated for service '{}': rating={}, reviews={}",
+                                service.getName(), ratingResponse.getRating(), ratingResponse.getUserRatingCount());
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to fetch Google rating for service '{}': {}",
+                            service.getName(), e.getMessage());
+                }
+            } else if (serviceDto.getGooglePlaceId().isBlank()) {
+                // Clear rating if placeId is cleared
+                service.setGoogleRating(null);
+                service.setGoogleReviewCount(null);
+            }
+        }
 
         com.hitendra.turf_booking_backend.entity.Service updated = serviceRepository.save(service);
         return convertToDto(updated);
@@ -439,7 +564,10 @@ public class ServiceService {
         dto.setContactNumber(service.getContactNumber());
         dto.setImages(service.getImages());
         dto.setAvailability(service.isAvailability());
+        dto.setRefundAllowed(service.isRefundAllowed());
         dto.setAmenities(service.getAmenities());
+        dto.setGoogleRating(service.getGoogleRating());
+        dto.setGoogleReviewCount(service.getGoogleReviewCount());
 
         if (service.getActivities() != null) {
             dto.setActivities(service.getActivities().stream()
@@ -458,6 +586,8 @@ public class ServiceService {
         dto.setAvailability(service.isAvailability());
         dto.setImages(service.getImages());
         dto.setDescription(service.getDescription());
+        dto.setGoogleRating(service.getGoogleRating());
+        dto.setGoogleReviewCount(service.getGoogleReviewCount());
         return dto;
     }
 

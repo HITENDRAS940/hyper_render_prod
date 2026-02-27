@@ -16,4 +16,8 @@ public class ServiceCardDto {
     private boolean availability;
     private List<String> images;
     private String description;
+
+    // Google Places rating (cached, updated daily)
+    private Double googleRating;
+    private Integer googleReviewCount;
 }
