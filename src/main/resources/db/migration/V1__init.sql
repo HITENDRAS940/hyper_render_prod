@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS services (
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
     description TEXT,
-    contact_number VARCHAR(20),
+    contact_number VARCHAR(50),
     gstin VARCHAR(50),
     state VARCHAR(100),
     start_time TIME,

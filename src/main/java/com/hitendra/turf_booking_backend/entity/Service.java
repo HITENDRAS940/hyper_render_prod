@@ -37,7 +37,7 @@ public class Service {
     @Column
     private String description;
 
-    @Column
+    @Column(length = 50)
     private String contactNumber;
 
     @Column(name = "gstin")
