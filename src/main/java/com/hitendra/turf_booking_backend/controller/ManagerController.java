@@ -20,10 +20,10 @@ import com.hitendra.turf_booking_backend.entity.AdminLedgerType;
 import com.hitendra.turf_booking_backend.dto.revenue.AdminRevenueReportDto;
 import com.hitendra.turf_booking_backend.dto.revenue.ServiceRevenueDto;
 import com.hitendra.turf_booking_backend.dto.service.*;
+import com.hitendra.turf_booking_backend.dto.service.UpdateServiceResourceRequest;
 import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.CreateAdminRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
-import com.hitendra.turf_booking_backend.entity.BookingStatus;
 import com.hitendra.turf_booking_backend.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -187,6 +187,38 @@ public class ManagerController {
         request.setServiceId(serviceId);
         ServiceResourceDto created = serviceResourceService.createResource(request);
         return ResponseEntity.ok(created);
+    }
+
+    @PutMapping("/resources/{resourceId}")
+    @Operation(summary = "Update resource",
+               description = "Update a resource's name, description, enabled status, pricing type, or max persons allowed. " +
+                       "All fields are optional — only provided fields will be updated.")
+    public ResponseEntity<ServiceResourceDto> updateResource(
+            @PathVariable Long resourceId,
+            @Valid @RequestBody UpdateServiceResourceRequest request) {
+        ServiceResourceDto updated = serviceResourceService.updateResource(resourceId, request);
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/resources/{resourceId}")
+    @Operation(summary = "Delete resource", description = "Permanently delete a resource and all its slot configuration and price rules.")
+    public ResponseEntity<String> deleteResource(@PathVariable Long resourceId) {
+        serviceResourceService.deleteResource(resourceId);
+        return ResponseEntity.ok("Resource deleted successfully");
+    }
+
+    @PatchMapping("/resources/{resourceId}/enable")
+    @Operation(summary = "Enable resource", description = "Enable a disabled resource so it becomes bookable.")
+    public ResponseEntity<ServiceResourceDto> enableResource(@PathVariable Long resourceId) {
+        ServiceResourceDto updated = serviceResourceService.enableResource(resourceId);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PatchMapping("/resources/{resourceId}/disable")
+    @Operation(summary = "Disable resource", description = "Disable a resource without deleting it — it will no longer accept new bookings.")
+    public ResponseEntity<ServiceResourceDto> disableResource(@PathVariable Long resourceId) {
+        ServiceResourceDto updated = serviceResourceService.disableResource(resourceId);
+        return ResponseEntity.ok(updated);
     }
 
     @PutMapping("/services/{serviceId}/location-from-url")
