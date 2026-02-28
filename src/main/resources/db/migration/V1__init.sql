@@ -560,11 +560,11 @@ INSERT INTO app_config (
     force_update_message,
     soft_update_message
 ) VALUES (
-    '6.1.0',
-    '6.1.0',
+    '6.1.1',
+    '6.1.1',
     'https://apps.apple.com/app/hyper/idXXXXXXXXX',
-    '6.1.0',
-    '6.1.0',
+    '6.1.1',
+    '6.1.1',
     'https://play.google.com/store/apps/details?id=com.hitendras940.hyper',
     'A critical update is required to continue using Hyper. Please update to the latest version.',
     'A new version of Hyper is available with premium UI enhancements and bug fixes!'
