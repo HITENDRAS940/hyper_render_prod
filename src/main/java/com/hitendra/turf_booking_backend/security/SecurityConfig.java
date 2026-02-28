@@ -60,6 +60,7 @@ public class SecurityConfig {
                 .requestMatchers("/v2/api-docs", "/swagger-resources/**", "/configuration/security", "/swagger-ui.html", "/webjars/**").permitAll()
                 // Health check
                 .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers("/v1/app/config").permitAll()
                 // Role-based access
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MANAGER")

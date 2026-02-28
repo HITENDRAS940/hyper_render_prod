@@ -2,6 +2,9 @@ package com.hitendra.turf_booking_backend.controller;
 
 import com.hitendra.turf_booking_backend.dto.activity.CreateActivityDto;
 import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
+import com.hitendra.turf_booking_backend.dto.appconfig.AppConfigRequest;
+import com.hitendra.turf_booking_backend.dto.appconfig.AppConfigResponse;
+import com.hitendra.turf_booking_backend.service.AppConfigService;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
@@ -56,6 +59,7 @@ public class ManagerController {
     private final RevenueService revenueService;
     private final ActivityService activityService;
     private final AdminFinancialService adminFinancialService;
+    private final AppConfigService appConfigService;
 
     @PostMapping("/admins")
     @Operation(summary = "Create admin", description = "Create a new admin user")
@@ -634,5 +638,40 @@ public class ManagerController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
                 adminFinancialService.getTransactionHistory(adminId, page, size));
+    }
+
+    // ─── App Config CRUD ───────────────────────────────────────────────────────
+
+    @GetMapping("/app-config")
+    @Operation(summary = "List all app configs", description = "Retrieve all app update configuration records")
+    public ResponseEntity<List<AppConfigResponse>> getAllAppConfigs() {
+        return ResponseEntity.ok(appConfigService.getAllConfigs());
+    }
+
+    @GetMapping("/app-config/{id}")
+    @Operation(summary = "Get app config by ID", description = "Retrieve a specific app update configuration record by its ID")
+    public ResponseEntity<AppConfigResponse> getAppConfigById(@PathVariable Long id) {
+        return ResponseEntity.ok(appConfigService.getConfigById(id));
+    }
+
+    @PostMapping("/app-config")
+    @Operation(summary = "Create app config", description = "Create a new app update configuration record")
+    public ResponseEntity<AppConfigResponse> createAppConfig(@Valid @RequestBody AppConfigRequest request) {
+        return ResponseEntity.ok(appConfigService.createConfig(request));
+    }
+
+    @PutMapping("/app-config/{id}")
+    @Operation(summary = "Update app config", description = "Update an existing app update configuration record by its ID")
+    public ResponseEntity<AppConfigResponse> updateAppConfig(
+            @PathVariable Long id,
+            @Valid @RequestBody AppConfigRequest request) {
+        return ResponseEntity.ok(appConfigService.updateConfig(id, request));
+    }
+
+    @DeleteMapping("/app-config/{id}")
+    @Operation(summary = "Delete app config", description = "Delete an app update configuration record by its ID")
+    public ResponseEntity<Void> deleteAppConfig(@PathVariable Long id) {
+        appConfigService.deleteConfig(id);
+        return ResponseEntity.noContent().build();
     }
 }
