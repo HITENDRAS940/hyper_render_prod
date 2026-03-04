@@ -50,6 +50,14 @@ public class ServiceResource {
     private PricingType pricingType = PricingType.PER_SLOT;
 
     /**
+     * Minimum number of persons required per booking.
+     * Only meaningful when pricingType = PER_PERSON.
+     * Null (or absent) means no lower bound — a single person is sufficient.
+     */
+    @Column(name = "min_person_allowed")
+    private Integer minPersonAllowed;
+
+    /**
      * Maximum number of persons allowed per booking.
      * Only meaningful when pricingType = PER_PERSON.
      * Null means no upper limit (only @Min(1) is enforced on input).

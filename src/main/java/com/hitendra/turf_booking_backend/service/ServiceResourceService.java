@@ -87,6 +87,7 @@ public class ServiceResourceService {
                 .pricingType(request.getPricingType() != null
                         ? request.getPricingType()
                         : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT)
+                .minPersonAllowed(request.getMinPersonAllowed())
                 .maxPersonAllowed(request.getMaxPersonAllowed())
                 .activities(new ArrayList<>())
                 .build();
@@ -160,6 +161,11 @@ public class ServiceResourceService {
             resource.setPricingType(request.getPricingType());
         }
 
+        if (request.getMinPersonAllowed() != null) {
+            // value 0 is used as a sentinel to explicitly clear the lower bound
+            resource.setMinPersonAllowed(request.getMinPersonAllowed() == 0 ? null : request.getMinPersonAllowed());
+        }
+
         if (request.getMaxPersonAllowed() != null) {
             resource.setMaxPersonAllowed(request.getMaxPersonAllowed());
         }
@@ -219,6 +225,7 @@ public class ServiceResourceService {
                 .enabled(resource.isEnabled())
                 .activities(resource.getActivities())
                 .pricingType(resource.getPricingType() != null ? resource.getPricingType().name() : "PER_SLOT")
+                .minPersonAllowed(resource.getMinPersonAllowed())
                 .maxPersonAllowed(resource.getMaxPersonAllowed())
                 .build();
     }
@@ -287,6 +294,7 @@ public class ServiceResourceService {
                 .description(resource.getDescription())
                 .enabled(resource.isEnabled())
                 .pricingType(resource.getPricingType() != null ? resource.getPricingType().name() : "PER_SLOT")
+                .minPersonAllowed(resource.getMinPersonAllowed())
                 .maxPersonAllowed(resource.getMaxPersonAllowed())
                 .activities(resource.getActivities())
                 .slotConfig(slotConfigDto)

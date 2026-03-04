@@ -24,6 +24,9 @@ public class ServiceResourceDto {
     /** "PER_SLOT" or "PER_PERSON" */
     private String pricingType;
 
+    /** Min persons required per booking; null means no lower bound. Only relevant for PER_PERSON. */
+    private Integer minPersonAllowed;
+
     /** Max persons per booking; null means no limit. Only relevant for PER_PERSON. */
     private Integer maxPersonAllowed;
 }

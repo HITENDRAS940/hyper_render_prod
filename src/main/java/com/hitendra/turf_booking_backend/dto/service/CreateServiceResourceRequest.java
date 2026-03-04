@@ -51,6 +51,13 @@ public class CreateServiceResourceRequest {
     private PricingType pricingType = PricingType.PER_SLOT;
 
     /**
+     * Minimum persons required per booking.
+     * Only meaningful for PER_PERSON resources. Null = no lower bound.
+     */
+    @Min(value = 1, message = "minPersonAllowed must be at least 1 if specified")
+    private Integer minPersonAllowed;
+
+    /**
      * Maximum persons allowed per booking.
      * Only meaningful for PER_PERSON resources. Null = no limit.
      */

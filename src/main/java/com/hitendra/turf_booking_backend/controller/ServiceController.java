@@ -82,6 +82,17 @@ public class ServiceController {
 
     // ==================== Resource Endpoints ====================
 
+    @GetMapping("/resources/{resourceId}")
+    @Operation(
+        summary = "Get resource by ID",
+        description = "Returns the full details of a specific resource including its name, description, " +
+                      "pricing type, min/max persons allowed, and associated activities."
+    )
+    public ResponseEntity<ServiceResourceDto> getResourceById(@PathVariable Long resourceId) {
+        ServiceResourceDto resource = serviceResourceService.getResourceById(resourceId);
+        return ResponseEntity.ok(resource);
+    }
+
     @GetMapping("/{serviceId}/resources")
     @Operation(summary = "Get service resources", description = "Get all enabled resources for a specific service")
     public ResponseEntity<List<ServiceResourceDto>> getServiceResources(@PathVariable Long serviceId) {

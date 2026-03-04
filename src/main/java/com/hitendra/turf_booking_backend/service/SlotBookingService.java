@@ -420,6 +420,7 @@ public class SlotBookingService {
                 .pricingType(primaryResource.getPricingType() != null
                         ? primaryResource.getPricingType().name()
                         : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                .minPersonAllowed(primaryResource.getMinPersonAllowed())
                 .maxPersonAllowed(primaryResource.getMaxPersonAllowed())
                 .slots(aggregatedSlots)
                 .build();
@@ -494,6 +495,7 @@ public class SlotBookingService {
                     .pricingType(resources.get(0).getPricingType() != null
                             ? resources.get(0).getPricingType().name()
                             : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                    .minPersonAllowed(resources.get(0).getMinPersonAllowed())
                     .maxPersonAllowed(resources.get(0).getMaxPersonAllowed())
                     .resources(emptyResources)
                     .build();
@@ -603,6 +605,7 @@ public class SlotBookingService {
                 .pricingType(firstResource.getPricingType() != null
                         ? firstResource.getPricingType().name()
                         : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                .minPersonAllowed(firstResource.getMinPersonAllowed())
                 .maxPersonAllowed(firstResource.getMaxPersonAllowed())
                 .resources(resourceSlotDtos)
                 .build();
@@ -1014,6 +1017,12 @@ public class SlotBookingService {
             if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
                 throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
             }
+            if (resource.getMinPersonAllowed() != null
+                    && request.getNumberOfPersons() < resource.getMinPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") is below the minimum required of " + resource.getMinPersonAllowed());
+            }
             if (resource.getMaxPersonAllowed() != null
                     && request.getNumberOfPersons() > resource.getMaxPersonAllowed()) {
                 throw new BookingException(
@@ -1093,6 +1102,12 @@ public class SlotBookingService {
         if (poolPricingType == com.hitendra.turf_booking_backend.entity.PricingType.PER_PERSON) {
             if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
                 throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
+            }
+            if (firstResource.getMinPersonAllowed() != null
+                    && request.getNumberOfPersons() < firstResource.getMinPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") is below the minimum required of " + firstResource.getMinPersonAllowed());
             }
             if (firstResource.getMaxPersonAllowed() != null
                     && request.getNumberOfPersons() > firstResource.getMaxPersonAllowed()) {
@@ -1693,6 +1708,12 @@ public class SlotBookingService {
         if (pricingType == com.hitendra.turf_booking_backend.entity.PricingType.PER_PERSON) {
             if (request.getNumberOfPersons() == null || request.getNumberOfPersons() < 1) {
                 throw new BookingException("numberOfPersons is required for PER_PERSON pricing");
+            }
+            if (availableResource.getMinPersonAllowed() != null
+                    && request.getNumberOfPersons() < availableResource.getMinPersonAllowed()) {
+                throw new BookingException(
+                        "Number of persons (" + request.getNumberOfPersons() +
+                        ") is below the minimum required of " + availableResource.getMinPersonAllowed());
             }
             if (availableResource.getMaxPersonAllowed() != null
                     && request.getNumberOfPersons() > availableResource.getMaxPersonAllowed()) {

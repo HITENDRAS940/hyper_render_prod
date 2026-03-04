@@ -29,6 +29,13 @@ public class SlotAvailabilityResponseDto {
     private String pricingType;
 
     /**
+     * Minimum number of persons required per booking.
+     * Only populated when pricingType = "PER_PERSON".
+     * Null means no lower bound — a single person is sufficient.
+     */
+    private Integer minPersonAllowed;
+
+    /**
      * Maximum number of persons allowed per booking.
      * Only populated when pricingType = "PER_PERSON".
      * Null means no upper limit.

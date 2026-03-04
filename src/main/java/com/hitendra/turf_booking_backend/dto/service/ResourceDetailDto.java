@@ -26,6 +26,7 @@ public class ResourceDetailDto {
     private String description;
     private boolean enabled;
     private String pricingType;
+    private Integer minPersonAllowed;
     private Integer maxPersonAllowed;
     private List<Activity> activities;
 

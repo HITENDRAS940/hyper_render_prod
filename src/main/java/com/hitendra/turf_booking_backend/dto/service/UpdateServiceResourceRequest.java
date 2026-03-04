@@ -16,6 +16,13 @@ public class UpdateServiceResourceRequest {
     private PricingType pricingType;
 
     /**
+     * Update the min persons required. Leave null to keep existing value.
+     * Set to 0 to remove the lower bound (stored as null internally).
+     */
+    @Min(value = 1, message = "minPersonAllowed must be at least 1 if specified")
+    private Integer minPersonAllowed;
+
+    /**
      * Update the max persons allowed. Leave null to keep existing value.
      * Set to 0 to remove the limit (stored as null internally).
      */
