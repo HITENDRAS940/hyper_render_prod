@@ -173,6 +173,7 @@ public class ServiceService {
                 .availability(service.isAvailability())
                 .refundAllowed(service.isRefundAllowed())
                 .onlinePaymentPercent(service.getOnlinePaymentPercent())
+                .termsAndConditions(service.getTermsAndConditions())
                 .amenities(service.getAmenities())
                 .images(service.getImages())
                 .activities(service.getActivities() != null
@@ -211,6 +212,7 @@ public class ServiceService {
                 .refundAllowed(request.getRefundAllowed() != null ? request.getRefundAllowed() : true)
                 .onlinePaymentPercent(request.getOnlinePaymentPercent())
                 .googlePlaceId(request.getGooglePlaceId())
+                .termsAndConditions(request.getTermsAndConditions())
                 .resourceSelectionMode(request.getResourceSelectionMode() != null
                         ? request.getResourceSelectionMode()
                         : com.hitendra.turf_booking_backend.entity.ResourceSelectionMode.AUTO)
@@ -333,6 +335,9 @@ public class ServiceService {
         // (null = revert to global config fallback)
         service.setOnlinePaymentPercent(serviceDto.getOnlinePaymentPercent());
 
+        // Allow updating or clearing terms and conditions (null clears them)
+        service.setTermsAndConditions(serviceDto.getTermsAndConditions());
+
         // Update resource selection mode if provided
         if (serviceDto.getResourceSelectionMode() != null) {
             service.setResourceSelectionMode(serviceDto.getResourceSelectionMode());
@@ -367,6 +372,35 @@ public class ServiceService {
 
         com.hitendra.turf_booking_backend.entity.Service updated = serviceRepository.save(service);
         return convertToDto(updated);
+    }
+
+    /**
+     * Update (or clear) the terms and conditions for a single service.
+     * Only the creating admin or a manager may call this.
+     *
+     * @param serviceId target service
+     * @param termsAndConditions new T&C text, or {@code null} to remove existing terms
+     * @return updated {@link ServiceDto}
+     */
+    public ServiceDto updateTermsAndConditions(Long serviceId, String termsAndConditions) {
+        Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new RuntimeException("Service not found with id: " + serviceId));
+        checkServiceModificationPermission(service);
+        service.setTermsAndConditions(termsAndConditions);
+        return convertToDto(serviceRepository.save(service));
+    }
+
+    /**
+     * Fetch only the terms and conditions text for a service (public-facing, lightweight).
+     *
+     * @param serviceId target service
+     * @return terms and conditions string, or {@code null} if none set
+     */
+    @Transactional(readOnly = true)
+    public String getTermsAndConditions(Long serviceId) {
+        Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new RuntimeException("Service not found with id: " + serviceId));
+        return service.getTermsAndConditions();
     }
 
     /**
@@ -584,6 +618,7 @@ public class ServiceService {
         dto.setGoogleRating(service.getGoogleRating());
         dto.setGoogleReviewCount(service.getGoogleReviewCount());
         dto.setResourceSelectionMode(service.getResourceSelectionMode());
+        dto.setTermsAndConditions(service.getTermsAndConditions());
 
         if (service.getActivities() != null) {
             dto.setActivities(service.getActivities().stream()

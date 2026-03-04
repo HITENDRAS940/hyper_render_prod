@@ -49,5 +49,12 @@ public class CreateServiceRequest {
      * Used to fetch rating and review count from Google Places API.
      */
     private String googlePlaceId;
+
+    /**
+     * Service-specific terms and conditions.
+     * Supports long-form content (1000+ words). Plain text or Markdown.
+     * When null, the service has no custom terms and conditions.
+     */
+    private String termsAndConditions;
 }
 

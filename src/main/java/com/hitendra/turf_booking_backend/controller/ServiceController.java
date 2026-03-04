@@ -36,6 +36,20 @@ public class ServiceController {
         return ResponseEntity.ok(service);
     }
 
+    @GetMapping("/{id}/terms")
+    @Operation(
+        summary = "Get service terms and conditions",
+        description = "Returns the full terms and conditions text for a service. " +
+                      "Returns 204 No Content when the service has no terms set."
+    )
+    public ResponseEntity<String> getTermsAndConditions(@PathVariable Long id) {
+        String terms = serviceService.getTermsAndConditions(id);
+        if (terms == null || terms.isBlank()) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(terms);
+    }
+
     @GetMapping("/cities")
     @Operation(summary = "Get available cities", description = "Get list of all cities where services are available")
     public ResponseEntity<List<String>> getAvailableCities() {

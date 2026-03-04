@@ -43,6 +43,12 @@ public class ServiceDetailDto {
     /** Per-service online payment percentage. Null means the global config value applies. */
     private Double onlinePaymentPercent;
 
+    /**
+     * Service-specific terms and conditions (can be 1000+ words).
+     * Null when the service has no custom terms.
+     */
+    private String termsAndConditions;
+
     // ── Media & taxonomy ─────────────────────────────────────────────────
     private List<String> amenities;
     private List<String> images;

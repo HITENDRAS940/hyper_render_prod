@@ -243,6 +243,20 @@ public class ManagerController {
         return ResponseEntity.ok(resources);
     }
 
+    @PatchMapping("/services/{id}/terms")
+    @Operation(
+        summary = "Update service terms and conditions",
+        description = "Create or replace the full terms and conditions text for a service. " +
+                      "The text may be plain text or Markdown and is unlimited in length. " +
+                      "Send { \"termsAndConditions\": null } to clear existing terms."
+    )
+    public ResponseEntity<ServiceDto> updateTermsAndConditions(
+            @PathVariable Long id,
+            @RequestBody com.hitendra.turf_booking_backend.dto.service.UpdateTermsRequest request) {
+        ServiceDto updated = serviceService.updateTermsAndConditions(id, request.getTermsAndConditions());
+        return ResponseEntity.ok(updated);
+    }
+
     @PutMapping("/services/{id}")
     @Operation(summary = "Update service", description = "Update service details")
     public ResponseEntity<ServiceDto> updateService(

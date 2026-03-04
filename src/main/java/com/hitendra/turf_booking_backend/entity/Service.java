@@ -79,6 +79,16 @@ public class Service {
     private Double onlinePaymentPercent;
 
     /**
+     * Service-specific terms and conditions.
+     * Stored as TEXT in the database to support long-form content (1000+ words).
+     * Admins can set this per service. Users should be shown and asked to accept
+     * these terms before completing a booking.
+     * Null means the service has no custom terms and conditions.
+     */
+    @Column(name = "terms_and_conditions", columnDefinition = "TEXT")
+    private String termsAndConditions;
+
+    /**
      * Determines how resources are selected during booking.
      *
      * AUTO (default):

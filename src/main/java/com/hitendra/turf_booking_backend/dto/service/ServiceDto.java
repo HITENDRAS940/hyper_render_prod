@@ -31,4 +31,10 @@ public class ServiceDto {
     // Google Places rating (cached, updated daily)
     private Double googleRating;
     private Integer googleReviewCount;
+
+    /**
+     * Service-specific terms and conditions (can be 1000+ words).
+     * Null when the service has no custom terms.
+     */
+    private String termsAndConditions;
 }
