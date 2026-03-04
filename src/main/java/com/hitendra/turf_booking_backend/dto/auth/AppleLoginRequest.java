@@ -1,9 +1,7 @@
 package com.hitendra.turf_booking_backend.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Data
 @NoArgsConstructor
@@ -12,5 +10,18 @@ public class AppleLoginRequest {
 
     @NotBlank(message = "Identity token is required")
     private String identityToken;
+
+    private FullName fullName;
+
+    private String email;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class FullName {
+        private String givenName;
+        private String familyName;
+    }
 }
 

@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.dto.service;
 
+import com.hitendra.turf_booking_backend.entity.ResourceSelectionMode;
 import lombok.Data;
 import java.util.List;
 
@@ -17,6 +18,12 @@ public class ServiceDto {
     private boolean refundAllowed;
     /** Per-service online payment percentage. Null means the global config value applies. */
     private Double onlinePaymentPercent;
+    /**
+     * Resource selection mode for this service.
+     * "AUTO" (default): Backend allocates resource using priority algorithm.
+     * "MANUAL": User explicitly selects which resource to book.
+     */
+    private ResourceSelectionMode resourceSelectionMode;
     private  List<String> amenities;
     private List<String> images;
     private List<String> activities;

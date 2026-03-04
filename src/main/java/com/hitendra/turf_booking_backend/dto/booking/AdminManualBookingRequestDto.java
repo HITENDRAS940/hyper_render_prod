@@ -66,5 +66,13 @@ public class AdminManualBookingRequestDto {
      */
     @Min(value = 1, message = "Number of persons must be at least 1")
     private Integer numberOfPersons;
+
+    /**
+     * Resource ID for MANUAL resource-selection mode.
+     *
+     * REQUIRED when the service's resourceSelectionMode = MANUAL.
+     * IGNORED  when the service's resourceSelectionMode = AUTO.
+     */
+    private Long resourceId;
 }
 

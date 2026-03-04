@@ -105,7 +105,73 @@ public class SlotBookingController {
         return ResponseEntity.ok(availability);
     }
 
+    // ==================== MANUAL RESOURCE SLOT AVAILABILITY ====================
 
+    /**
+     * Get slot availability grouped by individual resource.
+     * <p>
+     * Use this endpoint for services configured with
+     * {@code resourceSelectionMode = MANUAL}. Unlike the standard
+     * {@code /availability} endpoint (which aggregates across pooled resources),
+     * this endpoint exposes each resource independently so the user can choose
+     * a specific one.
+     * <p>
+     * <b>Response structure:</b>
+     * <ul>
+     *   <li>Each element in {@code resources} represents one bookable resource.</li>
+     *   <li>Each resource contains its own list of slots with availability flags.</li>
+     *   <li>Available slots include an encrypted {@code slotKey} that should be
+     *       passed to {@code POST /book} together with the chosen {@code resourceId}.</li>
+     * </ul>
+     *
+     * @param serviceId    Service ID (must have resourceSelectionMode = MANUAL)
+     * @param activityCode Activity code, e.g. "BOWLING"
+     * @param date         Date to check availability (yyyy-MM-dd)
+     * @return Per-resource slot availability
+     */
+    @GetMapping("/availability/manual")
+    @Operation(
+        summary = "Get manual resource slot availability",
+        description = """
+            Returns slot availability grouped by individual resources.
+
+            **Only valid for services with `resourceSelectionMode = MANUAL`.**
+
+            Unlike the standard `/availability` endpoint (which pools identical resources),
+            this endpoint exposes each resource independently so the user can pick one.
+
+            **Usage flow:**
+            1. Call this endpoint to get per-resource availability.
+            2. Display the resource list to the user.
+            3. User selects a specific resource + slot.
+            4. Call `POST /book` with `slotKeys` **and** `resourceId`.
+            """
+    )
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Manual resource availability retrieved successfully"),
+        @ApiResponse(responseCode = "404", description = "Service or activity not found"),
+        @ApiResponse(responseCode = "409", description = "Service is not configured for manual resource selection")
+    })
+    public ResponseEntity<ManualResourceSlotAvailabilityDto> getManualResourceSlotAvailability(
+            @Parameter(description = "Service ID", required = true)
+            @RequestParam Long serviceId,
+
+            @Parameter(description = "Activity code (e.g., BOWLING, CRICKET)", required = true)
+            @RequestParam String activityCode,
+
+            @Parameter(description = "Date for availability check (yyyy-MM-dd)", required = true)
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate date) {
+
+        log.info("Getting manual resource slot availability: serviceId={}, activity={}, date={}",
+                serviceId, activityCode, date);
+
+        ManualResourceSlotAvailabilityDto availability = slotBookingService
+                .getManualResourceSlotAvailability(serviceId, activityCode, date);
+
+        return ResponseEntity.ok(availability);
+    }
+
+    // ==================== SLOT BOOKING ====================
 
     /**
      * Book multiple slots as a SINGLE booking.

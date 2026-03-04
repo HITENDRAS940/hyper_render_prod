@@ -48,6 +48,18 @@ public class SlotBookingRequestDto {
      */
     @Min(value = 1, message = "Number of persons must be at least 1")
     private Integer numberOfPersons;
+
+    /**
+     * Resource ID for MANUAL resource-selection mode.
+     *
+     * REQUIRED when booking a service whose resourceSelectionMode = MANUAL.
+     *   - The booking will be created against exactly this resource.
+     *   - Backend validates that the resource is available for all requested slots.
+     *
+     * IGNORED for services whose resourceSelectionMode = AUTO.
+     *   - Backend applies its priority-based allocation algorithm instead.
+     */
+    private Long resourceId;
 }
 
 

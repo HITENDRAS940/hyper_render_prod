@@ -211,6 +211,9 @@ public class ServiceService {
                 .refundAllowed(request.getRefundAllowed() != null ? request.getRefundAllowed() : true)
                 .onlinePaymentPercent(request.getOnlinePaymentPercent())
                 .googlePlaceId(request.getGooglePlaceId())
+                .resourceSelectionMode(request.getResourceSelectionMode() != null
+                        ? request.getResourceSelectionMode()
+                        : com.hitendra.turf_booking_backend.entity.ResourceSelectionMode.AUTO)
                 .images(new ArrayList<>())
                 .activities(new ArrayList<>())  // Initialize activities list
                 .amenities(new ArrayList<>())   // Initialize amenities list
@@ -329,6 +332,11 @@ public class ServiceService {
         // Allow explicitly setting or clearing the per-service online payment percentage
         // (null = revert to global config fallback)
         service.setOnlinePaymentPercent(serviceDto.getOnlinePaymentPercent());
+
+        // Update resource selection mode if provided
+        if (serviceDto.getResourceSelectionMode() != null) {
+            service.setResourceSelectionMode(serviceDto.getResourceSelectionMode());
+        }
 
         // Update Google Place ID and fetch initial rating if changed
         if (serviceDto.getGooglePlaceId() != null) {
@@ -575,6 +583,7 @@ public class ServiceService {
         dto.setAmenities(service.getAmenities());
         dto.setGoogleRating(service.getGoogleRating());
         dto.setGoogleReviewCount(service.getGoogleReviewCount());
+        dto.setResourceSelectionMode(service.getResourceSelectionMode());
 
         if (service.getActivities() != null) {
             dto.setActivities(service.getActivities().stream()

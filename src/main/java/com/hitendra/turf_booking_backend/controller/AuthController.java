@@ -69,7 +69,7 @@ public class AuthController {
             @Valid @RequestBody AppleLoginRequest request
     ) {
         log.info("Apple Sign-In request received");
-        OAuthResponseDto response = appleAuthService.authenticate(request.getIdentityToken());
+        OAuthResponseDto response = appleAuthService.authenticate(request);
         log.info("Apple Sign-In successful — email: {}, isNewUser: {}",
                 response.getEmail(), response.isNewUser());
         return ResponseEntity.ok(response);

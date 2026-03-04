@@ -1,5 +1,6 @@
 package com.hitendra.turf_booking_backend.dto.service;
 
+import com.hitendra.turf_booking_backend.entity.ResourceSelectionMode;
 import lombok.Data;
 import java.util.List;
 
@@ -27,6 +28,21 @@ public class CreateServiceRequest {
      * Valid range: 0 – 100.
      */
     private Double onlinePaymentPercent;
+
+    /**
+     * Resource selection mode for this service.
+     *
+     * AUTO (default): Backend allocates resource using priority algorithm.
+     *   - Suitable for: Turfs, courts where resources are interchangeable
+     *   - Frontend shows aggregated slot availability
+     *
+     * MANUAL: User explicitly selects which specific resource to book.
+     *   - Suitable for: Bowling lanes, arcade machines where resources have distinct characteristics
+     *   - Frontend shows individual resource slot availability
+     *
+     * Defaults to AUTO when not provided for backward compatibility.
+     */
+    private ResourceSelectionMode resourceSelectionMode;
 
     /**
      * Google Places place_id for this service/venue.

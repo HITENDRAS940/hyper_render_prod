@@ -3,6 +3,7 @@ package com.hitendra.turf_booking_backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hitendra.turf_booking_backend.dto.booking.*;
 import com.hitendra.turf_booking_backend.dto.slot.GeneratedSlot;
+import com.hitendra.turf_booking_backend.entity.ResourceSelectionMode;
 import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.entity.accounting.LedgerSource;
 import com.hitendra.turf_booking_backend.entity.accounting.PaymentMode;
@@ -27,6 +28,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -423,6 +425,214 @@ public class SlotBookingService {
                 .build();
     }
 
+    // ==================== MANUAL RESOURCE SLOT AVAILABILITY ====================
+
+    /**
+     * Get slot availability grouped by individual resource.
+     * Used exclusively for services configured with {@code resourceSelectionMode = MANUAL}.
+     *
+     * Unlike the aggregated view (AUTO mode), this endpoint shows each resource
+     * independently so the user can choose a specific one.
+     *
+     * @param serviceId    The service ID
+     * @param activityCode The activity code (e.g. "BOWLING")
+     * @param date         The date to check availability
+     * @return ManualResourceSlotAvailabilityDto with per-resource slot availability
+     */
+    @Transactional(readOnly = true)
+    public ManualResourceSlotAvailabilityDto getManualResourceSlotAvailability(
+            Long serviceId, String activityCode, LocalDate date) {
+
+        // Validate service
+        com.hitendra.turf_booking_backend.entity.Service service = serviceRepository.findById(serviceId)
+                .orElseThrow(() -> new BookingException("Service not found: " + serviceId));
+
+        if (!service.isAvailability()) {
+            throw new BookingException("Service is currently unavailable");
+        }
+
+        // Guard: endpoint is only valid for MANUAL mode services
+        if (service.getResourceSelectionMode() != ResourceSelectionMode.MANUAL) {
+            throw new BookingException(
+                    "This endpoint is only available for services with resourceSelectionMode = MANUAL. " +
+                    "Current mode: " + service.getResourceSelectionMode());
+        }
+
+        // Validate activity
+        Activity activity = activityRepository.findByCode(activityCode)
+                .orElseThrow(() -> new BookingException("Activity not found: " + activityCode));
+
+        if (!activity.isEnabled()) {
+            throw new BookingException("Activity is currently unavailable: " + activityCode);
+        }
+
+        // Fetch all enabled resources that support this activity for the service
+        List<ServiceResource> resources = resourceRepository.findByServiceIdAndActivityCode(serviceId, activityCode);
+
+        if (resources.isEmpty()) {
+            throw new BookingException("No resources available for activity: " + activityCode);
+        }
+
+        // Time filtering for today (IST)
+        ZoneId istZone = ZoneId.of("Asia/Kolkata");
+        ZonedDateTime nowIST = ZonedDateTime.now(istZone);
+        LocalDate todayIST = nowIST.toLocalDate();
+        LocalTime timeIST = nowIST.toLocalTime();
+
+        if (date.isBefore(todayIST)) {
+            // Past date – return resources with empty slot lists
+            List<ManualResourceSlotAvailabilityDto.ResourceSlotDto> emptyResources = resources.stream()
+                    .map(r -> ManualResourceSlotAvailabilityDto.ResourceSlotDto.builder()
+                            .resourceId(r.getId())
+                            .resourceName(r.getName())
+                            .resourceDescription(r.getDescription())
+                            .slots(Collections.emptyList())
+                            .build())
+                    .collect(Collectors.toList());
+
+            return ManualResourceSlotAvailabilityDto.builder()
+                    .pricingType(resources.get(0).getPricingType() != null
+                            ? resources.get(0).getPricingType().name()
+                            : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                    .maxPersonAllowed(resources.get(0).getMaxPersonAllowed())
+                    .resources(emptyResources)
+                    .build();
+        }
+
+        List<ManualResourceSlotAvailabilityDto.ResourceSlotDto> resourceSlotDtos = new ArrayList<>();
+
+        for (ServiceResource resource : resources) {
+            ResourceSlotConfig config = slotConfigRepository.findByResourceId(resource.getId()).orElse(null);
+
+            if (config == null) {
+                log.warn("No slot config found for resource {} – skipping in manual availability", resource.getId());
+                continue;
+            }
+
+            // Generate slots dynamically
+            List<GeneratedSlot> slots = slotGeneratorService.generateSlots(config);
+
+            // Apply booking cutoff for today
+            if (date.equals(todayIST)) {
+                slots = slots.stream()
+                        .filter(s -> timeIST.isBefore(s.getStartTime().minusMinutes(30)))
+                        .collect(Collectors.toList());
+            }
+
+            // Bookings & disabled slots for this specific resource on this date
+            List<Booking> bookingsForResource = bookingRepository
+                    .findByResourceIdAndBookingDate(resource.getId(), date)
+                    .stream()
+                    .filter(this::isBookingLockingSlot)
+                    .collect(Collectors.toList());
+
+            List<DisabledSlot> disabledSlotsForResource =
+                    disabledSlotRepository.findByResourceIdAndDisabledDate(resource.getId(), date);
+
+            // Price rules for this resource
+            List<ResourcePriceRule> priceRules =
+                    priceRuleRepository.findEnabledRulesByResourceId(resource.getId());
+            boolean isWeekend = isWeekend(date);
+
+            // Build slot DTOs
+            List<ManualResourceSlotAvailabilityDto.SlotDto> slotDtos = new ArrayList<>();
+            List<Long> singleResourceIdList = List.of(resource.getId());
+
+            for (GeneratedSlot slot : slots) {
+                boolean slotBooked = bookingsForResource.stream()
+                        .anyMatch(b -> isTimeRangeOverlap(slot.getStartTime(), slot.getEndTime(),
+                                b.getStartTime(), b.getEndTime()));
+
+                boolean slotDisabled = disabledSlotsForResource.stream()
+                        .anyMatch(ds -> isTimeRangeOverlap(slot.getStartTime(), slot.getEndTime(),
+                                ds.getStartTime(), ds.getEndTime()));
+
+                boolean available = !slotBooked && !slotDisabled;
+                Double slotPrice = calculateDynamicSlotPrice(slot, priceRules, isWeekend, config);
+
+                // Deterministic group ID (resource-specific)
+                String hashInput = serviceId + "-" + date + "-" + slot.getStartTime() + "-"
+                        + slot.getEndTime() + "-" + resource.getId();
+                String slotGroupId = cryptoUtil.generateHash(hashInput);
+
+                // Encrypt slot key only for available slots
+                String slotKey = null;
+                if (available) {
+                    try {
+                        SlotKeyPayload payload = SlotKeyPayload.builder()
+                                .slotGroupId(slotGroupId)
+                                .serviceId(serviceId)
+                                .activityCode(activityCode)
+                                .date(date)
+                                .startTime(slot.getStartTime())
+                                .endTime(slot.getEndTime())
+                                .resourceIds(singleResourceIdList)
+                                .quotedPrice(slotPrice)
+                                .expiresAt(Instant.now().plusSeconds(600).getEpochSecond())
+                                .resourceSelectionMode(ResourceSelectionMode.MANUAL)
+                                .build();
+                        slotKey = cryptoUtil.encrypt(objectMapper.writeValueAsString(payload));
+                    } catch (Exception e) {
+                        log.error("Error generating manual slot key for resource {}", resource.getId(), e);
+                    }
+                }
+
+                int durationMinutes = (int) ChronoUnit.MINUTES.between(slot.getStartTime(), slot.getEndTime());
+
+                slotDtos.add(ManualResourceSlotAvailabilityDto.SlotDto.builder()
+                        .slotKey(slotKey)
+                        .slotGroupId(slotGroupId)
+                        .startTime(slot.getStartTime().format(TIME_FORMATTER))
+                        .endTime(slot.getEndTime().format(TIME_FORMATTER))
+                        .durationMinutes(durationMinutes)
+                        .displayPrice(slotPrice)
+                        .available(available)
+                        .build());
+            }
+
+            resourceSlotDtos.add(ManualResourceSlotAvailabilityDto.ResourceSlotDto.builder()
+                    .resourceId(resource.getId())
+                    .resourceName(resource.getName())
+                    .resourceDescription(resource.getDescription())
+                    .slots(slotDtos)
+                    .build());
+        }
+
+        ServiceResource firstResource = resources.get(0);
+        return ManualResourceSlotAvailabilityDto.builder()
+                .pricingType(firstResource.getPricingType() != null
+                        ? firstResource.getPricingType().name()
+                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                .maxPersonAllowed(firstResource.getMaxPersonAllowed())
+                .resources(resourceSlotDtos)
+                .build();
+    }
+
+    /**
+     * Returns true if a booking should count as "locking" a slot
+     * (i.e. it blocks availability from the user's perspective).
+     * Logic matches {@code ResourceSlotService.isBookingLockingSlot}.
+     */
+    private boolean isBookingLockingSlot(Booking booking) {
+        BookingStatus status = booking.getStatus();
+        PaymentStatus paymentStatus = booking.getPaymentStatusEnum();
+
+        // Confirmed or Completed bookings always lock the slot
+        if (status == BookingStatus.CONFIRMED || status == BookingStatus.COMPLETED) {
+            return true;
+        }
+
+        // Pending or Awaiting Confirmation bookings lock the slot ONLY if payment
+        // is in progress or has succeeded
+        if (status == BookingStatus.PENDING || status == BookingStatus.AWAITING_CONFIRMATION) {
+            return paymentStatus == PaymentStatus.IN_PROGRESS
+                    || paymentStatus == PaymentStatus.SUCCESS;
+        }
+
+        // All other statuses (CANCELLED, EXPIRED, etc.) do not lock the slot
+        return false;
+    }
+
     // ==================== SLOT BOOKING (Intent-based) ====================
 
     /**
@@ -515,6 +725,15 @@ public class SlotBookingService {
         if (!service.isAvailability()) {
             throw new BookingException("Service is currently unavailable");
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ROUTE BY RESOURCE SELECTION MODE
+        // ═══════════════════════════════════════════════════════════════════════
+        if (service.getResourceSelectionMode() == ResourceSelectionMode.MANUAL) {
+            log.info("Service {} uses MANUAL resource selection – routing to manual booking handler", serviceId);
+            return createManualModeBooking(request, service, payloads, activityCode, bookingDate, startTime, endTime);
+        }
+        // else: fall through to existing AUTO allocation logic
 
         // STEP 6: Validate activity
         Activity activity = activityRepository.findByCode(activityCode)
@@ -676,6 +895,86 @@ public class SlotBookingService {
             if (!slotCovered) return false;
         }
         return true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // MANUAL MODE BOOKING HANDLER
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Create a booking for a service with {@code resourceSelectionMode = MANUAL}.
+     *
+     * The caller (user) must supply {@code resourceId} in the request; that specific
+     * resource is validated for availability and then used to create the booking.
+     * The backend allocation algorithm is intentionally bypassed.
+     */
+    private BookingResponseDto createManualModeBooking(
+            SlotBookingRequestDto request,
+            com.hitendra.turf_booking_backend.entity.Service service,
+            List<SlotKeyPayload> payloads,
+            String activityCode,
+            LocalDate bookingDate,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        // 1. resourceId is mandatory for MANUAL mode
+        if (request.getResourceId() == null) {
+            throw new BookingException(
+                    "resourceId is required for services with resourceSelectionMode = MANUAL");
+        }
+
+        Long selectedResourceId = request.getResourceId();
+        log.info("MANUAL mode booking: user selected resource {}", selectedResourceId);
+
+        // 2. Fetch resource with pessimistic lock
+        ServiceResource selectedResource = resourceRepository
+                .findByIdWithLock(selectedResourceId)
+                .orElseThrow(() -> new BookingException("Resource not found: " + selectedResourceId));
+
+        // 3. Validate resource belongs to this service
+        if (!selectedResource.getService().getId().equals(service.getId())) {
+            throw new BookingException(
+                    "Resource " + selectedResourceId + " does not belong to service " + service.getId());
+        }
+
+        // 4. Validate resource supports the requested activity
+        boolean supportsActivity = selectedResource.getActivities().stream()
+                .anyMatch(a -> a.getCode().equals(activityCode));
+        if (!supportsActivity) {
+            throw new BookingException(
+                    "Resource " + selectedResourceId + " does not support activity: " + activityCode);
+        }
+
+        // 5. Check bookings and disabled slots for the selected resource
+        List<Long> singleIdList = List.of(selectedResourceId);
+
+        List<Booking> overlappingBookings = bookingRepository
+                .findOverlappingBookingsForResourcesWithLock(singleIdList, bookingDate, startTime, endTime);
+
+        List<DisabledSlot> disabledSlots = disabledSlotRepository
+                .findOverlappingDisabledSlots(singleIdList, bookingDate, startTime, endTime);
+
+        // 6. Verify availability for every requested slot
+        for (SlotKeyPayload payload : payloads) {
+            if (!isResourceAvailableForSlot(
+                    selectedResource,
+                    payload.getStartTime(),
+                    payload.getEndTime(),
+                    overlappingBookings,
+                    disabledSlots)) {
+                throw new BookingException(
+                        "Selected resource is not available for the requested time: "
+                        + payload.getStartTime() + " – " + payload.getEndTime());
+            }
+        }
+
+        log.info("Resource {} is available for all requested slots – creating MANUAL mode booking",
+                selectedResourceId);
+
+        // 7. Delegate to the shared merged-booking builder
+        return createMergedBooking(request, service, selectedResource,
+                activityCode, bookingDate, startTime, endTime,
+                payloads, List.of(selectedResource));
     }
 
     private BookingResponseDto createMergedBooking(SlotBookingRequestDto request, com.hitendra.turf_booking_backend.entity.Service service,
@@ -1329,22 +1628,50 @@ public class SlotBookingService {
         ServiceResource availableResource = null;
         String allocationReason = null;
 
-        // PRIORITY 1: Exclusive
-        for (ServiceResource resource : exclusiveResources) {
-            if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
-                availableResource = resource;
-                allocationReason = "EXCLUSIVE (supports only " + activityCode + ")";
-                break;
+        // ═══════════════════════════════════════════════════════════════════════
+        // ROUTE BY RESOURCE SELECTION MODE
+        // ═══════════════════════════════════════════════════════════════════════
+        if (service.getResourceSelectionMode() == ResourceSelectionMode.MANUAL) {
+            // MANUAL mode: admin must supply a specific resourceId
+            if (request.getResourceId() == null) {
+                throw new BookingException(
+                        "resourceId is required for admin bookings on services with resourceSelectionMode = MANUAL");
             }
-        }
 
-        // PRIORITY 2: Multi-activity
-        if (availableResource == null) {
-            for (ServiceResource resource : multiActivityResources) {
+            availableResource = pooledResources.stream()
+                    .filter(r -> r.getId().equals(request.getResourceId()))
+                    .findFirst()
+                    .orElseThrow(() -> new BookingException(
+                            "Specified resource " + request.getResourceId()
+                            + " is not a valid resource for this service/activity"));
+
+            // Verify availability even in MANUAL mode
+            if (!isResourceAvailableForSlots(availableResource, payloads, overlappingBookings, disabledSlots)) {
+                throw new BookingException(
+                        "Selected resource " + availableResource.getName()
+                        + " is not available for the requested slots");
+            }
+            allocationReason = "MANUAL (admin selected resource " + availableResource.getId() + ")";
+
+        } else {
+            // AUTO mode: existing priority-based allocation
+            // PRIORITY 1: Exclusive
+            for (ServiceResource resource : exclusiveResources) {
                 if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
                     availableResource = resource;
-                    allocationReason = "MULTI-ACTIVITY";
+                    allocationReason = "EXCLUSIVE (supports only " + activityCode + ")";
                     break;
+                }
+            }
+
+            // PRIORITY 2: Multi-activity
+            if (availableResource == null) {
+                for (ServiceResource resource : multiActivityResources) {
+                    if (isResourceAvailableForSlots(resource, payloads, overlappingBookings, disabledSlots)) {
+                        availableResource = resource;
+                        allocationReason = "MULTI-ACTIVITY";
+                        break;
+                    }
                 }
             }
         }

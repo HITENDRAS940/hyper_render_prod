@@ -78,6 +78,29 @@ public class Service {
     @Column(name = "online_payment_percent")
     private Double onlinePaymentPercent;
 
+    /**
+     * Determines how resources are selected during booking.
+     *
+     * AUTO (default):
+     *   - Backend automatically allocates resource using priority algorithm.
+     *   - Frontend shows aggregated slots without exposing individual resource IDs.
+     *   - Resources with the same activity + price are pooled together.
+     *   - Best for: Turfs, courts where resources are interchangeable.
+     *
+     * MANUAL:
+     *   - User explicitly selects a resource before booking.
+     *   - Frontend shows individual resources with their slot availability.
+     *   - resourceId must be supplied in the booking request.
+     *   - Best for: Bowling lanes, arcade machines, or any service where
+     *     resource identity matters to the user.
+     *
+     * Defaults to AUTO for backward compatibility with all existing services.
+     */
+    @Column(name = "resource_selection_mode", nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ResourceSelectionMode resourceSelectionMode = ResourceSelectionMode.AUTO;
+
     // Google Places API fields
     @Column(name = "google_place_id")
     private String googlePlaceId;
