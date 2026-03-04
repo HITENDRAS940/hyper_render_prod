@@ -33,9 +33,9 @@ public class FlywayConfig {
     public FlywayMigrationStrategy flywayMigrationStrategy() {
         return flyway -> {
 
-            // ── Step 1: If admin_profiles is missing financial columns, delete the
-            //            history entries so Flyway re-runs those migrations ──────────
             try (Connection conn = dataSource.getConnection()) {
+
+                // ── Fix 1: admin_profiles missing financial columns → re-run V5/V6/V7/V8 ──
                 if (adminProfilesMissingFinancialColumns(conn)) {
                     log.warn("⚠️  admin_profiles is missing financial columns — deleting V5/V6/V7/V8 " +
                              "from flyway_schema_history so they are re-applied...");
@@ -44,11 +44,22 @@ public class FlywayConfig {
                 } else {
                     log.info("✅ admin_profiles financial columns are present — no history fix needed.");
                 }
+
+                // ── Fix 2: coupons table missing enhanced constraint columns → re-run V2/V3 ──
+                if (couponsMissingEnhancedColumns(conn)) {
+                    log.warn("⚠️  coupons table is missing enhanced constraint columns — deleting V2/V3 " +
+                             "from flyway_schema_history so they are re-applied...");
+                    deleteFlywayHistoryEntries(conn, "2", "3");
+                    log.info("✅ Flyway V2/V3 history entries deleted. Migrations will be re-applied.");
+                } else {
+                    log.info("✅ coupons enhanced columns are present — no history fix needed.");
+                }
+
             } catch (Exception e) {
                 log.warn("⚠️  Could not check/fix flyway_schema_history (non-fatal): {}", e.getMessage());
             }
 
-            // ── Step 2: Standard repair (clears FAILED entries) ──────────────────
+            // ── Standard repair (clears FAILED entries) ──────────────────────────
             log.info("Running Flyway repair...");
             try {
                 flyway.repair();
@@ -57,11 +68,38 @@ public class FlywayConfig {
                 log.warn("Flyway repair encountered an issue (non-fatal): {}", e.getMessage());
             }
 
-            // ── Step 3: Migrate ───────────────────────────────────────────────────
+            // ── Migrate ───────────────────────────────────────────────────────────
             log.info("Running Flyway migrate...");
             flyway.migrate();
             log.info("Flyway migration completed.");
         };
+    }
+
+    /**
+     * Returns true if the coupons table exists but is missing the enhanced
+     * constraint columns added in V2/V3 (e.g. min_booking_duration_minutes).
+     */
+    private boolean couponsMissingEnhancedColumns(Connection conn) {
+        try {
+            // Check table exists
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT 1 FROM information_schema.tables WHERE table_name = 'coupons'")) {
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) return false; // Fresh DB — migrations will create it
+                }
+            }
+            // Check for the sentinel column that the old minimal schema was missing
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT 1 FROM information_schema.columns " +
+                    "WHERE table_name = 'coupons' AND column_name = 'min_booking_duration_minutes'")) {
+                try (ResultSet rs = ps.executeQuery()) {
+                    return !rs.next(); // Missing → need to re-run migrations
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not inspect coupons columns: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

@@ -51,6 +51,17 @@ public class BookingService {
     @Value("${pricing.platform-fee-rate:2.0}")
     private Double platformFeeRate;
 
+    /**
+     * Returns the effective online-payment percentage for a given service.
+     * Uses the service-level override when set; falls back to the global
+     * {@code pricing.online-payment-percent} config value otherwise.
+     */
+    private double effectiveOnlinePaymentPercent(com.hitendra.turf_booking_backend.entity.Service service) {
+        return (service != null && service.getOnlinePaymentPercent() != null)
+                ? service.getOnlinePaymentPercent()
+                : onlinePaymentPercent;
+    }
+
     // Auto-confirm is now handled via Razorpay webhook only
 
     /**
@@ -541,9 +552,14 @@ public class BookingService {
         // Use stored amounts from projection (already calculated during booking creation)
         Double totalAmount = projection.getAmount();
         if (totalAmount != null) {
+            // Resolve the effective online-payment percentage: per-service value, or global fallback
+            double effectivePct = (projection.getServiceOnlinePaymentPercent() != null)
+                    ? projection.getServiceOnlinePaymentPercent()
+                    : onlinePaymentPercent;
+
             double onlineAmount = projection.getOnlineAmountPaid() != null
                     ? projection.getOnlineAmountPaid().doubleValue()
-                    : Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+                    : Math.round(totalAmount * effectivePct) / 100.0;
             double venueAmount = projection.getVenueAmountDue() != null
                     ? projection.getVenueAmountDue().doubleValue()
                     : Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
@@ -567,7 +583,7 @@ public class BookingService {
                     .platformFeePercent(platformFeePercent)
                     .platformFee(platformFee)
                     .totalAmount(totalAmount)
-                    .onlinePaymentPercent(onlinePaymentPercent)
+                    .onlinePaymentPercent(effectivePct)
                     .onlineAmount(onlineAmount)
                     .venueAmount(venueAmount)
                     .venueAmountCollected(venueAmountCollected)
@@ -620,6 +636,7 @@ public class BookingService {
 
         // Calculate accurate price breakdown using PricingService
         if (booking.getResource() != null && booking.getAmount() != null) {
+            double effectivePct = effectiveOnlinePaymentPercent(booking.getService());
             try {
                 // Use PricingService for accurate calculation
                 PriceBreakdownDto priceBreakdown = pricingService.calculatePriceBreakdownForTimeRange(
@@ -629,44 +646,30 @@ public class BookingService {
                         booking.getBookingDate()
                 );
 
-                // Use calculated values from PricingService
                 double slotSubtotal = priceBreakdown.getSubtotal() != null ? priceBreakdown.getSubtotal() : 0.0;
                 double platformFeePercent = priceBreakdown.getConvenienceFeeRate() != null ? priceBreakdown.getConvenienceFeeRate() : 2.0;
                 double platformFee = priceBreakdown.getConvenienceFee() != null ? priceBreakdown.getConvenienceFee() : 0.0;
-
-                // Use the stored amount as the authoritative total (in case pricing rules changed)
                 double storedTotal = booking.getAmount();
-
-                // If calculated total differs significantly from stored total,
-                // use stored total and recalculate breakdown proportionally
                 double calculatedTotal = priceBreakdown.getTotalAmount() != null ? priceBreakdown.getTotalAmount() : 0.0;
 
                 if (Math.abs(calculatedTotal - storedTotal) > 0.01) {
-                    // Pricing rules may have changed, so derive breakdown from stored amount
-                    // Using the formula: storedTotal = subtotal * (1 + feeRate/100)
-                    // Therefore: subtotal = storedTotal / (1 + feeRate/100)
                     slotSubtotal = storedTotal / (1 + platformFeePercent / 100.0);
                     platformFee = storedTotal - slotSubtotal;
                     log.debug("Price recalculated for booking {}: stored={}, calculated={}",
                             booking.getId(), storedTotal, calculatedTotal);
                 }
 
-                // Round to 2 decimal places for monetary precision
                 slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
                 platformFee = Math.round(platformFee * 100.0) / 100.0;
                 storedTotal = Math.round(storedTotal * 100.0) / 100.0;
 
-                // Calculate online and venue amounts
                 double onlineAmount;
                 double venueAmount;
-
                 if (booking.getOnlineAmountPaid() != null) {
-                    // Use stored value if available
                     onlineAmount = booking.getOnlineAmountPaid().doubleValue();
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 } else {
-                    // Calculate from percentage (for backward compatibility)
-                    onlineAmount = Math.round(storedTotal * onlinePaymentPercent) / 100.0;
+                    onlineAmount = Math.round(storedTotal * effectivePct) / 100.0;
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 }
 
@@ -679,7 +682,7 @@ public class BookingService {
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
                         .totalAmount(storedTotal)
-                        .onlinePaymentPercent(onlinePaymentPercent)
+                        .onlinePaymentPercent(effectivePct)
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
                         .venueAmountCollected(venueAmountCollected)
@@ -690,26 +693,22 @@ public class BookingService {
                 dto.setAmountBreakdown(amountBreakdown);
             } catch (Exception e) {
                 log.warn("Failed to calculate price breakdown for booking {}: {}", booking.getId(), e.getMessage());
-                // Fallback: derive from stored amount with default fee
                 double storedTotal = booking.getAmount();
                 double platformFeePercent = platformFeeRate != null ? platformFeeRate : 0.0;
                 double slotSubtotal = storedTotal / (1 + platformFeePercent / 100.0);
                 double platformFee = storedTotal - slotSubtotal;
 
-                // Round to 2 decimal places
                 slotSubtotal = Math.round(slotSubtotal * 100.0) / 100.0;
                 platformFee = Math.round(platformFee * 100.0) / 100.0;
                 storedTotal = Math.round(storedTotal * 100.0) / 100.0;
 
-                // Calculate online and venue amounts for fallback
                 double onlineAmount;
                 double venueAmount;
-
                 if (booking.getOnlineAmountPaid() != null) {
                     onlineAmount = booking.getOnlineAmountPaid().doubleValue();
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 } else {
-                    onlineAmount = Math.round(storedTotal * onlinePaymentPercent) / 100.0;
+                    onlineAmount = Math.round(storedTotal * effectivePct) / 100.0;
                     venueAmount = Math.round((storedTotal - onlineAmount) * 100.0) / 100.0;
                 }
 
@@ -722,7 +721,7 @@ public class BookingService {
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
                         .totalAmount(storedTotal)
-                        .onlinePaymentPercent(onlinePaymentPercent)
+                        .onlinePaymentPercent(effectivePct)
                         .onlineAmount(onlineAmount)
                         .venueAmount(venueAmount)
                         .venueAmountCollected(venueAmountCollected)

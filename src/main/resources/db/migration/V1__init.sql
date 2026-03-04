@@ -124,6 +124,9 @@ CREATE TABLE IF NOT EXISTS services (
     end_time TIME,
     availability BOOLEAN NOT NULL DEFAULT TRUE,
     refund_allowed BOOLEAN NOT NULL DEFAULT TRUE,
+    -- Percentage of total booking amount to be collected online (rest at venue).
+    -- NULL means fall back to the global pricing.online-payment-percent config.
+    online_payment_percent DOUBLE PRECISION DEFAULT NULL,
     google_place_id VARCHAR(255),
     google_rating DOUBLE PRECISION,
     google_review_count INTEGER,
@@ -284,7 +287,9 @@ CREATE TABLE IF NOT EXISTS bookings (
     remaining_amount NUMERIC(19, 2),
     transfer_status VARCHAR(20) DEFAULT 'PENDING',
     pricing_type VARCHAR(20),
-    number_of_persons INTEGER
+    number_of_persons INTEGER,
+    discount_amount NUMERIC(19, 2) NOT NULL DEFAULT 0,
+    applied_coupon_code VARCHAR(255)
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_booking_idempotency_key ON bookings(idempotency_key);
@@ -569,6 +574,66 @@ INSERT INTO app_config (
     'A critical update is required to continue using Hyper. Please update to the latest version.',
     'A new version of Hyper is available with premium UI enhancements and bug fixes!'
 );
+
+-- ============================================================================
+-- COUPONS (from V3)
+-- ============================================================================
+
+
+-- ============================================================================
+-- COUPONS (from V3)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS coupons (
+    id                           BIGSERIAL PRIMARY KEY,
+    code                         VARCHAR(255)     NOT NULL,
+    description                  VARCHAR(500),
+    discount_type                VARCHAR(50)      NOT NULL,
+    discount_value               DOUBLE PRECISION NOT NULL,
+    min_booking_amount           DOUBLE PRECISION,
+    max_discount_amount          DOUBLE PRECISION,
+    valid_from                   DATE,
+    expiry_date                  DATE             NOT NULL,
+    active                       BOOLEAN          NOT NULL DEFAULT TRUE,
+    usage_limit                  INTEGER,
+    current_usage                INTEGER          NOT NULL DEFAULT 0,
+    per_user_usage_limit         INTEGER          NOT NULL DEFAULT 1,
+    new_users_only               BOOLEAN          NOT NULL DEFAULT FALSE,
+    min_booking_duration_minutes INTEGER,
+    valid_day_type               VARCHAR(20),
+    created_at                   TIMESTAMPTZ      NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_coupon_code UNIQUE (code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupon_code ON coupons (code);
+
+CREATE TABLE IF NOT EXISTS coupon_applicable_services (
+    coupon_id  BIGINT NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+    service_id BIGINT NOT NULL,
+    PRIMARY KEY (coupon_id, service_id)
+);
+
+CREATE TABLE IF NOT EXISTS coupon_applicable_resources (
+    coupon_id   BIGINT NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+    resource_id BIGINT NOT NULL,
+    PRIMARY KEY (coupon_id, resource_id)
+);
+
+CREATE TABLE IF NOT EXISTS coupon_applicable_activities (
+    coupon_id     BIGINT      NOT NULL REFERENCES coupons(id) ON DELETE CASCADE,
+    activity_code VARCHAR(50) NOT NULL,
+    PRIMARY KEY (coupon_id, activity_code)
+);
+
+CREATE TABLE IF NOT EXISTS coupon_usages (
+    id         BIGSERIAL PRIMARY KEY,
+    coupon_id  BIGINT      NOT NULL REFERENCES coupons(id)   ON DELETE CASCADE,
+    user_id    BIGINT      NOT NULL REFERENCES users(id)     ON DELETE CASCADE,
+    booking_id BIGINT      NOT NULL REFERENCES bookings(id)  ON DELETE CASCADE,
+    used_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coupon_usage_user_coupon ON coupon_usages (user_id, coupon_id);
 
 -- ============================================================================
 -- END OF SCHEMA

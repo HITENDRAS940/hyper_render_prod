@@ -25,6 +25,13 @@ import java.util.Optional;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
+     * Count CONFIRMED or COMPLETED bookings for a user.
+     * Used by coupon validation to detect "new users" (zero prior bookings).
+     */
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.user.id = :userId AND b.status IN ('CONFIRMED','COMPLETED')")
+    long countCompletedBookingsByUserId(@Param("userId") Long userId);
+
+    /**
      * Find booking by ID with all relationships eagerly loaded for invoice generation.
      * This prevents LazyInitializationException when processing booking in async thread.
      *
@@ -79,6 +86,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
+               b.service.onlinePaymentPercent as serviceOnlinePaymentPercent,
                b.resource.id as resourceId, b.resource.name as resourceName,
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
@@ -100,6 +108,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
+               b.service.onlinePaymentPercent as serviceOnlinePaymentPercent,
                b.resource.id as resourceId, b.resource.name as resourceName,
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
@@ -197,6 +206,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
+               s.onlinePaymentPercent as serviceOnlinePaymentPercent,
                r.id as resourceId, r.name as resourceName,
                u.id as userId, u.name as userName, 
                u.email as userEmail, u.phone as userPhone
@@ -224,6 +234,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
+               s.onlinePaymentPercent as serviceOnlinePaymentPercent,
                r.id as resourceId, r.name as resourceName,
                u.id as userId, u.name as userName, 
                u.email as userEmail, u.phone as userPhone
@@ -252,6 +263,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
+               s.onlinePaymentPercent as serviceOnlinePaymentPercent,
                r.id as resourceId, r.name as resourceName,
                u.id as userId, u.name as userName, 
                u.email as userEmail, u.phone as userPhone
@@ -280,6 +292,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                s.id as serviceId, s.name as serviceName,
+               s.onlinePaymentPercent as serviceOnlinePaymentPercent,
                r.id as resourceId, r.name as resourceName,
                u.id as userId, u.name as userName, 
                u.email as userEmail, u.phone as userPhone
@@ -308,6 +321,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
+               b.service.onlinePaymentPercent as serviceOnlinePaymentPercent,
                b.resource.id as resourceId, b.resource.name as resourceName,
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
@@ -329,6 +343,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
+               b.service.onlinePaymentPercent as serviceOnlinePaymentPercent,
                b.resource.id as resourceId, b.resource.name as resourceName,
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone
@@ -350,6 +365,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                CAST(b.venuePaymentCollectionMethod AS string) as venuePaymentCollectionMethod,
                CAST(b.paymentStatusEnum AS string) as paymentStatus,
                b.service.id as serviceId, b.service.name as serviceName,
+               b.service.onlinePaymentPercent as serviceOnlinePaymentPercent,
                b.resource.id as resourceId, b.resource.name as resourceName,
                b.user.id as userId, b.user.name as userName, 
                b.user.email as userEmail, b.user.phone as userPhone

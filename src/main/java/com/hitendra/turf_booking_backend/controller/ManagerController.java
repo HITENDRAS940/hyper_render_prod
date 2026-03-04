@@ -4,6 +4,9 @@ import com.hitendra.turf_booking_backend.dto.activity.CreateActivityDto;
 import com.hitendra.turf_booking_backend.dto.activity.GetActivityDto;
 import com.hitendra.turf_booking_backend.dto.appconfig.AppConfigRequest;
 import com.hitendra.turf_booking_backend.dto.appconfig.AppConfigResponse;
+import com.hitendra.turf_booking_backend.dto.coupon.CouponDto;
+import com.hitendra.turf_booking_backend.dto.coupon.CouponSummaryDto;
+import com.hitendra.turf_booking_backend.dto.coupon.CreateCouponRequest;
 import com.hitendra.turf_booking_backend.service.AppConfigService;
 import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.PendingBookingDto;
@@ -60,6 +63,7 @@ public class ManagerController {
     private final ActivityService activityService;
     private final AdminFinancialService adminFinancialService;
     private final AppConfigService appConfigService;
+    private final CouponService couponService;
 
     @PostMapping("/admins")
     @Operation(summary = "Create admin", description = "Create a new admin user")
@@ -672,38 +676,48 @@ public class ManagerController {
                 adminFinancialService.getTransactionHistory(adminId, page, size));
     }
 
-    // ─── App Config CRUD ───────────────────────────────────────────────────────
+    // ─── App Config ────────────────────────────────────────────────────────────
 
     @GetMapping("/app-config")
-    @Operation(summary = "List all app configs", description = "Retrieve all app update configuration records")
-    public ResponseEntity<List<AppConfigResponse>> getAllAppConfigs() {
-        return ResponseEntity.ok(appConfigService.getAllConfigs());
+    @Operation(summary = "Get app config", description = "Retrieve the current app update configuration")
+    public ResponseEntity<AppConfigResponse> getAppConfig() {
+        return ResponseEntity.ok(appConfigService.getAppConfig());
     }
 
-    @GetMapping("/app-config/{id}")
-    @Operation(summary = "Get app config by ID", description = "Retrieve a specific app update configuration record by its ID")
-    public ResponseEntity<AppConfigResponse> getAppConfigById(@PathVariable Long id) {
-        return ResponseEntity.ok(appConfigService.getConfigById(id));
+    @PutMapping("/app-config")
+    @Operation(summary = "Update app config", description = "Update the single app update configuration row in-place. No new rows are ever created.")
+    public ResponseEntity<AppConfigResponse> updateAppConfig(@Valid @RequestBody AppConfigRequest request) {
+        return ResponseEntity.ok(appConfigService.updateConfig(request));
     }
 
-    @PostMapping("/app-config")
-    @Operation(summary = "Create app config", description = "Create a new app update configuration record")
-    public ResponseEntity<AppConfigResponse> createAppConfig(@Valid @RequestBody AppConfigRequest request) {
-        return ResponseEntity.ok(appConfigService.createConfig(request));
+    @PostMapping("/coupons")
+    @Operation(summary = "Create Coupon", description = "Create a new discount coupon with full constraint configuration")
+    public ResponseEntity<CouponDto> createCoupon(@Valid @RequestBody CreateCouponRequest request) {
+        return ResponseEntity.ok(couponService.createCoupon(request));
     }
 
-    @PutMapping("/app-config/{id}")
-    @Operation(summary = "Update app config", description = "Update an existing app update configuration record by its ID")
-    public ResponseEntity<AppConfigResponse> updateAppConfig(
-            @PathVariable Long id,
-            @Valid @RequestBody AppConfigRequest request) {
-        return ResponseEntity.ok(appConfigService.updateConfig(id, request));
+    @GetMapping("/coupons")
+    @Operation(summary = "Get All Coupons", description = "Returns id and code only — use GET /coupons/{id} for full details")
+    public ResponseEntity<List<CouponSummaryDto>> getAllCoupons() {
+        return ResponseEntity.ok(couponService.getAllCoupons());
     }
 
-    @DeleteMapping("/app-config/{id}")
-    @Operation(summary = "Delete app config", description = "Delete an app update configuration record by its ID")
-    public ResponseEntity<Void> deleteAppConfig(@PathVariable Long id) {
-        appConfigService.deleteConfig(id);
+    @GetMapping("/coupons/{id}")
+    @Operation(summary = "Get Coupon by ID", description = "Retrieve a specific coupon with all its constraints")
+    public ResponseEntity<CouponDto> getCouponById(@PathVariable Long id) {
+        return ResponseEntity.ok(couponService.getCouponById(id));
+    }
+
+    @PatchMapping("/coupons/{id}/deactivate")
+    @Operation(summary = "Deactivate Coupon", description = "Soft-delete: mark a coupon as inactive so it can no longer be applied")
+    public ResponseEntity<Void> deactivateCoupon(@PathVariable Long id) {
+        couponService.deactivateCoupon(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/coupons/{id}/activate")
+    @Operation(summary = "Activate Coupon", description = "Re-enable a previously deactivated coupon")
+    public ResponseEntity<CouponDto> activateCoupon(@PathVariable Long id) {
+        return ResponseEntity.ok(couponService.activateCoupon(id));
     }
 }

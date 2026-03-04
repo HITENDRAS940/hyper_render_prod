@@ -27,6 +27,8 @@ public interface BookingListProjection {
     // Service info
     Long getServiceId();
     String getServiceName();
+    /** Per-service online payment %. Null = fall back to global config. */
+    Double getServiceOnlinePaymentPercent();
 
     // Resource info
     Long getResourceId();

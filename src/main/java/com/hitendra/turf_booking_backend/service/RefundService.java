@@ -53,6 +53,19 @@ public class RefundService {
     private static final ZoneId IST_ZONE = ZoneId.of("Asia/Kolkata");
 
     /**
+     * Returns the effective online-payment percentage for a booking's service.
+     * Uses the service-level override when set; falls back to the global
+     * {@code pricing.online-payment-percent} config value otherwise.
+     */
+    private double effectiveOnlinePaymentPercent(Booking booking) {
+        com.hitendra.turf_booking_backend.entity.Service service =
+                (booking != null) ? booking.getService() : null;
+        return (service != null && service.getOnlinePaymentPercent() != null)
+                ? service.getOnlinePaymentPercent()
+                : onlinePaymentPercent;
+    }
+
+    /**
      * Get refund preview for a booking (READ-ONLY - no DB changes).
      * This is safe to call multiple times.
      *
@@ -151,9 +164,9 @@ public class RefundService {
             // Use stored online amount paid
             originalAmount = booking.getOnlineAmountPaid();
         } else {
-            // For backward compatibility: calculate from total amount using online payment percentage
+            // For backward compatibility: calculate from total amount using the effective percentage
             double totalAmount = booking.getAmount();
-            double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            double onlineAmount = Math.round(totalAmount * effectiveOnlinePaymentPercent(booking)) / 100.0;
             originalAmount = BigDecimal.valueOf(onlineAmount);
         }
 

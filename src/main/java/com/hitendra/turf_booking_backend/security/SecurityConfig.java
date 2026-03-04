@@ -61,6 +61,7 @@ public class SecurityConfig {
                 // Health check
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/v1/app/config").permitAll()
+                .requestMatchers("/v1/app/coupons").permitAll()
                 // Role-based access
                 .requestMatchers("/manager/**").hasRole("MANAGER")
                 .requestMatchers("/admin/**").hasAnyRole("ADMIN", "MANAGER")

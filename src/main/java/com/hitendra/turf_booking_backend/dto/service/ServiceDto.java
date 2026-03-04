@@ -15,6 +15,8 @@ public class ServiceDto {
     private String contactNumber; // Need to be removed in production
     private boolean availability;
     private boolean refundAllowed;
+    /** Per-service online payment percentage. Null means the global config value applies. */
+    private Double onlinePaymentPercent;
     private  List<String> amenities;
     private List<String> images;
     private List<String> activities;

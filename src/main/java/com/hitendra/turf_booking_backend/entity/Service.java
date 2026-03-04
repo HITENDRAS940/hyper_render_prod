@@ -70,6 +70,14 @@ public class Service {
     @Builder.Default
     private boolean refundAllowed = true;
 
+    /**
+     * Percentage of the total booking amount the user must pay online upfront.
+     * The remainder is collected at the venue.
+     * When null, the global {@code pricing.online-payment-percent} config value is used.
+     */
+    @Column(name = "online_payment_percent")
+    private Double onlinePaymentPercent;
+
     // Google Places API fields
     @Column(name = "google_place_id")
     private String googlePlaceId;

@@ -40,6 +40,8 @@ public class ServiceDetailDto {
     // ── Flags ─────────────────────────────────────────────────────────────
     private boolean availability;
     private boolean refundAllowed;
+    /** Per-service online payment percentage. Null means the global config value applies. */
+    private Double onlinePaymentPercent;
 
     // ── Media & taxonomy ─────────────────────────────────────────────────
     private List<String> amenities;

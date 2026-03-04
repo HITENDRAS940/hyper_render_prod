@@ -120,11 +120,22 @@ public class SlotBookingService {
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
-    @Value("${pricing.platform-fee-rate:2.0}")
+    @Value("${pricing.platform-fee-rate:0.0}")
     private Double platformFeeRate;
 
     @Value("${pricing.online-payment-percent:20}")
     private Double onlinePaymentPercent;
+
+    /**
+     * Returns the effective online-payment percentage for a given service.
+     * Uses the service-level override when set; falls back to the global
+     * {@code pricing.online-payment-percent} config value otherwise.
+     */
+    private double effectiveOnlinePaymentPercent(com.hitendra.turf_booking_backend.entity.Service service) {
+        return (service != null && service.getOnlinePaymentPercent() != null)
+                ? service.getOnlinePaymentPercent()
+                : onlinePaymentPercent;
+    }
 
     // ==================== SLOT AVAILABILITY (Aggregated) ====================
 
@@ -257,8 +268,10 @@ public class SlotBookingService {
         }
 
         if (date.equals(todayIST)) {
+            // A slot is only bookable if the current time is at least 30 minutes
+            // before the slot's start time (booking cutoff = startTime - 30 mins)
             slots = slots.stream()
-                    .filter(slot -> slot.getEndTime().isAfter(timeIST))
+                    .filter(slot -> timeIST.isBefore(slot.getStartTime().minusMinutes(30)))
                     .toList();
         }
 
@@ -719,8 +732,8 @@ public class SlotBookingService {
         double platformFee = Math.round(totalSlotPrice * platformFeeRate) / 100.0;
         double totalAmount = Math.round((totalSlotPrice + platformFee) * 100.0) / 100.0;
 
-        // Calculate online and venue amounts based on configurable percentage
-        double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+        // Calculate online and venue amounts based on per-service percentage (fallback to global config)
+        double onlineAmount = Math.round(totalAmount * effectiveOnlinePaymentPercent(service)) / 100.0;
         double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
         User user = authUtil.getCurrentUser();
@@ -832,8 +845,8 @@ public class SlotBookingService {
             double platformFee = Math.round(slotPrice * platformFeeRate) / 100.0;
             double totalAmount = Math.round((slotPrice + platformFee) * 100.0) / 100.0;
 
-            // Calculate online and venue amounts based on configurable percentage
-            double onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            // Calculate online and venue amounts based on per-service percentage (fallback to global config)
+            double onlineAmount = Math.round(totalAmount * effectiveOnlinePaymentPercent(service)) / 100.0;
             double venueAmount = Math.round((totalAmount - onlineAmount) * 100.0) / 100.0;
 
             String idempotencyKey = request.getIdempotencyKey() != null ? request.getIdempotencyKey() + "-" + i : null;
@@ -1143,11 +1156,12 @@ public class SlotBookingService {
         // Calculate online and venue amounts
         double onlineAmount;
         double venueAmount;
+        double effectivePct = effectiveOnlinePaymentPercent(booking.getService());
 
         if (booking.getOnlineAmountPaid() != null) {
             onlineAmount = booking.getOnlineAmountPaid().doubleValue();
         } else {
-            onlineAmount = Math.round(totalAmount * onlinePaymentPercent) / 100.0;
+            onlineAmount = Math.round(totalAmount * effectivePct) / 100.0;
         }
 
         if (booking.getVenueAmountDue() != null) {
@@ -1171,7 +1185,7 @@ public class SlotBookingService {
                 .platformFeePercent(platformFeeRate)
                 .platformFee(platformFee)
                 .totalAmount(totalAmount)
-                .onlinePaymentPercent(onlinePaymentPercent)
+                .onlinePaymentPercent(effectivePct)
                 .onlineAmount(onlineAmount)
                 .venueAmount(venueAmount)
                 .venueAmountCollected(venueAmountCollected)

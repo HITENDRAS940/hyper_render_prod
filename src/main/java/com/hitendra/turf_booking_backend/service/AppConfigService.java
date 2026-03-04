@@ -8,8 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -21,52 +19,22 @@ public class AppConfigService {
     // ─── Public ────────────────────────────────────────────────────────────────
 
     /**
-     * Returns the first (and only expected) app config row.
-     * Throws IllegalStateException when no config is seeded yet.
+     * Returns the single app-config row.
+     * Throws if no config has been seeded yet.
      */
     @Transactional(readOnly = true)
     public AppConfigResponse getAppConfig() {
-        AppConfig config = appConfigRepository.findAll()
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("App configuration has not been set up yet."));
-        return toResponse(config);
+        return toResponse(getSingleton());
     }
 
-    // ─── Manager CRUD ──────────────────────────────────────────────────────────
+    // ─── Manager ───────────────────────────────────────────────────────────────
 
-    @Transactional(readOnly = true)
-    public List<AppConfigResponse> getAllConfigs() {
-        return appConfigRepository.findAll()
-                .stream()
-                .map(this::toResponse)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public AppConfigResponse getConfigById(Long id) {
-        AppConfig config = findOrThrow(id);
-        return toResponse(config);
-    }
-
-    public AppConfigResponse createConfig(AppConfigRequest request) {
-        AppConfig config = AppConfig.builder()
-                .iosMinVersion(request.getIosMinVersion())
-                .iosLatestVersion(request.getIosLatestVersion())
-                .iosStoreUrl(request.getIosStoreUrl())
-                .androidMinVersion(request.getAndroidMinVersion())
-                .androidLatestVersion(request.getAndroidLatestVersion())
-                .androidStoreUrl(request.getAndroidStoreUrl())
-                .forceUpdateMessage(request.getForceUpdateMessage())
-                .softUpdateMessage(request.getSoftUpdateMessage())
-                .build();
-        AppConfig saved = appConfigRepository.save(config);
-        log.info("AppConfig created with id={}", saved.getId());
-        return toResponse(saved);
-    }
-
-    public AppConfigResponse updateConfig(Long id, AppConfigRequest request) {
-        AppConfig config = findOrThrow(id);
+    /**
+     * Updates the single app-config row in-place.
+     * Never creates a second row.
+     */
+    public AppConfigResponse updateConfig(AppConfigRequest request) {
+        AppConfig config = getSingleton();
         config.setIosMinVersion(request.getIosMinVersion());
         config.setIosLatestVersion(request.getIosLatestVersion());
         config.setIosStoreUrl(request.getIosStoreUrl());
@@ -76,21 +44,15 @@ public class AppConfigService {
         config.setForceUpdateMessage(request.getForceUpdateMessage());
         config.setSoftUpdateMessage(request.getSoftUpdateMessage());
         AppConfig saved = appConfigRepository.save(config);
-        log.info("AppConfig updated for id={}", saved.getId());
+        log.info("AppConfig updated (id={})", saved.getId());
         return toResponse(saved);
-    }
-
-    public void deleteConfig(Long id) {
-        AppConfig config = findOrThrow(id);
-        appConfigRepository.delete(config);
-        log.info("AppConfig deleted for id={}", id);
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────
 
-    private AppConfig findOrThrow(Long id) {
-        return appConfigRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("AppConfig not found with id: " + id));
+    private AppConfig getSingleton() {
+        return appConfigRepository.findSingleton()
+                .orElseThrow(() -> new IllegalStateException("App configuration has not been seeded yet."));
     }
 
     private AppConfigResponse toResponse(AppConfig config) {
@@ -118,4 +80,3 @@ public class AppConfigService {
                 .build();
     }
 }
-

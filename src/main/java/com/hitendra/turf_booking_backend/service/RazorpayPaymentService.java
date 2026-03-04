@@ -3,9 +3,12 @@ package com.hitendra.turf_booking_backend.service;
 import com.hitendra.turf_booking_backend.dto.payment.*;
 import com.hitendra.turf_booking_backend.entity.Booking;
 import com.hitendra.turf_booking_backend.entity.BookingStatus;
+import com.hitendra.turf_booking_backend.entity.CouponUsage;
 import com.hitendra.turf_booking_backend.entity.PaymentStatus;
 import com.hitendra.turf_booking_backend.exception.PaymentException;
 import com.hitendra.turf_booking_backend.repository.BookingRepository;
+import com.hitendra.turf_booking_backend.repository.CouponRepository;
+import com.hitendra.turf_booking_backend.repository.CouponUsageRepository;
 import com.razorpay.Order;
 import com.razorpay.Payment;
 import com.razorpay.RazorpayClient;
@@ -32,6 +35,8 @@ public class RazorpayPaymentService {
 
     private final RazorpayClient razorpayClient;
     private final BookingRepository bookingRepository;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
     private final SmsService smsService;
     private final EmailService emailService;
     private final org.springframework.context.ApplicationEventPublisher applicationEventPublisher;
@@ -300,6 +305,38 @@ public class RazorpayPaymentService {
             booking.setLockExpiresAt(null); // Remove timeout
 
             bookingRepository.save(booking);
+
+            // ── Record coupon usage now that booking is confirmed ─────────────────
+            // CouponUsage is intentionally deferred to this point: a coupon is only
+            // considered "used" when payment succeeds, not when it is merely applied.
+            if (booking.getAppliedCouponCode() != null) {
+                try {
+                    couponRepository.findByCodeAndActiveTrue(booking.getAppliedCouponCode())
+                            .ifPresentOrElse(coupon -> {
+                                // Guard against duplicate usage rows (idempotency)
+                                if (!couponUsageRepository.existsByBookingId(booking.getId())) {
+                                    CouponUsage usage = CouponUsage.builder()
+                                            .coupon(coupon)
+                                            .user(booking.getUser())
+                                            .booking(booking)
+                                            .usedAt(Instant.now())
+                                            .build();
+                                    couponUsageRepository.save(usage);
+
+                                    coupon.setCurrentUsage(coupon.getCurrentUsage() + 1);
+                                    couponRepository.save(coupon);
+
+                                    log.info("Coupon '{}' marked as used for booking ID: {}",
+                                            coupon.getCode(), booking.getId());
+                                } else {
+                                    log.info("Coupon usage already recorded for booking ID: {} (idempotent)", booking.getId());
+                                }
+                            }, () -> log.warn("Applied coupon code '{}' not found or inactive when recording usage for booking ID: {}",
+                                    booking.getAppliedCouponCode(), booking.getId()));
+                } catch (Exception e) {
+                    log.error("Failed to record coupon usage for booking {}: {}", booking.getId(), e.getMessage(), e);
+                }
+            }
 
             // ── Admin Financial Tracking: ADVANCE_ONLINE ──────────────────────────
             // NOTE: Online advance is NOT credited to cash_ledger here because the money

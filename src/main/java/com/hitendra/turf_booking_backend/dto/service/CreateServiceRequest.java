@@ -22,6 +22,13 @@ public class CreateServiceRequest {
     private Boolean refundAllowed = true;
 
     /**
+     * Percentage of total booking amount to be paid online (rest collected at venue).
+     * When null the global pricing.online-payment-percent config value is used as fallback.
+     * Valid range: 0 – 100.
+     */
+    private Double onlinePaymentPercent;
+
+    /**
      * Google Places place_id for this service/venue.
      * Used to fetch rating and review count from Google Places API.
      */

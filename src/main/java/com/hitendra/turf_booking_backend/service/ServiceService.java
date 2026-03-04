@@ -172,6 +172,7 @@ public class ServiceService {
                 .endTime(service.getEndTime())
                 .availability(service.isAvailability())
                 .refundAllowed(service.isRefundAllowed())
+                .onlinePaymentPercent(service.getOnlinePaymentPercent())
                 .amenities(service.getAmenities())
                 .images(service.getImages())
                 .activities(service.getActivities() != null
@@ -208,6 +209,7 @@ public class ServiceService {
                 .contactNumber(request.getContactNumber())
                 .createdBy(adminProfile)
                 .refundAllowed(request.getRefundAllowed() != null ? request.getRefundAllowed() : true)
+                .onlinePaymentPercent(request.getOnlinePaymentPercent())
                 .googlePlaceId(request.getGooglePlaceId())
                 .images(new ArrayList<>())
                 .activities(new ArrayList<>())  // Initialize activities list
@@ -323,6 +325,10 @@ public class ServiceService {
         if (serviceDto.getRefundAllowed() != null) {
             service.setRefundAllowed(serviceDto.getRefundAllowed());
         }
+
+        // Allow explicitly setting or clearing the per-service online payment percentage
+        // (null = revert to global config fallback)
+        service.setOnlinePaymentPercent(serviceDto.getOnlinePaymentPercent());
 
         // Update Google Place ID and fetch initial rating if changed
         if (serviceDto.getGooglePlaceId() != null) {
@@ -565,6 +571,7 @@ public class ServiceService {
         dto.setImages(service.getImages());
         dto.setAvailability(service.isAvailability());
         dto.setRefundAllowed(service.isRefundAllowed());
+        dto.setOnlinePaymentPercent(service.getOnlinePaymentPercent());
         dto.setAmenities(service.getAmenities());
         dto.setGoogleRating(service.getGoogleRating());
         dto.setGoogleReviewCount(service.getGoogleReviewCount());

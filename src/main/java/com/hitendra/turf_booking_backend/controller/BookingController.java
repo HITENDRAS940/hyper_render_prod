@@ -1,9 +1,14 @@
 package com.hitendra.turf_booking_backend.controller;
 
+import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.CancellationResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.RefundHistoryDto;
 import com.hitendra.turf_booking_backend.dto.booking.RefundPreviewDto;
+import com.hitendra.turf_booking_backend.dto.coupon.CouponApplyResponseDto;
+import com.hitendra.turf_booking_backend.entity.User;
+import com.hitendra.turf_booking_backend.service.CouponService;
 import com.hitendra.turf_booking_backend.service.RefundService;
+import com.hitendra.turf_booking_backend.util.AuthUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,20 +25,21 @@ import java.util.List;
 @SecurityRequirement(name = "Bearer Authentication")
 @Tag(name = "Bookings", description = "User booking APIs")
 @PreAuthorize("hasRole('USER')")
-public class  BookingController {
+public class BookingController {
     private final RefundService refundService;
+    private final CouponService couponService;
+    private final AuthUtil authUtil;
 
     /**
      * Refund History API (Read-Only)
-     * Returns all refunds for the currently authenticated user, ordered by most recent first.
+     * Returns all refunds for the currently authenticated user, ordered by most
+     * recent first.
      */
     @GetMapping("/refund-history")
-    @Operation(
-        summary = "Get refund history for current user",
-        description = "Returns all refund records for the authenticated user, ordered by most recent first. " +
-                     "Includes refund status, amounts, booking details, and processing timestamps. " +
-                     "Read-only - no side effects."
-    )
+    @Operation(summary = "Get refund history for current user", description = "Returns all refund records for the authenticated user, ordered by most recent first. "
+            +
+            "Includes refund status, amounts, booking details, and processing timestamps. " +
+            "Read-only - no side effects.")
     public ResponseEntity<List<RefundHistoryDto>> getRefundHistory() {
         List<RefundHistoryDto> history = refundService.getRefundHistory();
         return ResponseEntity.ok(history);
@@ -45,12 +51,10 @@ public class  BookingController {
      * Safe to call multiple times.
      */
     @GetMapping("/{bookingId}/cancel-preview")
-    @Operation(
-        summary = "Get cancellation refund preview",
-        description = "Calculate and return refundable amount for a booking WITHOUT modifying database. " +
-                     "Use this API to show user what they will receive before confirming cancellation. " +
-                     "Safe to call multiple times - no side effects."
-    )
+    @Operation(summary = "Get cancellation refund preview", description = "Calculate and return refundable amount for a booking WITHOUT modifying database. "
+            +
+            "Use this API to show user what they will receive before confirming cancellation. " +
+            "Safe to call multiple times - no side effects.")
     public ResponseEntity<RefundPreviewDto> getCancelPreview(@PathVariable Long bookingId) {
         RefundPreviewDto preview = refundService.getRefundPreview(bookingId);
         return ResponseEntity.ok(preview);
@@ -62,14 +66,27 @@ public class  BookingController {
      * Never trusts frontend refund values.
      */
     @PostMapping("/{bookingId}/cancel")
-    @Operation(
-        summary = "Cancel booking and initiate refund",
-        description = "Cancel a confirmed booking and initiate refund. " +
-                     "Refund amount is RE-CALCULATED on backend (never trusts frontend). " +
-                     "Updates booking status to CANCELLED_BY_USER and creates refund record."
-    )
+    @Operation(summary = "Cancel booking and initiate refund", description = "Cancel a confirmed booking and initiate refund. "
+            +
+            "Refund amount is RE-CALCULATED on backend (never trusts frontend). " +
+            "Updates booking status to CANCELLED_BY_USER and creates refund record.")
     public ResponseEntity<CancellationResponseDto> cancelBooking(@PathVariable Long bookingId) {
         CancellationResponseDto response = refundService.cancelBookingWithRefund(bookingId);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Apply Coupon to Booking API
+     */
+    @PostMapping("/{bookingId}/apply-coupon")
+    @Operation(summary = "Apply coupon to pending booking",
+               description = "Validates and applies a coupon code to a PENDING booking. " +
+                             "Returns only the revised amount breakdown — all amounts are persisted to DB.")
+    public ResponseEntity<CouponApplyResponseDto> applyCoupon(
+            @PathVariable Long bookingId,
+            @RequestParam String code) {
+        User currentUser = authUtil.getCurrentUser();
+        CouponApplyResponseDto response = couponService.applyCoupon(bookingId, code, currentUser);
         return ResponseEntity.ok(response);
     }
 }

@@ -10,10 +10,10 @@ import java.util.List;
 
 @Entity
 @Table(name = "bookings", indexes = {
-    @Index(name = "idx_booking_idempotency_key", columnList = "idempotency_key", unique = true),
-    @Index(name = "idx_booking_resource_date", columnList = "resource_id, booking_date"),
-    @Index(name = "idx_booking_service_date", columnList = "service_id, booking_date"),
-    @Index(name = "idx_booking_status_lock_expires", columnList = "status, lock_expires_at")
+        @Index(name = "idx_booking_idempotency_key", columnList = "idempotency_key", unique = true),
+        @Index(name = "idx_booking_resource_date", columnList = "resource_id, booking_date"),
+        @Index(name = "idx_booking_service_date", columnList = "service_id, booking_date"),
+        @Index(name = "idx_booking_status_lock_expires", columnList = "status, lock_expires_at")
 })
 @Getter
 @Setter
@@ -77,8 +77,10 @@ public class Booking {
 
     /**
      * Lock expiry time for PAYMENT_PENDING bookings.
-     * If payment is not confirmed before this time, booking will be marked as EXPIRED.
-     * This implements soft-locking to prevent double booking during manual UPI payment.
+     * If payment is not confirmed before this time, booking will be marked as
+     * EXPIRED.
+     * This implements soft-locking to prevent double booking during manual UPI
+     * payment.
      */
     @Column(name = "lock_expires_at")
     private Instant lockExpiresAt;
@@ -147,7 +149,8 @@ public class Booking {
     private VenuePaymentCollectionMethod venuePaymentCollectionMethod;
 
     /**
-     * Advance amount paid by user (calculated dynamically based on config at booking time).
+     * Advance amount paid by user (calculated dynamically based on config at
+     * booking time).
      */
     @Column(name = "advance_amount", precision = 19, scale = 2)
     private java.math.BigDecimal advanceAmount;
@@ -181,4 +184,17 @@ public class Booking {
      */
     @Column(name = "number_of_persons")
     private Integer numberOfPersons;
+
+    /**
+     * Discount amount applied via coupon.
+     */
+    @Column(name = "discount_amount", precision = 19, scale = 2)
+    @Builder.Default
+    private java.math.BigDecimal discountAmount = java.math.BigDecimal.ZERO;
+
+    /**
+     * Coupon code applied to this booking.
+     */
+    @Column(name = "applied_coupon_code")
+    private String appliedCouponCode;
 }
