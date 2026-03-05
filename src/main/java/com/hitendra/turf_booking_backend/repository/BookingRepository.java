@@ -130,6 +130,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.startTime as startTime, b.endTime as endTime, b.amount as amount,
                b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.discountAmount as discountAmount, b.appliedCouponCode as appliedCouponCode,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName
         FROM Booking b
@@ -158,6 +159,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
                b.startTime as startTime, b.endTime as endTime, b.amount as amount,
                b.createdAt as createdAt,
                b.onlineAmountPaid as onlineAmountPaid, b.venueAmountDue as venueAmountDue,
+               b.discountAmount as discountAmount, b.appliedCouponCode as appliedCouponCode,
                b.service.id as serviceId, b.service.name as serviceName,
                b.resource.id as resourceId, b.resource.name as resourceName
         FROM Booking b

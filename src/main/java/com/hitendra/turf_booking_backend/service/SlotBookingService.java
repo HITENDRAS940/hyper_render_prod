@@ -487,16 +487,16 @@ public class SlotBookingService {
                             .resourceId(r.getId())
                             .resourceName(r.getName())
                             .resourceDescription(r.getDescription())
+                            .pricingType(r.getPricingType() != null
+                                    ? r.getPricingType().name()
+                                    : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                            .minPersonAllowed(r.getMinPersonAllowed())
+                            .maxPersonAllowed(r.getMaxPersonAllowed())
                             .slots(Collections.emptyList())
                             .build())
                     .collect(Collectors.toList());
 
             return ManualResourceSlotAvailabilityDto.builder()
-                    .pricingType(resources.get(0).getPricingType() != null
-                            ? resources.get(0).getPricingType().name()
-                            : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
-                    .minPersonAllowed(resources.get(0).getMinPersonAllowed())
-                    .maxPersonAllowed(resources.get(0).getMaxPersonAllowed())
                     .resources(emptyResources)
                     .build();
         }
@@ -596,17 +596,16 @@ public class SlotBookingService {
                     .resourceId(resource.getId())
                     .resourceName(resource.getName())
                     .resourceDescription(resource.getDescription())
+                    .pricingType(resource.getPricingType() != null
+                            ? resource.getPricingType().name()
+                            : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
+                    .minPersonAllowed(resource.getMinPersonAllowed())
+                    .maxPersonAllowed(resource.getMaxPersonAllowed())
                     .slots(slotDtos)
                     .build());
         }
 
-        ServiceResource firstResource = resources.get(0);
         return ManualResourceSlotAvailabilityDto.builder()
-                .pricingType(firstResource.getPricingType() != null
-                        ? firstResource.getPricingType().name()
-                        : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name())
-                .minPersonAllowed(firstResource.getMinPersonAllowed())
-                .maxPersonAllowed(firstResource.getMaxPersonAllowed())
                 .resources(resourceSlotDtos)
                 .build();
     }
@@ -1492,12 +1491,20 @@ public class SlotBookingService {
                 ? booking.getPricingType().name()
                 : com.hitendra.turf_booking_backend.entity.PricingType.PER_SLOT.name();
 
+        double discountAmount = booking.getDiscountAmount() != null
+                ? booking.getDiscountAmount().doubleValue() : 0.0;
+        double originalAmount = Math.round((totalAmount + discountAmount) * 100.0) / 100.0;
+        String couponCode = booking.getAppliedCouponCode();
+
         BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                 .pricePerPerson(pricePerPerson)
                 .numberOfPersons(numberOfPersons)
                 .slotSubtotal(slotSubtotal)
                 .platformFeePercent(platformFeeRate)
                 .platformFee(platformFee)
+                .couponCode(couponCode)
+                .discountAmount(discountAmount > 0 ? discountAmount : null)
+                .originalAmount(discountAmount > 0 ? originalAmount : null)
                 .totalAmount(totalAmount)
                 .onlinePaymentPercent(effectivePct)
                 .onlineAmount(onlineAmount)

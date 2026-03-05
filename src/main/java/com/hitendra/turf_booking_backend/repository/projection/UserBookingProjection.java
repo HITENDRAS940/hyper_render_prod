@@ -20,6 +20,8 @@ public interface UserBookingProjection {
     Instant getCreatedAt();
     BigDecimal getOnlineAmountPaid();
     BigDecimal getVenueAmountDue();
+    BigDecimal getDiscountAmount();
+    String getAppliedCouponCode();
 
     // Service info
     Long getServiceId();

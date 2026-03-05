@@ -306,13 +306,28 @@ public class BookingService {
                 .endTime(projection.getEndTime().toString())
                 .build());
 
-        // Extract paid and due amounts from projection
+        Double totalAmount = projection.getAmount();
         Double paidAmount = projection.getOnlineAmountPaid() != null
                 ? projection.getOnlineAmountPaid().doubleValue()
                 : 0.0;
         Double dueAmount = projection.getVenueAmountDue() != null
                 ? projection.getVenueAmountDue().doubleValue()
-                : (projection.getAmount() != null ? projection.getAmount() - paidAmount : 0.0);
+                : (totalAmount != null ? totalAmount - paidAmount : 0.0);
+        Double discountAmount = projection.getDiscountAmount() != null
+                ? projection.getDiscountAmount().doubleValue()
+                : 0.0;
+        // originalAmount = current total + discount that was applied
+        Double originalAmount = (totalAmount != null ? totalAmount : 0.0) + discountAmount;
+        String couponCode = projection.getAppliedCouponCode();
+
+        UserBookingDto.AmountBreakdown amountBreakdown = UserBookingDto.AmountBreakdown.builder()
+                .originalAmount(originalAmount)
+                .discountAmount(discountAmount > 0 ? discountAmount : null)
+                .couponCode(couponCode)
+                .totalAmount(totalAmount)
+                .paidAmount(paidAmount)
+                .dueAmount(dueAmount)
+                .build();
 
         return UserBookingDto.builder()
                 .id(projection.getId())
@@ -324,9 +339,7 @@ public class BookingService {
                 .status(projection.getStatus())
                 .date(projection.getBookingDate())
                 .slots(slotTimes)
-                .totalAmount(projection.getAmount())
-                .paidAmount(paidAmount)
-                .dueAmount(dueAmount)
+                .amountBreakdown(amountBreakdown)
                 .createdAt(projection.getCreatedAt())
                 .build();
     }
@@ -677,10 +690,18 @@ public class BookingService {
                 String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
                         ? booking.getVenuePaymentCollectionMethod().name() : null;
 
+                double discountAmt = booking.getDiscountAmount() != null
+                        ? booking.getDiscountAmount().doubleValue() : 0.0;
+                double originalAmt = Math.round((storedTotal + discountAmt) * 100.0) / 100.0;
+                String couponCode = booking.getAppliedCouponCode();
+
                 BookingResponseDto.AmountBreakdown amountBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
+                        .couponCode(couponCode)
+                        .discountAmount(discountAmt > 0 ? discountAmt : null)
+                        .originalAmount(discountAmt > 0 ? originalAmt : null)
                         .totalAmount(storedTotal)
                         .onlinePaymentPercent(effectivePct)
                         .onlineAmount(onlineAmount)
@@ -716,10 +737,18 @@ public class BookingService {
                 String venuePaymentCollectionMethod = booking.getVenuePaymentCollectionMethod() != null
                         ? booking.getVenuePaymentCollectionMethod().name() : null;
 
+                double discountAmtFallback = booking.getDiscountAmount() != null
+                        ? booking.getDiscountAmount().doubleValue() : 0.0;
+                double originalAmtFallback = Math.round((storedTotal + discountAmtFallback) * 100.0) / 100.0;
+                String couponCodeFallback = booking.getAppliedCouponCode();
+
                 BookingResponseDto.AmountBreakdown fallbackBreakdown = BookingResponseDto.AmountBreakdown.builder()
                         .slotSubtotal(slotSubtotal)
                         .platformFeePercent(platformFeePercent)
                         .platformFee(platformFee)
+                        .couponCode(couponCodeFallback)
+                        .discountAmount(discountAmtFallback > 0 ? discountAmtFallback : null)
+                        .originalAmount(discountAmtFallback > 0 ? originalAmtFallback : null)
                         .totalAmount(storedTotal)
                         .onlinePaymentPercent(effectivePct)
                         .onlineAmount(onlineAmount)

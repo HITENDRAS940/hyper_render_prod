@@ -23,27 +23,6 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ManualResourceSlotAvailabilityDto {
 
-    /**
-     * Pricing strategy shared by all resources of this service/activity.
-     * "PER_SLOT"   – price is flat per slot; numberOfPersons is not required.
-     * "PER_PERSON" – price is multiplied by numberOfPersons; frontend should
-     *                prompt the user to enter headcount before booking.
-     */
-    private String pricingType;
-
-    /**
-     * Minimum number of persons required per booking.
-     * Only populated when pricingType = "PER_PERSON".
-     * Null means no lower bound — a single person is sufficient.
-     */
-    private Integer minPersonAllowed;
-
-    /**
-     * Maximum number of persons allowed per booking.
-     * Only populated when pricingType = "PER_PERSON".
-     * Null means no upper limit.
-     */
-    private Integer maxPersonAllowed;
 
     /**
      * Each element represents one bookable resource of the service.
@@ -74,6 +53,28 @@ public class ManualResourceSlotAvailabilityDto {
          * e.g. "6-pin bowling lane", "Latest gaming rig".
          */
         private String resourceDescription;
+
+        /**
+         * Pricing strategy for this specific resource.
+         * "PER_SLOT"   – price is flat per slot; numberOfPersons is not required.
+         * "PER_PERSON" – price is multiplied by numberOfPersons; frontend should
+         *                prompt the user to enter headcount before booking.
+         */
+        private String pricingType;
+
+        /**
+         * Minimum number of persons required per booking.
+         * Only populated when pricingType = "PER_PERSON".
+         * Null means no lower bound — a single person is sufficient.
+         */
+        private Integer minPersonAllowed;
+
+        /**
+         * Maximum number of persons allowed per booking.
+         * Only populated when pricingType = "PER_PERSON".
+         * Null means no upper limit.
+         */
+        private Integer maxPersonAllowed;
 
         /** Slots available (or unavailable) for THIS specific resource. */
         private List<SlotDto> slots;

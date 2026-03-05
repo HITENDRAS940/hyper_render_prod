@@ -59,20 +59,20 @@ public class BookingResponseDto {
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class AmountBreakdown {
-        private Double pricePerPerson; // Base price per person / per slot (before person multiplier)
-        private Integer numberOfPersons; // Number of persons (1 for PER_SLOT bookings)
-        private Double slotSubtotal; // Base price of slots × numberOfPersons (without platform fee)
-        private Double platformFeePercent; // Platform fee percentage (2%)
-        private Double platformFee; // Platform fee amount (2% of subtotal)
-        private Double totalAmount; // Final amount to pay (slotSubtotal + platformFee)
-        private Double onlinePaymentPercent; // Percentage of total to pay online
-        private Double onlineAmount; // Amount paid online (X% of totalAmount)
-        private Double venueAmount; // Amount to pay at venue (100-X% of totalAmount)
-        private Boolean venueAmountCollected; // Whether venue amount has been collected
+        private Double pricePerPerson;              // Base price per person / per slot (before person multiplier)
+        private Integer numberOfPersons;            // Number of persons (1 for PER_SLOT bookings)
+        private Double slotSubtotal;                // Base price of slots × numberOfPersons (without platform fee)
+        private Double platformFeePercent;          // Platform fee percentage (2%)
+        private Double platformFee;                 // Platform fee amount (2% of subtotal)
+        private String couponCode;                  // Coupon code applied (null if none)
+        private Double discountAmount;              // Discount applied via coupon (null if none)
+        private Double originalAmount;              // Total before coupon discount (slotSubtotal + platformFee)
+        private Double totalAmount;                 // Final amount after discount
+        private Double onlinePaymentPercent;        // Percentage of total to pay online
+        private Double onlineAmount;                // Amount paid online (X% of totalAmount)
+        private Double venueAmount;                 // Amount to pay at venue (100-X% of totalAmount)
+        private Boolean venueAmountCollected;       // Whether venue amount has been collected
         private String venuePaymentCollectionMethod; // Method used to collect venue amount (CASH or ONLINE)
-        private String currency; // Currency code (e.g., "INR")
-
-        private Double discountAmount; // Total discount applied
-        private String couponCode; // Coupon code applied
+        private String currency;                    // Currency code (e.g., "INR")
     }
 }
