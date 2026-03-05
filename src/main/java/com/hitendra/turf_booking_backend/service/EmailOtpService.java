@@ -32,7 +32,7 @@ public class EmailOtpService {
 
     // Test accounts that bypass OTP and generate token directly
     private static final String GOOGLE_TEST_EMAIL = "googletest@hyper.com";
-    private static final String RAZORPAY_TEST_EMAIL = "razorpaytest@hyper.com";
+    private static final String RAZORPAY_TEST_EMAIL = "appletest@hyper.com";
 
     /**
      * Request OTP for email
