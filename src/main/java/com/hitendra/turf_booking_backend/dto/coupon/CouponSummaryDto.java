@@ -17,4 +17,5 @@ public class CouponSummaryDto {
     private Long id;
     private String code;
     private String description;
+    private java.time.LocalDate expiryDate;
 }

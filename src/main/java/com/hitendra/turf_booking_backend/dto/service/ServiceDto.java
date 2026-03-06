@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.dto.service;
 
 import com.hitendra.turf_booking_backend.entity.ResourceSelectionMode;
 import lombok.Data;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -10,10 +11,14 @@ public class ServiceDto {
     private String name;
     private String location;
     private String city;
+    private String state;
     private Double latitude;
     private Double longitude;
     private String description;
-    private String contactNumber; // Need to be removed in production
+    private String contactNumber;
+    private String gstin;
+    private LocalTime startTime;
+    private LocalTime endTime;
     private boolean availability;
     private boolean refundAllowed;
     /** Per-service online payment percentage. Null means the global config value applies. */
@@ -24,11 +29,12 @@ public class ServiceDto {
      * "MANUAL": User explicitly selects which resource to book.
      */
     private ResourceSelectionMode resourceSelectionMode;
-    private  List<String> amenities;
+    private List<String> amenities;
     private List<String> images;
     private List<String> activities;
 
     // Google Places rating (cached, updated daily)
+    private String googlePlaceId;
     private Double googleRating;
     private Integer googleReviewCount;
 

@@ -6,6 +6,7 @@ import com.hitendra.turf_booking_backend.entity.*;
 import com.hitendra.turf_booking_backend.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +34,12 @@ public class ResourceSlotService {
     private final BookingRepository bookingRepository;
     private final SlotGeneratorService slotGeneratorService;
     private final ServiceRepository serviceRepository;
+    private final DisabledSlotRepository disabledSlotRepository;
 
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("h:mm a");
+
+    @Value("${pricing.platform-fee-rate:2.0}")
+    private Double platformFeeRate;
 
     // ==================== Slot Configuration ====================
 
@@ -199,6 +204,9 @@ public class ResourceSlotService {
                 .filter(this::isBookingLockingSlot)
                 .toList();
 
+        // Get individually disabled slots for this resource on this date
+        List<DisabledSlot> disabledSlots = disabledSlotRepository.findByResourceIdAndDisabledDate(resourceId, date);
+
         // Get price rules
         List<ResourcePriceRule> priceRules = priceRuleRepository.findEnabledRulesByResourceId(resourceId);
         boolean isWeekend = isWeekend(date);
@@ -210,23 +218,47 @@ public class ResourceSlotService {
             boolean isBooked = bookings.stream().anyMatch(b ->
                     isTimeOverlap(slot.getStartTime(), slot.getEndTime(), b.getStartTime(), b.getEndTime()));
 
+            // Check if slot is individually disabled by admin
+            DisabledSlot matchingDisabledSlot = disabledSlots.stream()
+                    .filter(ds -> isTimeOverlap(slot.getStartTime(), slot.getEndTime(), ds.getStartTime(), ds.getEndTime()))
+                    .findFirst()
+                    .orElse(null);
+            boolean isDisabled = matchingDisabledSlot != null;
+
             SlotStatus status;
+            String statusReason = null;
             if (!config.isEnabled()) {
                 status = SlotStatus.DISABLED;
+                statusReason = "Slot configuration disabled";
+            } else if (isDisabled) {
+                status = SlotStatus.DISABLED;
+                statusReason = matchingDisabledSlot.getReason() != null
+                        ? matchingDisabledSlot.getReason()
+                        : "Disabled by admin";
             } else if (isBooked) {
                 status = SlotStatus.BOOKED;
+                statusReason = "Already booked";
             } else {
                 status = SlotStatus.AVAILABLE;
             }
 
             Double price = calculateSlotPrice(slot, config, priceRules, dayType);
+            double platformFee = Math.round(price * (platformFeeRate / 100) * 100.0) / 100.0;
+            double totalPrice = Math.round((price + platformFee) * 100.0) / 100.0;
 
             ResourceSlotDetailDto detail = ResourceSlotDetailDto.builder()
                     .slotId(resourceId + "-" + date + "-" + slot.getStartTime())
                     .startTime(slot.getStartTime().format(TIME_FORMATTER))
                     .endTime(slot.getEndTime().format(TIME_FORMATTER))
+                    .displayName(slot.getDisplayName())
+                    .durationMinutes(slot.getDurationMinutes())
+                    .basePrice(price)
+                    .totalPrice(totalPrice)
+                    .price(totalPrice)
                     .status(status)
-                    .price(price)
+                    .statusReason(statusReason)
+                    .isEnabled(!isDisabled && config.isEnabled() && !isBooked)
+                    .slotDate(date)
                     .build();
 
             details.add(detail);

@@ -71,7 +71,7 @@ public class CouponService {
     public List<CouponSummaryDto> getAllCoupons() {
         return couponRepository.findAllSummaries()
                 .stream()
-                .map(p -> new CouponSummaryDto(p.getId(), p.getCode(), p.getDescription()))
+                .map(p -> new CouponSummaryDto(p.getId(), p.getCode(), p.getDescription(), p.getExpiryDate()))
                 .collect(Collectors.toList());
     }
 
@@ -83,7 +83,7 @@ public class CouponService {
     public List<CouponSummaryDto> getAvailableCoupons() {
         return couponRepository.findAllAvailableSummaries(LocalDate.now())
                 .stream()
-                .map(p -> new CouponSummaryDto(p.getId(), p.getCode(), p.getDescription()))
+                .map(p -> new CouponSummaryDto(p.getId(), p.getCode(), p.getDescription(), p.getExpiryDate()))
                 .collect(Collectors.toList());
     }
 

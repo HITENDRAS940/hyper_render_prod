@@ -16,16 +16,16 @@ public interface CouponRepository extends JpaRepository<Coupon, Long> {
 
     boolean existsByCode(String code);
 
-    /** Admin view — all coupons, id + code + description only. */
-    @Query("SELECT c.id AS id, c.code AS code, c.description AS description FROM Coupon c ORDER BY c.id ASC")
+    /** Admin view — all coupons, id + code + description + expiryDate. */
+    @Query("SELECT c.id AS id, c.code AS code, c.description AS description, c.expiryDate AS expiryDate FROM Coupon c ORDER BY c.id ASC")
     List<CouponSummaryProjection> findAllSummaries();
 
     /**
      * Public view — only active coupons whose validity window is open right now.
-     * Fetches id, code, description — nothing else.
+     * Fetches id, code, description, expiryDate.
      */
     @Query("""
-            SELECT c.id AS id, c.code AS code, c.description AS description
+            SELECT c.id AS id, c.code AS code, c.description AS description, c.expiryDate AS expiryDate
             FROM Coupon c
             WHERE c.active = true
               AND c.expiryDate >= :today
