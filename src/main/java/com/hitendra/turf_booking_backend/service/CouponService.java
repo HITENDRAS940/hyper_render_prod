@@ -178,6 +178,68 @@ public class CouponService {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // USER — REMOVE COUPON
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Remove a previously applied coupon from a PENDING booking.
+     * Reverts the booking to its original amount and recalculates online/venue split.
+     * All amounts are persisted to DB.
+     *
+     * @param bookingId booking from which to remove the coupon
+     * @return amount breakdown after removing the coupon
+     */
+    @Transactional
+    public CouponApplyResponseDto removeCoupon(Long bookingId, User user) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BookingException("Booking not found"));
+
+        if (booking.getUser() == null || !booking.getUser().getId().equals(user.getId())) {
+            throw new BookingException("Access denied: You can only manage coupons for your own bookings");
+        }
+
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            throw new BookingException("Coupons can only be removed from PENDING bookings");
+        }
+
+        if (booking.getAppliedCouponCode() == null) {
+            throw new BookingException("No coupon has been applied to this booking");
+        }
+
+        // Capture details before clearing
+        String removedCouponCode = booking.getAppliedCouponCode();
+        BigDecimal discountRemoved = booking.getDiscountAmount() != null
+                ? booking.getDiscountAmount()
+                : BigDecimal.ZERO;
+
+        // Calculate original amount (before discount)
+        BigDecimal currentAmount = BigDecimal.valueOf(booking.getAmount());
+        BigDecimal originalAmount = currentAmount.add(discountRemoved);
+
+        // Recalculate online / venue split with original amount
+        double onlinePct = (booking.getService() != null && booking.getService().getOnlinePaymentPercent() != null)
+                ? booking.getService().getOnlinePaymentPercent()
+                : 20.0;
+        BigDecimal onlineAmountPaid = originalAmount
+                .multiply(BigDecimal.valueOf(onlinePct))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal venueAmountDue = originalAmount.subtract(onlineAmountPaid);
+
+        // Clear coupon and discount from booking
+        booking.setAppliedCouponCode(null);
+        booking.setDiscountAmount(BigDecimal.ZERO);
+        booking.setAmount(originalAmount.doubleValue());
+        booking.setOnlineAmountPaid(onlineAmountPaid);
+        booking.setVenueAmountDue(venueAmountDue);
+        bookingRepository.save(booking);
+
+        log.info("Coupon {} removed from booking {}. Restored original amount: {}",
+                removedCouponCode, bookingId, originalAmount);
+
+        return buildDiscountResponse(booking, originalAmount.doubleValue(), BigDecimal.ZERO, onlinePct);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // VALIDATION ENGINE
     // ══════════════════════════════════════════════════════════════════════════
 

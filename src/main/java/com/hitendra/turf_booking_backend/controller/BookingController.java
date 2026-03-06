@@ -89,4 +89,42 @@ public class BookingController {
         CouponApplyResponseDto response = couponService.applyCoupon(bookingId, code, currentUser);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Remove Coupon from Booking API
+     * Removes the applied coupon and restores the booking to its original amount.
+     * Safe to call multiple times - returns error if no coupon is applied.
+     */
+    @DeleteMapping("/{bookingId}/remove-coupon")
+    @Operation(summary = "Remove applied coupon from pending booking",
+               description = "Removes a previously applied coupon from a PENDING booking. " +
+                             "Reverts the booking to its original amount and recalculates the amount breakdown. " +
+                             "All amounts are persisted to DB.")
+    public ResponseEntity<CouponApplyResponseDto> removeCoupon(@PathVariable Long bookingId) {
+        User currentUser = authUtil.getCurrentUser();
+        CouponApplyResponseDto response = couponService.removeCoupon(bookingId, currentUser);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reapply Different Coupon API
+     * Removes the current coupon and applies a new one in a single operation.
+     * Useful when user wants to try a different coupon code.
+     */
+    @PostMapping("/{bookingId}/reapply-coupon")
+    @Operation(summary = "Remove current coupon and apply a different one",
+               description = "Convenience endpoint to replace an applied coupon with a different code. " +
+                             "Removes the existing coupon and validates + applies the new coupon code in a single operation. " +
+                             "Returns the revised amount breakdown with the new coupon applied. " +
+                             "If the new coupon is invalid or the booking doesn't have an applied coupon, returns an appropriate error.")
+    public ResponseEntity<CouponApplyResponseDto> reapplyCoupon(
+            @PathVariable Long bookingId,
+            @RequestParam String code) {
+        User currentUser = authUtil.getCurrentUser();
+        // First remove the existing coupon (if any)
+        couponService.removeCoupon(bookingId, currentUser);
+        // Then apply the new coupon
+        CouponApplyResponseDto response = couponService.applyCoupon(bookingId, code, currentUser);
+        return ResponseEntity.ok(response);
+    }
 }
