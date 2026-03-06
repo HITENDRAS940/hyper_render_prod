@@ -1519,6 +1519,8 @@ public class SlotBookingService {
                 .reference(booking.getReference())
                 .serviceId(booking.getService().getId())
                 .serviceName(booking.getService().getName())
+                .resourceId(booking.getResource() != null ? booking.getResource().getId() : null)
+                .resourceName(booking.getResource() != null ? booking.getResource().getName() : null)
                 .startTime(booking.getStartTime().format(TIME_FORMATTER))
                 .endTime(booking.getEndTime().format(TIME_FORMATTER))
                 .bookingDate(booking.getBookingDate())
