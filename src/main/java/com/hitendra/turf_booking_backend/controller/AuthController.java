@@ -4,13 +4,18 @@ import com.hitendra.turf_booking_backend.dto.auth.*;
 import com.hitendra.turf_booking_backend.service.AppleAuthService;
 import com.hitendra.turf_booking_backend.service.AuthService;
 import com.hitendra.turf_booking_backend.service.EmailOtpService;
+import com.hitendra.turf_booking_backend.util.JwtUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
@@ -22,6 +27,7 @@ public class AuthController {
     private final AuthService authService;
     private final EmailOtpService emailOtpService;
     private final AppleAuthService appleAuthService;
+    private final JwtUtils jwtUtils;
 
     @PostMapping("/request-otp")
     @Operation(summary = "Request OTP", description = "Send OTP to user's phone number")
@@ -56,6 +62,28 @@ public class AuthController {
     ) {
         JwtResponseDto response = emailOtpService.verifyEmailOtp(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
+    @Operation(
+        summary = "Refresh JWT Token",
+        description = "Exchange a valid (or recently expired) JWT for a brand-new one with a fresh expiration. " +
+                      "Pass the current token in the Authorization header as 'Bearer <token>'."
+    )
+    public ResponseEntity<Map<String, String>> refreshToken(HttpServletRequest request) {
+        String header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Missing or invalid Authorization header"));
+        }
+        String token = header.substring(7);
+        if (!jwtUtils.validateJwtToken(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Token is invalid or expired"));
+        }
+        String newToken = jwtUtils.refreshToken(token);
+        log.info("Token refreshed for user: {}", jwtUtils.getEmailFromJwtToken(newToken));
+        return ResponseEntity.ok(Map.of("token", newToken));
     }
 
     @PostMapping("/apple")

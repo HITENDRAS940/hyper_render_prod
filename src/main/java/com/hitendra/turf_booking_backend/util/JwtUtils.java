@@ -20,7 +20,7 @@ public class JwtUtils {
     private String jwtSecret;
 
     @Value("${app.jwt.expiration-ms}")
-    private int jwtExpirationMs;
+    private long jwtExpirationMs;
 
     /**
      * Generate JWT token from email, role, userId, name, and phone
@@ -131,6 +131,25 @@ public class JwtUtils {
         } catch (Exception e) {
             return true;
         }
+    }
+
+    /**
+     * Refresh a token by re-issuing it with a fresh expiration date.
+     * Extracts all existing claims and signs a new token.
+     */
+    public String refreshToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
     }
 }
 
