@@ -4,6 +4,7 @@ import com.hitendra.turf_booking_backend.dto.booking.BookingResponseDto;
 import com.hitendra.turf_booking_backend.dto.booking.UserBookingDto;
 import com.hitendra.turf_booking_backend.dto.user.DeleteProfileRequest;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
+import com.hitendra.turf_booking_backend.dto.user.UserBasicInfoDto;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserProfileRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserProfileDto;
 import com.hitendra.turf_booking_backend.security.service.UserDetailsImplementation;
@@ -35,6 +36,14 @@ public class UserController {
     private final UserProfileService userProfileService;
 
     private final InvoiceService invoiceService;
+
+    @GetMapping("/basic-info")
+    @Operation(summary = "Get user basic info",
+               description = "Get the name and phone number of the current logged-in user.")
+    public ResponseEntity<UserBasicInfoDto> getUserBasicInfo() {
+        UserBasicInfoDto basicInfo = userService.getUserBasicInfo();
+        return ResponseEntity.ok(basicInfo);
+    }
 
     @PutMapping("/basic-info")
     @Operation(summary = "Update user basic info",

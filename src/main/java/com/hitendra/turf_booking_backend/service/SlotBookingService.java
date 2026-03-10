@@ -1443,6 +1443,21 @@ public class SlotBookingService {
         return "BK" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
+    /**
+     * Build UserInfo from User entity
+     */
+    private BookingResponseDto.UserInfo buildUserInfo(User user) {
+        if (user == null) {
+            return null;
+        }
+        return BookingResponseDto.UserInfo.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .build();
+    }
+
 
     /**
      * Convert booking to response DTO.
@@ -1529,6 +1544,7 @@ public class SlotBookingService {
                 .pricingType(pricingTypeName)
                 .numberOfPersons(numberOfPersons)
                 .status(booking.getStatus().name())
+                .user(buildUserInfo(booking.getUser()))
                 .build();
     }
 

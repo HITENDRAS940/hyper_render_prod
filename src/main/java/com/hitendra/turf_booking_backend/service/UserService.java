@@ -2,6 +2,7 @@ package com.hitendra.turf_booking_backend.service;
 
 import com.hitendra.turf_booking_backend.dto.common.PaginatedResponse;
 import com.hitendra.turf_booking_backend.dto.user.UpdateUserBasicInfoDto;
+import com.hitendra.turf_booking_backend.dto.user.UserBasicInfoDto;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
 import com.hitendra.turf_booking_backend.entity.Role;
 import com.hitendra.turf_booking_backend.entity.User;
@@ -97,8 +98,19 @@ public class UserService {
     }
 
     /**
+     * Get user's basic information (name and phone)
+     */
+    public UserBasicInfoDto getUserBasicInfo() {
+        User loggedInUser = authUtil.getCurrentUser();
+        return UserBasicInfoDto.builder()
+                .name(loggedInUser.getName())
+                .phone(loggedInUser.getPhone())
+                .build();
+    }
+
+    /**
      * Update user's basic information (name and/or phone)
-     * Either field can be updated independently
+     * Both fields are optional - update only the fields that are provided
      */
     public String updateUserBasicInfo(@Valid UpdateUserBasicInfoDto updateDto) {
         User loggedInUser = authUtil.getCurrentUser();
