@@ -77,9 +77,9 @@ public class AuthController {
                     .body(Map.of("error", "Missing or invalid Authorization header"));
         }
         String token = header.substring(7);
-        if (!jwtUtils.validateJwtToken(token)) {
+        if (!jwtUtils.validateJwtTokenForRefresh(token)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Token is invalid or expired"));
+                    .body(Map.of("error", "Token is invalid or cannot be refreshed"));
         }
         String newToken = jwtUtils.refreshToken(token);
         log.info("Token refreshed for user: {}", jwtUtils.getEmailFromJwtToken(newToken));

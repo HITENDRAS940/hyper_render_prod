@@ -102,6 +102,26 @@ public class JwtUtils {
     }
 
     /**
+     * Validate token specifically for refresh flow.
+     * Expired tokens are accepted if signature/structure is still valid.
+     */
+    public boolean validateJwtTokenForRefresh(String authToken) {
+        try {
+            extractClaimsAllowExpired(authToken);
+            return true;
+        } catch (MalformedJwtException e) {
+            logger.error("Invalid JWT token for refresh: {}", e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            logger.error("JWT token is unsupported for refresh: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            logger.error("JWT claims string is empty for refresh: {}", e.getMessage());
+        } catch (Exception e) {
+            logger.error("JWT refresh validation error: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    /**
      * Get signing key from secret
      */
     private SecretKey getSigningKey() {
@@ -138,11 +158,7 @@ public class JwtUtils {
      * Extracts all existing claims and signs a new token.
      */
     public String refreshToken(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+        Claims claims = extractClaimsAllowExpired(token);
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -150,6 +166,19 @@ public class JwtUtils {
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    private Claims extractClaimsAllowExpired(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(getSigningKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (ExpiredJwtException e) {
+            // For refresh flow, we still trust claims from a signature-verified expired token.
+            return e.getClaims();
+        }
     }
 }
 
