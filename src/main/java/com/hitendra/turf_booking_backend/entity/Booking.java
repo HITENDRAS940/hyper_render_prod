@@ -5,8 +5,6 @@ import lombok.*;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "bookings", indexes = {
@@ -197,4 +195,10 @@ public class Booking {
      */
     @Column(name = "applied_coupon_code")
     private String appliedCouponCode;
+
+    /**
+     * Marker used by pending-booking reminder scheduler to avoid duplicate reminders.
+     */
+    @Column(name = "pending_reminder_sent_at")
+    private Instant pendingReminderSentAt;
 }

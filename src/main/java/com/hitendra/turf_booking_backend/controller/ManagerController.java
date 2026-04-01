@@ -28,6 +28,7 @@ import com.hitendra.turf_booking_backend.dto.user.AdminProfileDto;
 import com.hitendra.turf_booking_backend.dto.user.CreateAdminRequest;
 import com.hitendra.turf_booking_backend.dto.user.UserInfoDto;
 import com.hitendra.turf_booking_backend.service.*;
+import com.hitendra.turf_booking_backend.dto.notification.ManagerCustomNotificationRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -64,6 +65,7 @@ public class ManagerController {
     private final AdminFinancialService adminFinancialService;
     private final AppConfigService appConfigService;
     private final CouponService couponService;
+    private final NotificationService notificationService;
 
     @PostMapping("/admins")
     @Operation(summary = "Create admin", description = "Create a new admin user")
@@ -733,5 +735,22 @@ public class ManagerController {
     @Operation(summary = "Activate Coupon", description = "Re-enable a previously deactivated coupon")
     public ResponseEntity<CouponDto> activateCoupon(@PathVariable Long id) {
         return ResponseEntity.ok(couponService.activateCoupon(id));
+    }
+
+    // ==================== Notifications ====================
+
+    @PostMapping("/notifications/users/publish")
+    @Operation(summary = "Publish custom notification to users",
+            description = "Send a custom push notification to selected users or broadcast to all users with active push tokens.")
+    public ResponseEntity<String> publishCustomNotificationToUsers(
+            @Valid @RequestBody ManagerCustomNotificationRequest request) {
+
+        int sentCount = notificationService.sendCustomNotificationToUsers(
+                request.getTitle(),
+                request.getBody(),
+                request.getUserIds(),
+                request.getData());
+
+        return ResponseEntity.ok("Notification published to " + sentCount + " device(s)");
     }
 }

@@ -12,6 +12,7 @@ import com.hitendra.turf_booking_backend.service.BookingService;
 import com.hitendra.turf_booking_backend.service.InvoiceService;
 import com.hitendra.turf_booking_backend.service.UserProfileService;
 import com.hitendra.turf_booking_backend.service.UserService;
+import com.hitendra.turf_booking_backend.service.UserPushTokenService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -36,6 +37,8 @@ public class UserController {
     private final UserProfileService userProfileService;
 
     private final InvoiceService invoiceService;
+
+    private final UserPushTokenService userPushTokenService;
 
     @GetMapping("/basic-info")
     @Operation(summary = "Get user basic info",
@@ -145,6 +148,32 @@ public class UserController {
                 "Your past bookings are retained only in an anonymous form for legal and accounting purposes and are no longer linked to you." +
                 "This action cannot be undone."
                 );
+    }
+
+    // ==================== Push Notification Token Management ====================
+
+    @PostMapping("/push-token")
+    @Operation(summary = "Save User Push Token", description = "Register a push notification token for the current user")
+    public ResponseEntity<Void> savePushToken(@RequestBody java.util.Map<String, String> payload) {
+        String token = payload.get("token");
+        if (token == null || token.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Long userId = getCurrentUserId();
+        userPushTokenService.saveToken(userId, token);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/push-token")
+    @Operation(summary = "Remove User Push Token", description = "Remove a push notification token on logout")
+    public ResponseEntity<Void> removePushToken(@RequestBody java.util.Map<String, String> payload) {
+        String token = payload.get("token");
+        if (token != null && !token.isEmpty()) {
+            Long userId = getCurrentUserId();
+            userPushTokenService.removeTokenForUser(userId, token);
+        }
+        return ResponseEntity.ok().build();
     }
 
     private Long getCurrentUserId() {

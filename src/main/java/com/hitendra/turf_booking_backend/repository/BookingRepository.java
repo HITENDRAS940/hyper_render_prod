@@ -152,6 +152,22 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findStalePendingBookings(@Param("threshold") Instant threshold);
 
     /**
+     * Find pending bookings that are old enough for reminder and not reminded yet.
+     * Uses pageable to cap scheduler workload per run.
+     */
+    @Query("""
+        SELECT b FROM Booking b
+        JOIN FETCH b.user u
+        JOIN FETCH b.service s
+        WHERE b.status = 'PENDING'
+        AND b.user IS NOT NULL
+        AND b.pendingReminderSentAt IS NULL
+        AND b.createdAt <= :threshold
+        ORDER BY b.createdAt ASC
+        """)
+    List<Booking> findPendingBookingsForReminder(@Param("threshold") Instant threshold, Pageable pageable);
+
+    /**
      * Get paginated lightweight booking list for a user (projection-based).
      */
     @Query("""
