@@ -5,6 +5,7 @@ import com.hitendra.turf_booking_backend.dto.auth.JwtResponseDto;
 import com.hitendra.turf_booking_backend.dto.auth.RequestEmailOtpDto;
 import com.hitendra.turf_booking_backend.dto.auth.VerifyEmailOtpDto;
 import com.hitendra.turf_booking_backend.entity.Otp;
+import com.hitendra.turf_booking_backend.entity.Role;
 import com.hitendra.turf_booking_backend.entity.User;
 import com.hitendra.turf_booking_backend.exception.AuthException;
 import com.hitendra.turf_booking_backend.repository.OtpRepository;
@@ -33,6 +34,7 @@ public class EmailOtpService {
     // Test accounts that bypass OTP and generate token directly
     private static final String GOOGLE_TEST_EMAIL = "googletest@hyper.com";
     private static final String RAZORPAY_TEST_EMAIL = "appletest@hyper.com";
+    private static final String ADMIN_TEST_EMAIL = "testadmin@hyper.com";
 
     /**
      * Request OTP for email
@@ -185,7 +187,8 @@ public class EmailOtpService {
      */
     private boolean isTestAccount(String email) {
         return GOOGLE_TEST_EMAIL.equalsIgnoreCase(email) ||
-               RAZORPAY_TEST_EMAIL.equalsIgnoreCase(email);
+               RAZORPAY_TEST_EMAIL.equalsIgnoreCase(email) ||
+               ADMIN_TEST_EMAIL.equalsIgnoreCase(email);
     }
 
     /**
@@ -202,14 +205,31 @@ public class EmailOtpService {
             // REGISTRATION FLOW: Create new user
             log.info("New test user registration via email: {}", email);
 
-            // Determine name based on email
-            String name = email.equals(GOOGLE_TEST_EMAIL) ? "Google Test User" : "Razorpay Test User";
+            // Determine name and role based on email
+            String name;
+            String role = null;
+
+            if (email.equals(GOOGLE_TEST_EMAIL)) {
+                name = "Google Test User";
+            } else if (email.equals(RAZORPAY_TEST_EMAIL)) {
+                name = "Razorpay Test User";
+            } else if (email.equals(ADMIN_TEST_EMAIL)) {
+                name = "Admin Test User";
+                role = "ADMIN"; // Set admin role
+            } else {
+                name = "Test User";
+            }
 
             user = User.builder()
                     .email(email)
                     .name(name)
                     .emailVerified(true)
                     .build();
+
+            // Set admin role if this is the admin test account
+            if (role != null && role.equals("ADMIN")) {
+                user.setRole(Role.ADMIN);
+            }
 
             user = userRepository.save(user);
             isNewUser = true;
