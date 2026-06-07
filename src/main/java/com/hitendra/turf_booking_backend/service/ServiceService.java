@@ -790,9 +790,17 @@ public class ServiceService {
     /**
      * Search services by date, time range, and activity availability.
      *
-     * OPTIMIZED APPROACH (Single SQL Query):
-     * Uses a single database query to find services that match the criteria and do NOT have
-     * any overlapping bookings or disabled slots.
+     * OPTIMIZED APPROACH (Two-Step Query):
+     * Step 1: Get only service IDs matching the complex availability criteria
+     * Step 2: Batch-load full service entities by IDs (fetches images in a single query batch)
+     *
+     * Result: Eliminates N+1 queries that occur when loading images for each service
+     *
+     * @param date
+     * @param startTime
+     * @param endTime
+     * @param city
+     * @param activityCode
      */
     public List<ServiceSearchDto> searchServicesByAvailability(LocalDate date, LocalTime startTime, LocalTime endTime, String city, String activityCode) {
         // Handle empty strings as null for the repository query
@@ -818,10 +826,23 @@ public class ServiceService {
             return new ArrayList<>();
         }
 
-        // Execute single optimized query with DTO projection
-        return serviceRepository.findAvailableServicesDto(
+        // Step 1: Get service IDs matching availability criteria
+        List<Long> availableServiceIds = serviceRepository.findAvailableServiceIds(
                 date, effectiveStartTime, effectiveEndTime, searchCity, searchActivity
         );
+
+        // If no services found, return empty list
+        if (availableServiceIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // Step 2: Batch-load full service entities by IDs (with images loaded in single query)
+        List<Service> availableServices = serviceRepository.findAvailableServicesByIds(availableServiceIds);
+
+        // Convert to DTOs with images included
+        return availableServices.stream()
+                .map(this::convertToSearchDtoWithImages)
+                .collect(Collectors.toList());
     }
 
     /**
@@ -846,6 +867,20 @@ public class ServiceService {
         dto.setId(service.getId());
         dto.setName(service.getName());
         dto.setLocation(service.getLocation());
+        return dto;
+    }
+
+    /**
+     * Convert Service entity to ServiceSearchDto including images (for availability search)
+     * OPTIMIZED: This is used with batch-loaded services to avoid N+1 queries
+     */
+    private ServiceSearchDto convertToSearchDtoWithImages(Service service) {
+        ServiceSearchDto dto = new ServiceSearchDto();
+        dto.setId(service.getId());
+        dto.setName(service.getName());
+        dto.setLocation(service.getLocation());
+        dto.setAvailability(service.isAvailability());
+        dto.setImages(service.getImages());
         return dto;
     }
 }

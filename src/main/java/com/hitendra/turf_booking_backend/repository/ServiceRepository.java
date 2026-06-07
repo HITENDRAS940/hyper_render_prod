@@ -64,9 +64,11 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
             @Param("activityCode") String activityCode
     );
 
-    @Query("SELECT new com.hitendra.turf_booking_backend.dto.service.ServiceSearchDto(" +
-            "s.id, s.name, s.location, s.availability) " +
-            "FROM Service s WHERE " +
+    /**
+     * Get available service IDs (Step 1) - avoids JOIN with images table
+     * OPTIMIZED: Returns only service IDs matching availability criteria for the given date/time
+     */
+    @Query("SELECT DISTINCT s.id FROM Service s WHERE " +
             "s.availability = true AND " +
             "(:city IS NULL OR LOWER(s.city) = LOWER(:city)) AND " +
             "(:activityCode IS NULL OR EXISTS (SELECT a FROM s.activities a WHERE a.code = :activityCode)) AND " +
@@ -83,13 +85,24 @@ public interface ServiceRepository extends JpaRepository<Service, Long> {
             "   AND (:activityCode IS NULL OR EXISTS (SELECT a FROM ds.resource.activities a WHERE a.code = :activityCode)) " +
             "   AND ds.startTime < :endTime AND ds.endTime > :startTime" +
             ")")
-    List<com.hitendra.turf_booking_backend.dto.service.ServiceSearchDto> findAvailableServicesDto(
+    List<Long> findAvailableServiceIds(
             @Param("date") LocalDate date,
             @Param("startTime") java.time.LocalTime startTime,
             @Param("endTime") java.time.LocalTime endTime,
             @Param("city") String city,
             @Param("activityCode") String activityCode
     );
+
+    /**
+     * Get complete service entities by IDs (Step 2) - fetches services with images in batch
+     * OPTIMIZED: Batch-loads all services with images to avoid N+1 query
+     */
+    @Query("""
+        SELECT s
+        FROM Service s
+        WHERE s.id IN :ids
+        """)
+    List<Service> findAvailableServicesByIds(@Param("ids") List<Long> ids);
 
     // ==================== OPTIMIZED PROJECTION QUERIES ====================
 
